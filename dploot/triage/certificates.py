@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption,
 from pyasn1.codec.der import decoder
 from pyasn1.type.char import UTF8String
 
-from dploot.lib.crypto import CERTBLOB, SYSTEMCERTBLOB
+from dploot.lib.crypto import CERTBLOB
 from dploot.lib.dpapi import decrypt_privatekey, find_masterkey_for_privatekey_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -89,9 +89,11 @@ class CertificatesTriage:
                 _, certblob_bytes = rrp.hBaseRegQueryValue(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, 'Blob')
                 with open('temp','wb') as f:
                     f.write(certblob_bytes)
-                certblob = SYSTEMCERTBLOB(certblob_bytes)
-                cert = self.der_to_cert(certblob['DER'])
-                certificates[certificate_key] = cert
+                certblob = CERTBLOB(certblob_bytes)
+
+                if certblob.der is not None:
+                    cert = self.der_to_cert(certblob.der)
+                    certificates[certificate_key] = cert
                 rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
         except rrp.DCERPCSessionError as e:
             if e.error_code == 2:
@@ -153,8 +155,9 @@ class CertificatesTriage:
                         certbytes = self.conn.readFile(self.share, certpath)
                         self.looted_files[certname] = certbytes
                         certblob = CERTBLOB(certbytes)
-                        cert = self.der_to_cert(certblob['DER'])
-                        certificates[certname] = cert
+                        if certblob.der is not None:
+                            cert = self.der_to_cert(certblob.der)
+                            certificates[certname] = cert
         return certificates
 
     def correlate_certificates_and_privatekeys(self, certificates: Dict[str, x509.Certificate], private_keys: Dict[str, Tuple[str,RSA.RsaKey]]) -> None:
@@ -186,7 +189,7 @@ class CertificatesTriage:
                 print((cert.public_bytes(Encoding.PEM).decode('utf-8')))
 
                 if not clientauth:
-                    ask = input('Certificate without client authentication EKU. Write to PFX anyway ? [Yes / [No]]')
+                    ask = input('Certificate without client authentication EKU. Write to PFX anyway ? [Yes / [No]] ')
                     if ask.upper() not in ["Y", "YES"]:
                         return
 

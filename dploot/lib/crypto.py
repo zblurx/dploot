@@ -10,111 +10,36 @@ from impacket.structure import Structure
 # https://blog.nviso.eu/2019/08/28/extracting-certificates-from-the-windows-registry/
 # https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-gpef/e051aba9-c9df-4f82-a42a-c13012c9d381
 # WARNING: CRAPPY STRUCT INCOMING
-class CERTBLOB(Structure):
+class CERTBLOB_PROPERTY(Structure):
     structure = (
-        ('Unk1Type', '<II=0'),
-        ('Unk1Len', '<I=0'),
-        ('_Unk1', '_-Unk1', 'self["Unk1Len"]'),
-        ('Unk1', ':'),
-        ('Unk2Type', '<II=0'),
-        ('Unk2Len', '<I=0'),
-        ('_Unk2', '_-Unk2', 'self["Unk2Len"]'),
-        ('Unk2', ':'),
-        ('Unk3Type', '<II=0'),
-        ('Unk3Len', '<I=0'),
-        ('_Unk3', '_-Unk3', 'self["Unk3Len"]'),
-        ('Unk3', ':'),
-        ('Unk4Type', '<II=0'),
-        ('Unk4Len', '<I=0'),
-        ('_Unk4', '_-Unk4', 'self["Unk4Len"]'),
-        ('Unk4', ':'),
-        ('Unk5Type', '<II=0'),
-        ('Unk5Len', '<I=0'),
-        ("_Unk5", "_-Unk5", 'self["Unk5Len"]'),
-        ("Unk5", ':'),
-        ('Unk6Type', '<II=0'),
-        ('Unk6Len', '<I=0'),
-        ("_Unk6", "_-Unk6", 'self["Unk6Len"]'),
-        ("Unk6", ':'),
-        ('Unk7Type', '<II=0'),
-        ('Unk7Len', '<I=0'),
-        ("_Unk7", "_-Unk7", 'self["Unk7Len"]'),
-        ("Unk7", ':'),
-        ('Unk8Type', '<II=0'),
-        ('Unk8Len', '<I=0'),
-        ("_Unk8", "_-Unk8", 'self["Unk8Len"]'),
-        ("Unk8", ':'),
-        ('Unk9Type', '<II=0'),
-        ('Unk9Len', '<I=0'),
-        ("_Unk9", "_-Unk9", 'self["Unk9Len"]'),
-        ("Unk9", ':'),
-        ('Unk10Type', '<II=0'),
-        ('Unk10Len', '<I=0'),
-        ("_Unk10", "_-Unk10", 'self["Unk10Len"]'),
-        ("Unk10", ':'),
-        ('DERType', '<II=0'),
-        ('DERLen', '<I=0'),
-        ('_DER', '_-DER', 'self["DERLen"]'),
-        ('DER', ':'),
+        ('PropertyID', '<I=0'),
+        ('Reserved', '<I=0'),
+        ('Length', '<I=0'),
+        ('_Value','_-Value', 'self["Length"]'),
+        ('Value',':')
     )
 
-    def dump(self):
-        print("DER             : %s " % (self['DER']))
-
-class SYSTEMCERTBLOB(Structure):
-    structure = (
-        ('Unk1Type', '<II=0'),
-        ('Unk1Len', '<I=0'),
-        ('_Unk1', '_-Unk1', 'self["Unk1Len"]'),
-        ('Unk1', ':'),
-        ('Unk2Type', '<II=0'),
-        ('Unk2Len', '<I=0'),
-        ('_Unk2', '_-Unk2', 'self["Unk2Len"]'),
-        ('Unk2', ':'),
-        ('Unk3Type', '<II=0'),
-        ('Unk3Len', '<I=0'),
-        ('_Unk3', '_-Unk3', 'self["Unk3Len"]'),
-        ('Unk3', ':'),
-        ('Unk4Type', '<II=0'),
-        ('Unk4Len', '<I=0'),
-        ('_Unk4', '_-Unk4', 'self["Unk4Len"]'),
-        ('Unk4', ':'),
-        ('Unk5Type', '<II=0'),
-        ('Unk5Len', '<I=0'),
-        ("_Unk5", "_-Unk5", 'self["Unk5Len"]'),
-        ("Unk5", ':'),
-        ('Unk6Type', '<II=0'),
-        ('Unk6Len', '<I=0'),
-        ("_Unk6", "_-Unk6", 'self["Unk6Len"]'),
-        ("Unk6", ':'),
-        ('Unk7Type', '<II=0'),
-        ('Unk7Len', '<I=0'),
-        ("_Unk7", "_-Unk7", 'self["Unk7Len"]'),
-        ("Unk7", ':'),
-        ('Unk8Type', '<II=0'),
-        ('Unk8Len', '<I=0'),
-        ("_Unk8", "_-Unk8", 'self["Unk8Len"]'),
-        ("Unk8", ':'),
-        ('Unk9Type', '<II=0'),
-        ('Unk9Len', '<I=0'),
-        ("_Unk9", "_-Unk9", 'self["Unk9Len"]'),
-        ("Unk9", ':'),
-        ('Unk10Type', '<II=0'),
-        ('Unk10Len', '<I=0'),
-        ("_Unk10", "_-Unk10", 'self["Unk10Len"]'),
-        ("Unk10", ':'),
-        ('Unk11Type', '<II=0'),
-        ('Unk11Len', '<I=0'),
-        ("_Unk11", "_-Unk11", 'self["Unk11Len"]'),
-        ("Unk11", ':'),
-        ('DERType', '<II=0'),
-        ('DERLen', '<I=0'),
-        ('_DER', '_-DER', 'self["DERLen"]'),
-        ('DER', ':'),
-    )
+class CERTBLOB():
+    def __init__(self, data = None, alignment = 0):
+        self.attributes = 0
+        self.der = None
+        if data is not None:
+            self.attributes = list()
+            remaining = data
+            while len(remaining) > 0:
+                attr = CERTBLOB_PROPERTY(remaining)
+                self.attributes.append(attr)
+                if attr["PropertyID"] == 32:
+                    self.der = attr["Value"]
+                remaining = remaining[len(attr):] 
 
     def dump(self):
-        print("DER             : %s " % (self['DER']))
+        print('[CERTBLOB]')
+        for attr in self.attributes:
+            print("%s:\t\t%s" % (attr['PropertyID'],attr['Value']))
+        if self.der is not None:
+            print('')
+            print("DER             : %s " % (self.der))
 
 # https://github.com/SecureAuthCorp/impacket/pull/1120
 # Private Decrypted Private Key 
