@@ -82,7 +82,7 @@ The goal of dploot is to simplify DPAPI related loot from a Linux box. As SharpD
 
 If you have domain admin privileges, you can obtain the domain DPAPI backup key with the backupkey command. This key can decrypt any DPAPI masterkeys for domain users and computers, and it will never change. Therefore, this key allow attacker to loot any DPAPI protected password realted to a domain user.
 
-If domain admin privileges have not been obtained (yet), using Mimikatz' sekurlsa::dpapi command will retrieve DPAPI masterkey {GUID}:SHA1 mappings of any loaded master keys (user and SYSTEM) on a given system (tip: running dpapi::cache after key extraction will give you a nice table). If you change these keys to a {GUID1}:SHA1 {GUID2}:SHA1... type format, they can be supplied to dploot to triage the box.
+If domain admin privileges have not been obtained (yet), using Mimikatz' sekurlsa::dpapi command will retrieve DPAPI masterkey {GUID}:SHA1 mappings of any loaded master keys (user and SYSTEM) on a given system (tip: running dpapi::cache after key extraction will give you a nice table). If you change these keys to a {GUID1}:SHA1 {GUID2}:SHA1... type format, they can be supplied to dploot to triage the box. A [pull request](https://github.com/Hackndo/lsassy/pull/71) has been merged to [lsassy](https://github.com/Hackndo/lsassy) to collect masterkeys.
 
 ## Commands
 
@@ -114,7 +114,7 @@ $ dploot masterkeys waza.local/Administrator:'Password!123'@192.168.57.5 -pvk ke
 *With password*:
 
 ```text
-$ cat passwords -p
+$ cat passwords
 jsmith:Password#123
 $ dploot masterkeys waza.local/jsmith:Password#123@192.168.56.14 -passwords passwords
 [*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
