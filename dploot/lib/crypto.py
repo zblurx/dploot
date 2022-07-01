@@ -193,7 +193,6 @@ class PVKHeader(Structure):
         ('FlagsLen', '<L=0'),
         ('_Description', '_-Description', 'self["descrLen"]'),
         ('Description', ':'),
-        ('unk2', '<LLLLL=0'),
 
         ('Remaining', ':'),
 

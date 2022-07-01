@@ -148,8 +148,9 @@ def decrypt_privatekey(privatekey_bytes:bytes, masterkey:str, cng: bool = False)
     return pkcs1
 
 def find_masterkey_for_privatekey_blob(privatekey_bytes:bytes, masterkeys:list, cng: bool = False) -> Any:
-    
     blob= PVKHeader(privatekey_bytes)
+    if len(blob['Remaining']) == 0:
+        return None
     if blob['SigHeadLen'] > 0:
         blob=PVKFile_SIG(privatekey_bytes)
     else:
