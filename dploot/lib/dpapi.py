@@ -21,7 +21,6 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
     data = data[len(mkf):]
     if mkf['MasterKeyLen'] > 0:
         mk = MasterKey(data[:mkf['MasterKeyLen']])
-        # mk.dump()
         data = data[len(mk):]
 
     if mkf['BackupKeyLen'] > 0:
@@ -66,6 +65,19 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
 
     if dpapi_systemkey is not None and sid != '':
         key1, key2 = deriveKeysFromUserkey(sid, dpapi_systemkey['UserKey'])
+        decryptedKey = mk.decrypt(key1)
+        if decryptedKey:
+            return decryptedKey
+        decryptedKey = mk.decrypt(key2)
+        if decryptedKey:
+            return decryptedKey
+        decryptedKey = bkmk.decrypt(key1)
+        if decryptedKey:
+            return decryptedKey
+        decryptedKey = bkmk.decrypt(key2)
+        if decryptedKey:
+            return decryptedKey
+        key1, key2 = deriveKeysFromUserkey(sid, dpapi_systemkey['MachineKey'])
         decryptedKey = mk.decrypt(key1)
         if decryptedKey:
             return decryptedKey
@@ -217,7 +229,6 @@ def find_masterkey_for_vpol_blob(vault_bytes:bytes, masterkeys:list) -> Any:
 
 def decrypt_blob(blob_bytes:bytes, masterkey:str, entropy = None) -> Any:
     blob = DPAPI_BLOB(blob_bytes)
-
     key = unhexlify(masterkey)
     decrypted = None
     if entropy is not None:
