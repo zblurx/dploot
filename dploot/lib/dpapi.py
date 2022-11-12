@@ -135,7 +135,7 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
             
     return None
 
-def decrypt_credential(credential_bytes:bytes, masterkey:str) -> Any:
+def decrypt_credential(credential_bytes:bytes, masterkey:MasterKey) -> Any:
     cred = CredentialFile(credential_bytes)
     decrypted = decrypt_blob(cred['Data'],masterkey=masterkey)
     if decrypted is not None:
@@ -143,23 +143,23 @@ def decrypt_credential(credential_bytes:bytes, masterkey:str) -> Any:
         return creds
     return None
 
-def find_masterkey_for_credential_blob(credential_bytes:bytes, masterkeys:list) -> Any:
+def find_masterkey_for_credential_blob(credential_bytes:bytes, masterkeys: Any) -> Any | None:
     cred = CredentialFile(credential_bytes)
     return find_masterkey_for_blob(cred['Data'], masterkeys=masterkeys)
 
-def decrypt_privatekey(privatekey_bytes:bytes, masterkey:str, cng: bool = False) -> RSA.RsaKey:
+def decrypt_privatekey(privatekey_bytes:bytes, masterkey:Any, cng: bool = False) -> RSA.RsaKey:
     blob= PVKHeader(privatekey_bytes)
     if blob['SigHeadLen'] > 0:
         blob=PVKFile_SIG(privatekey_bytes)
     else:
         blob=PVKFile(privatekey_bytes)
-    key = unhexlify(masterkey)
+    key = unhexlify(masterkey.sha1)
     decrypted = decrypt(blob['Blob'], key)
     rsa_temp = PRIVATE_KEY_RSA(decrypted)
     pkcs1 = pvkblob_to_pkcs1(rsa_temp)
     return pkcs1
 
-def find_masterkey_for_privatekey_blob(privatekey_bytes:bytes, masterkeys:list, cng: bool = False) -> Any:
+def find_masterkey_for_privatekey_blob(privatekey_bytes:bytes, masterkeys: List[Any], cng: bool = False) -> Any | None:
     blob= PVKHeader(privatekey_bytes)
     if len(blob['Remaining']) == 0:
         return None
@@ -169,18 +169,13 @@ def find_masterkey_for_privatekey_blob(privatekey_bytes:bytes, masterkeys:list, 
         blob=PVKFile(privatekey_bytes)
     
     masterkey = bin_to_string(blob['Blob']['GuidMasterKey'])
+    return find_masterkey(masterkey=masterkey, masterkeys=masterkeys)
 
-    for mk in masterkeys:
-        mksplit = mk.split(':')
-        if '{%s}' % masterkey.lower() == mksplit[0].lower():
-            return mksplit[1] 
-    return None
-
-def decrypt_vpol(vpol_bytes:bytes, masterkey:str) -> (VAULT_VPOL_KEYS | None):
+def decrypt_vpol(vpol_bytes:bytes, masterkey:Any) -> (VAULT_VPOL_KEYS | None):
     vpol = VAULT_VPOL(vpol_bytes)
     blob = vpol['Blob']
 
-    key = unhexlify(masterkey)
+    key = unhexlify(masterkey.sha1)
     decrypted = decrypt(blob, key)
     if decrypted is not None:
         vpol_decrypted = VAULT_VPOL_KEYS(decrypted)
@@ -217,19 +212,15 @@ def decrypt_vcrd(vcrd_bytes:bytes, vpol_keys:List[bytes]) -> Any:
                 pass
     return None
 
-def find_masterkey_for_vpol_blob(vault_bytes:bytes, masterkeys:list) -> Any:
+def find_masterkey_for_vpol_blob(vault_bytes:bytes, masterkeys: Any) -> Any | None:
     vault = VAULT_VPOL(vault_bytes)
     blob = vault['Blob']
     masterkey = bin_to_string(blob['GuidMasterKey'])
-    for mk in masterkeys:
-        mksplit = mk.split(':')
-        if '{%s}' % masterkey.lower() == mksplit[0].lower():
-            return mksplit[1] 
-    return None
+    return find_masterkey(masterkey=masterkey, masterkeys=masterkeys)
 
-def decrypt_blob(blob_bytes:bytes, masterkey:str, entropy = None) -> Any:
+def decrypt_blob(blob_bytes:bytes, masterkey:Any, entropy = None) -> Any:
     blob = DPAPI_BLOB(blob_bytes)
-    key = unhexlify(masterkey)
+    key = unhexlify(masterkey.sha1)
     decrypted = None
     if entropy is not None:
         decrypted = blob.decrypt(blob, key, entropy=entropy)
@@ -282,11 +273,13 @@ def decrypt(blob, keyHash, entropy = None) -> (bytes | None):
     else:
         return None
 
-def find_masterkey_for_blob(blob_bytes:bytes, masterkeys:list) -> Any:
+def find_masterkey_for_blob(blob_bytes:bytes, masterkeys: Any) -> Any | None:
     blob = DPAPI_BLOB(blob_bytes)
     masterkey = bin_to_string(blob['GuidMasterKey'])
+    return find_masterkey(masterkey=masterkey, masterkeys=masterkeys)
+
+def find_masterkey(masterkey:  str, masterkeys: Any) -> Any | None:
     for mk in masterkeys:
-        mksplit = mk.split(':')
-        if '{%s}' % masterkey.lower() == mksplit[0].lower():
-            return mksplit[1]
+        if masterkey.lower() == mk.guid.lower():
+            return mk
     return None

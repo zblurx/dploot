@@ -8,14 +8,12 @@ from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import handle_outputdir_option, parse_file_as_list
 from dploot.triage.certificates import CertificatesTriage
-from dploot.triage.masterkeys import MasterkeysTriage
+from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 
 
 NAME = 'machinecertificates'
 
 class MachineCertificatesAction:
-
-    false_positive = ['.','..', 'desktop.ini','Public','Default','Default User','All Users']
 
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
@@ -31,7 +29,7 @@ class MachineCertificatesAction:
 
         if self.options.mkfile is not None:
             try:
-                self.masterkeys = parse_file_as_list(self.options.mkfile)
+                self.masterkeys = parse_masterkey_file(self.options.mkfile)
             except Exception as e:
                 logging.error(str(e))
                 sys.exit(1)
@@ -46,14 +44,23 @@ class MachineCertificatesAction:
         if self.is_admin:
             if self.masterkeys is None:
                 triage = MasterkeysTriage(target=self.target, conn=self.conn)
-                triage.triage_system_masterkeys()
-                self.masterkeys = triage.masterkeys
+                logging.info("Triage SYSTEM masterkeys\n")
+                self.masterkeys = triage.triage_system_masterkeys()
                 for masterkey in self.masterkeys:
-                    print(masterkey)
+                    masterkey.dump()
                 print()
-
+                
             certificate_triage = CertificatesTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            certificate_triage.triage_system_certificates()
+            logging.info('Triage SYSTEM Certificates\n')
+            certificates = certificate_triage.triage_system_certificates()
+            for certificate in certificates:
+                certificate.dump()
+                if self.options.dump_all and not certificate.clientauth:
+                    continue
+                filename = "%s_%s.pfx" % (certificate.username,certificate.filename[:16])
+                logging.info("Writting certificate to %s\n" % filename)
+                with open(filename, "wb") as f:
+                    f.write(certificate.pfx)
             if self.outputdir is not None:
                 for filename, bytes in certificate_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
@@ -94,6 +101,14 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         help=(
             "Export keys to file"
         ),
+    )
+
+    group.add_argument(
+        "-dump-all",
+        action="store_true",
+        help=(
+            "Dump also certificates not used for client authentication"
+        )
     )
 
     group.add_argument(

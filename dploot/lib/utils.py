@@ -11,6 +11,14 @@ def is_guid(value: str):
 	guid = re.compile(r'^(\{{0,1}([0-9a-fA-F]{8})-([0-9a-fA-F]{4})-([0-9a-fA-F]{4})-([0-9a-fA-F]{4})-([0-9a-fA-F]{12})\}{0,1})$')
 	return guid.match(value)
 
+def find_guid(value: str):
+	guid = re.compile(r'(([0-9a-fA-F]{8})-([0-9a-fA-F]{4})-([0-9a-fA-F]{4})-([0-9a-fA-F]{4})-([0-9a-fA-F]{12}))')
+	return guid.search(value).group()
+
+def find_sha1(value: str):
+	guid = re.compile(r'([a-f0-9]{40})')
+	return guid.search(value).group()
+
 def is_certificate_guid(value: str):
 	guid = re.compile(r'^(\{{0,1}([0-9a-fA-F]{32})_([0-9a-fA-F]{8})-([0-9a-fA-F]{4})-([0-9a-fA-F]{4})-([0-9a-fA-F]{4})-([0-9a-fA-F]{12})\}{0,1})$')
 	return guid.match(value)

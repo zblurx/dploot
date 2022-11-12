@@ -10,15 +10,13 @@ from dploot.lib.utils import handle_outputdir_option, parse_file_as_list
 from dploot.triage.browser import BrowserTriage
 from dploot.triage.certificates import CertificatesTriage
 from dploot.triage.credentials import CredentialsTriage
-from dploot.triage.masterkeys import MasterkeysTriage
+from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.rdg import RDGTriage
 from dploot.triage.vaults import VaultsTriage
 
 NAME = 'machinetriage'
 
 class MachineTriageAction:
-
-    false_positive = ['.','..', 'desktop.ini','Public','Default','Default User','All Users']
 
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
@@ -37,14 +35,7 @@ class MachineTriageAction:
 
         if self.options.mkfile is not None:
             try:
-                self.masterkeys = parse_file_as_list(self.options.mkfile)
-            except Exception as e:
-                logging.error(str(e))
-                sys.exit(1)
-
-        if self.options.pvk is not None:
-            try:
-                self.pvkbytes = open(self.options.pvk, 'rb').read()
+                self.masterkeys = parse_masterkey_file(self.options.mkfile)
             except Exception as e:
                 logging.error(str(e))
                 sys.exit(1)
@@ -59,38 +50,52 @@ class MachineTriageAction:
         
         if self.is_admin:
             if self.masterkeys is None:
-                masterkeys_triage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes)
-                masterkeys_triage.triage_system_masterkeys()
-                self.masterkeys = masterkeys_triage.masterkeys
+                masterkeys_triage = MasterkeysTriage(target=self.target, conn=self.conn)
+                logging.info("Triage SYSTEM masterkeys\n")
+                self.masterkeys = masterkeys_triage.triage_system_masterkeys()
                 for masterkey in self.masterkeys:
-                    print(masterkey)
+                    masterkey.dump()
                 print()
                 if self.outputdir is not None:
-                    for filename, bytes in masterkeys_triage.looted_files.items():
-                        with open(os.path.join(self.outputdir, 'masterkeys', filename),'wb') as outputfile:
-                            outputfile.write(bytes)
+                        for filename, bytes in masterkeys_triage.looted_files.items():
+                            with open(os.path.join(self.outputdir, 'masterkeys', filename),'wb') as outputfile:
+                                outputfile.write(bytes)
 
             credentials_triage = CredentialsTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            credentials_triage.triage_system_credentials()
+            logging.info('Triage SYSTEM Credentials\n')
+            credentials = credentials_triage.triage_system_credentials()
+            for credential in credentials:
+                credential.dump()
             if self.outputdir is not None:
                 for filename, bytes in credentials_triage.looted_files.items():
-                    with open(os.path.join(self.outputdir,'credentials', filename),'wb') as outputfile:
+                    with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
                         outputfile.write(bytes)
 
             vaults_triage = VaultsTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            vaults_triage.triage_system_vaults
+            logging.debug('Triage SYSTEM Vaults\n')
+            vaults = vaults_triage.triage_system_vaults()
+            for vault in vaults:
+                vault.dump()
             if self.outputdir is not None:
                 for filename, bytes in vaults_triage.looted_files.items():
-                    with open(os.path.join(self.outputdir, 'vaults', filename),'wb') as outputfile:
+                    with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
                         outputfile.write(bytes)
 
-            certificates_triage = CertificatesTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            certificates_triage.triage_system_certificates()
+            certificate_triage = CertificatesTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
+            logging.info('Triage SYSTEM Certificates\n')
+            certificates = certificate_triage.triage_system_certificates()
+            for certificate in certificates:
+                certificate.dump()
+                if self.options.dump_all and not certificate.clientauth:
+                    continue
+                filename = "%s_%s.pfx" % (certificate.username,certificate.filename[:16])
+                logging.info("Writting certificate to %s\n" % filename)
+                with open(filename, "wb") as f:
+                    f.write(certificate.pfx)
             if self.outputdir is not None:
-                for filename, bytes in certificates_triage.looted_files.items():
-                    with open(os.path.join(self.outputdir,'certificates', filename),'wb') as outputfile:
+                for filename, bytes in certificate_triage.looted_files.items():
+                    with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
                         outputfile.write(bytes)
-
         else:
             logging.info("Not an admin, exiting...")
 
@@ -121,11 +126,11 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     )
 
     group.add_argument(
-        "-pvk",
-        action="store",
+        "-dump-all",
+        action="store_true",
         help=(
-            "Pvk file with domain backup key"
-        ),
+            "Dump also certificates not used for client authentication"
+        )
     )
 
     group.add_argument(
