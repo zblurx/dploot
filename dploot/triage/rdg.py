@@ -59,7 +59,6 @@ class RDGTriage:
         self.target = target
         self.conn = conn
         
-        self._is_admin = None
         self._users = None
         self.looted_files = dict()
         self.masterkeys = masterkeys
@@ -73,7 +72,10 @@ class RDGTriage:
                 rdcman_files.append(rdcman_user_file)
                 rdgfiles += rdg_user_files
             except Exception as e:
-                print(str(e))
+                if logging.getLogger().level == logging.DEBUG:
+                    import traceback
+                    traceback.print_exc()
+                    logging.debug(str(e))
                 pass
         return rdcman_files, rdgfiles
 
@@ -100,7 +102,10 @@ class RDGTriage:
                                 rdg_xml = ET.fromstring(rdg_bytes)
                                 rdgfiles.append(RDCMANFile(winuser=user,filepath=filename, rdg_creds=self.triage_rdgprofile(rdg_xml)))             
         except Exception as e:
-            print(str(e))
+            if logging.getLogger().level == logging.DEBUG:
+                import traceback
+                traceback.print_exc()
+                logging.debug(str(e))
             pass
         return rdcman_file, rdgfiles
 
@@ -175,15 +180,6 @@ class RDGTriage:
                 password = decrypt_blob(pass_dpapi_blob, masterkey)
 
         return profile_name, full_username, password
-            
-
-    @property
-    def is_admin(self) -> bool:
-        if self._is_admin is not None:
-            return self._is_admin
-
-        self._is_admin = self.conn.is_admin()
-        return self._is_admin
 
     @property
     def users(self) -> List[str]:

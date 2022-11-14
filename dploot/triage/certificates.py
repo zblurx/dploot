@@ -76,7 +76,6 @@ class CertificatesTriage:
         self.target = target
         self.conn = conn
         
-        self._is_admin = None
         self._users = None
         self.looted_files = dict()
         self.masterkeys = masterkeys
@@ -135,7 +134,10 @@ class CertificatesTriage:
             try:
                 certificates += self.triage_certificates_for_user(user=user)                         
             except Exception as e:
-                print(str(e))
+                if logging.getLogger().level == logging.DEBUG:
+                    import traceback
+                    traceback.print_exc()
+                    logging.debug(str(e))
                 pass
         return certificates
 
@@ -245,14 +247,6 @@ class CertificatesTriage:
             pass
 
         return None, None
-
-    @property
-    def is_admin(self) -> bool:
-        if self._is_admin is not None:
-            return self._is_admin
-
-        self._is_admin = self.conn.is_admin()
-        return self._is_admin
 
     @property
     def users(self) -> List[str]:

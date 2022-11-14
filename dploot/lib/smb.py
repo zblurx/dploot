@@ -1,6 +1,7 @@
 import sys
 import ntpath
 import logging
+import time
 from typing import Any, Dict, List
 
 from dploot.lib.target import Target
@@ -8,6 +9,8 @@ from dploot.lib.target import Target
 from impacket.smbconnection import SMBConnection
 from impacket.examples.secretsdump import RemoteOperations
 from impacket.smb3structs import FILE_READ_DATA, FILE_OPEN, FILE_NON_DIRECTORY_FILE, FILE_SHARE_READ
+
+from dploot.lib.wmi import DPLootWmiExec
 
 class DPLootSMBConnection:
     def __init__(self, target: Target) -> None:
@@ -37,7 +40,10 @@ class DPLootSMBConnection:
                     nthash=self.target.nthash
                     )
         except Exception as e:
-            print(str(e))
+            if logging.getLogger().level == logging.DEBUG:
+                import traceback
+                traceback.print_exc()
+                logging.debug(str(e))
             sys.exit(1)
         return self.smb_session
 
@@ -83,8 +89,7 @@ class DPLootSMBConnection:
     def getFile(self,  *args, **kwargs) -> (Any | None):
         return self.smb_session.getFile(*args, **kwargs)
 
-    def readFile(self, shareName, path, mode = FILE_OPEN, offset = 0, password = None, shareAccessMode = FILE_SHARE_READ) -> bytes:
-
+    def readFile(self, shareName, path, mode = FILE_OPEN, offset = 0, password = None, shareAccessMode = FILE_SHARE_READ, bypass_shared_violation = False) -> bytes:
         # ToDo: Handle situations where share is password protected
         path = path.replace('/', '\\')
         path = ntpath.normpath(path)
@@ -112,10 +117,25 @@ class DPLootSMBConnection:
                     written += len(data)
                     offset  += len(data)
         except Exception as e:
-            if 'STATUS_OBJECT_PATH_NOT_FOUND' in e.__str__:
+            if 'STATUS_OBJECT_PATH_NOT_FOUND' in str(e):
                 logging.debug(str(e))
+            if bypass_shared_violation and 'STATUS_SHARING_VIOLATION' in str(e):
+                wmiexec = DPLootWmiExec(target=self.target)
+                command = "cmd.exe /Q /c copy \"C:\\%s\" \"C:\\%s\"" % (path,wmiexec.output)
+                wmiexec.run(command)
+                time.sleep(1)
+                while True:
+                    try:
+                        data = self.readFile(shareName=shareName, path=wmiexec.output)
+                        break
+                    except Exception as e:
+                        if str(e).find('STATUS_SHARING_VIOLATION') >=0:
+                            # Output not finished, let's wait
+                            time.sleep(1)
+                            pass
+                self.smb_session.deleteFile(shareName, wmiexec.output)
             else:
-                logging.error(str(e))
+                logging.debug(str(e))
         finally:
             if fileId is not None:
                 self.smb_session._SMBConnection.close(treeId, fileId)

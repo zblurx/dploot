@@ -36,7 +36,6 @@ class WifiTriage:
         self.target = target
         self.conn = conn
         
-        self._is_admin = None
         self.looted_files = dict()
         self.masterkeys = masterkeys
 
@@ -73,14 +72,9 @@ class WifiTriage:
                                     password = decrypt_blob(unhexlify(dpapi_blob), masterkey=masterkey)
                                 wifi_creds.append(WifiCred(ssid, auth_type, password=password))
         except Exception as e:
-            print(str(e))
+            if logging.getLogger().level == logging.DEBUG:
+                import traceback
+                traceback.print_exc()
+                logging.debug(str(e))
             pass
         return wifi_creds
-
-    @property
-    def is_admin(self) -> bool:
-        if self._is_admin is not None:
-            return self._is_admin
-
-        self._is_admin = self.conn.is_admin()
-        return self._is_admin

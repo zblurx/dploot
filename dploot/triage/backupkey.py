@@ -24,7 +24,6 @@ class BackupkeyTriage:
         self.conn = conn
         
         self.dce = None
-        self._is_admin = None
         self._users = None
 
     def connect(self) -> None:

@@ -48,7 +48,6 @@ class MasterkeysTriage:
         self.passwords = passwords
         self.nthashes = nthashes
         
-        self._is_admin = None
         self._users = None
         self.looted_files = dict()
         self.dpapiSystem = dict()
@@ -148,14 +147,6 @@ class MasterkeysTriage:
             userKey = userKey.split(':')[1]
             self.dpapiSystem['MachineKey'] = unhexlify(machineKey[2:])
             self.dpapiSystem['UserKey'] = unhexlify(userKey[2:])
-    
-    @property
-    def is_admin(self) -> bool:
-        if self._is_admin is not None:
-            return self._is_admin
-
-        self._is_admin = self.conn.is_admin()
-        return self._is_admin
 
     @property
     def users(self) -> List[str]:

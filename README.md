@@ -665,10 +665,6 @@ Those projects helped a lot in writting this tool:
 ## TODO
 
 - Finish refacto
-- Improve error management
 - Implement Quiet option
-- AjoUTER LE PTR AZURE
-- Ajouter d'autres gestionnaires de pwd
-- Smb sneaky techniques
-- Shutdown chrome process to dump chrome db
+- Améliorer l'authentification kerberos
 - Implement LOCAL triage (with extracted stuff)
