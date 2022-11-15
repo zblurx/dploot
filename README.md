@@ -37,15 +37,17 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
 
 ## Installation
 
-To install dploot, use pipx (best solution to avoid conflict with other project dependencies):
+You can install dploot directly from PyPI:
 
 ```text
-git clone https://github.com/zblurx/dploot
-cd dploot
-python3 -m pipx install .
+pip install dploot
 ```
 
-Pip is a good solution too
+OR
+
+```text
+pipx install dploot
+```
 
 ## Usage
 
