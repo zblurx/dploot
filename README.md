@@ -9,6 +9,7 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
 - [dploot](#dploot)
   - [Table of Contents](#table-of-contents)
   - [Usage](#usage)
+    - [Kerberos](#kerberos)
   - [How to use](#how-to-use)
     - [As a local administrator on the machine](#as-a-local-administrator-on-the-machine)
     - [As a domain administrator (or equivalent)](#as-a-domain-administrator-or-equivalent)
@@ -77,6 +78,10 @@ options:
   -debug                Turn DEBUG output ON
   -quiet                Only output dumped credentials
 ```
+
+### Kerberos
+
+dploot can authenticate with Kerberos. Simply use `-k` option. If you want to use a cached ticket, use `-use-kcache` option. 
 
 ## How to use
 
