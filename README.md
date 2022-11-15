@@ -8,6 +8,7 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
 
 - [dploot](#dploot)
   - [Table of Contents](#table-of-contents)
+  - [Installation](#installation)
   - [Usage](#usage)
     - [Kerberos](#kerberos)
   - [How to use](#how-to-use)
