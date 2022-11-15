@@ -20,7 +20,7 @@ class MachineTriageAction:
 
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
-        self.target = Target(options)
+        self.target = Target.from_options(options)
         
         self.conn = None
         self._is_admin = None
