@@ -12,5 +12,9 @@ clean:
 rebuild: clean
 	python setup.py install
 
+publish: clean
+	python setup.py sdist bdist_wheel
+	python -m twine upload dist/*
+
 build: clean
 	python setup.py install
