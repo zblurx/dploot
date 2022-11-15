@@ -23,9 +23,9 @@ class Masterkey:
     def dump(self) -> None:
         print(self)
 
-def parse_masterkey_file(self, filename) -> List[Masterkey]:
+def parse_masterkey_file(filename) -> List[Masterkey]:
     masterkeys = list()
-    masterkeys_lines = parse_file_as_list(self.options.mkfile)
+    masterkeys_lines = parse_file_as_list(filename)
     for masterkey in masterkeys_lines:
         guid, sha1 = masterkey.split(':',1)
         masterkeys.append(Masterkey(
