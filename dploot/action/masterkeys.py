@@ -14,8 +14,6 @@ NAME = 'masterkeys'
 
 class MasterkeysAction:
 
-    false_positive = ['.','..', 'desktop.ini','Public','Default','Default User','All Users']
-
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
 
@@ -42,23 +40,25 @@ class MasterkeysAction:
     
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             triage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
-            triage.triage_masterkeys()
-            print()
+            logging.info("Triage ALL USERS masterkeys\n")
+            masterkeys = triage.triage_masterkeys()
+            if self.outputfile is not None:
+                with open(self.outputfile + '.mkf', 'a+')as file:
+                    for masterkey in masterkeys:
+                        masterkey.dump()
+                        file.write(str(masterkey)+'\n')
+                        logging.critical("Writting masterkeys to %s" % self.outputfile)
+            else:
+                for masterkey in masterkeys:
+                    masterkey.dump()
             if self.outputdir is not None:
                 for filename, bytes in triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
                         outputfile.write(bytes)
-            if self.outputfile is not None:
-                with open(self.outputfile + '.mkf', 'a+')as file:
-                    for masterkey in triage.masterkeys:
-                        print(masterkey)
-                        file.write(masterkey+'\n')
-            else:
-                for masterkey in triage.masterkeys:
-                    print(masterkey)
+
         else:
             logging.info("Not an admin, exiting...")
 

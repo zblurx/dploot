@@ -47,6 +47,8 @@ def main() -> None:
 
     parser.add_argument("-debug", action="store_true", help="Turn DEBUG output ON")
 
+    parser.add_argument("-quiet", action="store_true", help="Only output dumped credentials")
+
     subparsers = parser.add_subparsers(help="Action", dest="action", required=True)
 
     actions = dict()
@@ -63,6 +65,8 @@ def main() -> None:
 
     if options.debug is True:
         logging.getLogger().setLevel(logging.DEBUG)
+    elif options.quiet is True:
+        logging.getLogger().setLevel(logging.CRITICAL)
     else:
         logging.getLogger().setLevel(logging.INFO)
 

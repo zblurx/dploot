@@ -10,11 +10,13 @@ from dploot.triage.backupkey import BackupkeyTriage
 NAME = 'backupkey'
 
 class BackupkeyAction:
+    
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
         self.target = Target(options)
 
         self.conn = None
+        self._is_admin = None
         self.dce = None
         self.outputfile = None
         self.legacy = self.options.legacy
@@ -30,21 +32,31 @@ class BackupkeyAction:
 
     def run(self) -> None:
         self.connect()
-
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         triage = BackupkeyTriage(target=self.target, conn=self.conn)
-        triage.triage_backupkey()
-        if triage.backupkey_v1 is not None and self.legacy:
-            print("Legacy key:")
-            print("0x%s" % hexlify(triage.backupkey_v1).decode('latin-1'))
-            print("\n")
+        backupkey = triage.triage_backupkey()
+        if backupkey.backupkey_v1 is not None and self.legacy:
+            if not self.options.quiet:
+                print("Legacy key:")
+                print("0x%s" % hexlify(backupkey.backupkey_v1).decode('latin-1'))
+                print("\n")
             logging.info("Exporting key to file {}".format(self.outputfile  + ".key"))
-            open(self.outputfile + ".key", 'wb').write(triage.backupkey_v1)
-        print("[DOMAIN BACKUPKEY V2]")
-        triage.pvk_header.dump()
-        print("PRIVATEKEYBLOB:{%s}" % (hexlify(triage.backupkey_v2).decode('latin-1')))
-        print("\n")
-        logging.info("Exporting private key to file {}".format(self.outputfile ))
-        open(self.outputfile, 'wb').write(triage.backupkey_v2)
+            open(self.outputfile + ".key", 'wb').write(backupkey.backupkey_v1)
+        if not self.options.quiet:
+            print("[DOMAIN BACKUPKEY V2]")
+            backupkey.pvk_header.dump()
+            print("PRIVATEKEYBLOB:{%s}" % (hexlify(backupkey.backupkey_v2).decode('latin-1')))
+            print("\n")
+        logging.critical("Exporting domain backupkey to file {}".format(self.outputfile ))
+        open(self.outputfile, 'wb').write(backupkey.backupkey_v2)
+
+    @property
+    def is_admin(self) -> bool:
+        if self._is_admin is not None:
+            return self._is_admin
+
+        self._is_admin = self.conn.is_admin()
+        return self._is_admin
 
 def entry(options: argparse.Namespace) -> None:
     a = BackupkeyAction(options)

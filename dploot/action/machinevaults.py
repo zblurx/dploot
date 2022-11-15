@@ -8,15 +8,13 @@ from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import handle_outputdir_option, parse_file_as_list
 
-from dploot.triage.masterkeys import MasterkeysTriage
+from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.vaults import VaultsTriage
 
 
 NAME = 'machinevaults'
 
 class MachineVaultsAction:
-
-    false_positive = ['.','..', 'desktop.ini','Public','Default','Default User','All Users']
 
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
@@ -32,7 +30,7 @@ class MachineVaultsAction:
 
         if self.options.mkfile is not None:
             try:
-                self.masterkeys = parse_file_as_list(self.options.mkfile)
+                self.masterkeys = parse_masterkey_file(self.options.mkfile)
             except Exception as e:
                 logging.error(str(e))
                 sys.exit(1)
@@ -43,17 +41,25 @@ class MachineVaultsAction:
     
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
                 triage = MasterkeysTriage(target=self.target, conn=self.conn)
-                triage.triage_system_masterkeys()
-                self.masterkeys = triage.masterkeys
-                for masterkey in self.masterkeys:
-                    print(masterkey)
-                print()
+                logging.info("Triage SYSTEM masterkeys\n")
+                self.masterkeys = triage.triage_system_masterkeys()
+                if not self.options.quiet: 
+                    for masterkey in self.masterkeys:
+                        masterkey.dump()
+                    print()
+
             vaults_triage = VaultsTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            vaults_triage.triage_system_vaults()
+            logging.info('Triage SYSTEM Vaults\n')
+            vaults = vaults_triage.triage_system_vaults()
+            for vault in vaults:
+                if self.options.quiet:
+                    vault.dump_quiet() 
+                else:
+                    vault.dump()
             if self.outputdir is not None:
                 for filename, bytes in vaults_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:

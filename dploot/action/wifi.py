@@ -8,15 +8,13 @@ from dploot.action.masterkeys import add_masterkeys_argument_group, parse_master
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import handle_outputdir_option, parse_file_as_list
-from dploot.triage.masterkeys import MasterkeysTriage
+from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.wifi import WifiTriage
 
 
 NAME = 'wifi'
 
 class WifiAction:
-
-    false_positive = ['.','..', 'desktop.ini','Public','Default','Default User','All Users']
 
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
@@ -35,7 +33,7 @@ class WifiAction:
 
         if self.options.mkfile is not None:
             try:
-                self.masterkeys = parse_file_as_list(self.options.mkfile)
+                self.masterkeys = parse_masterkey_file(self.options.mkfile)
             except Exception as e:
                 logging.error(str(e))
                 sys.exit(1)
@@ -46,17 +44,25 @@ class WifiAction:
     
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
                 triage = MasterkeysTriage(target=self.target, conn=self.conn)
-                triage.triage_system_masterkeys()
-                self.masterkeys = triage.masterkeys
-                for masterkey in self.masterkeys:
-                    print(masterkey)
-                print()
+                logging.info("Triage SYSTEM masterkeys\n")
+                self.masterkeys = triage.triage_system_masterkeys()
+                if not self.options.quiet:
+                    for masterkey in self.masterkeys:
+                        masterkey.dump()
+                    print()
+
             wifi_triage = WifiTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            wifi_triage.triage_wifi()
+            logging.info('Triage ALL WIFI profiles\n')
+            wifi_creds = wifi_triage.triage_wifi()
+            for wifi_cred in wifi_creds:
+                if self.options.quiet:
+                    wifi_cred.dump_quiet()
+                else:
+                    wifi_cred.dump()
             if self.outputdir is not None:
                 for filename, bytes in wifi_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:

