@@ -19,6 +19,7 @@ class DPLootWmiExec:
         self.__nthash = target.nthash
         self.__aesKey = target.aesKey
         self.__addr = target.address
+        self.__kdcHost = target.kdcHost
         self.__doKerberos = target.do_kerberos
 
         self.__share = 'C$'
@@ -29,7 +30,7 @@ class DPLootWmiExec:
     def run(self, command):
         logging.getLogger("impacket").disabled = True
         dcom = DCOMConnection(self.__addr, self.__username, self.__password, self.__domain, self.__lmhash, self.__nthash,
-                              self.__aesKey, oxidResolver=True, doKerberos=self.__doKerberos)
+                              self.__aesKey, oxidResolver=True, doKerberos=self.__doKerberos, kdcHost=self.__kdcHost)
         try:
             iInterface = dcom.CoCreateInstanceEx(wmi.CLSID_WbemLevel1Login,wmi.IID_IWbemLevel1Login)
             iWbemLevel1Login = wmi.IWbemLevel1Login(iInterface)

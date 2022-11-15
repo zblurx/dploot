@@ -38,7 +38,9 @@ class Target:
         self.lmhash = lmhash
         self.nthash = nthash
         self.ntlmhash = "%s:%s" % (lmhash,nthash)
-        self.do_kerberos = options.k
+        self.do_kerberos = options.k or options.aesKey is not None or options.use_kcache
+        self.kdcHost = options.kdcHost
+        self.use_kcache = options.use_kcache
         self.dc_ip = options.dc_ip
         self.aesKey = options.aesKey
 
@@ -77,6 +79,8 @@ def add_target_argument_group(parser: argparse.ArgumentParser,) -> None:
         "line",
     )
     group.add_argument('-aesKey', action="store", metavar = "hex key", help='AES key to use for Kerberos Authentication (128 or 256 bits)')
+    group.add_argument("-use-kcache", action='store_true', help="Use Kerberos authentication from ccache file (KRB5CCNAME)")
+    group.add_argument("-kdcHost", help="FQDN of the domain controller. If omitted it will use the domain part (FQDN) specified in the target parameter")
     group.add_argument(
         "-dc-ip",
         action="store",

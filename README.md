@@ -666,6 +666,5 @@ Those projects helped a lot in writting this tool:
 
 - Finish refacto
 - Refaire le readme (ajouter une partie dpapi101) + documenter les functions + faire release
-- Améliorer l'authentification kerberos
 - browser -> simplifier le traitement
 - Implement LOCAL triage (with extracted stuff)

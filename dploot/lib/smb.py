@@ -23,15 +23,19 @@ class DPLootSMBConnection:
         try:
             self.smb_session = SMBConnection(self.target.address,self.target.address)
             if self.target.do_kerberos:
+                logging.debug("Authenticating with %s through Kerberos" % self.target.username)
                 self.smb_session.kerberosLogin(
                     user=self.target.username,
                     password=self.target.password,
                     domain=self.target.domain,
                     lmhash=self.target.lmhash,
                     nthash=self.target.nthash,
-                    aesKey=self.target.aesKey
+                    aesKey=self.target.aesKey,
+                    kdcHost=self.target.kdcHost,
+                    useCache=self.target.use_kcache,
                     )
             else:
+                logging.debug("Authenticating with %s through NTLM" % self.target.username)
                 self.smb_session.login(
                     user=self.target.username,
                     password=self.target.password,
