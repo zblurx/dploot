@@ -664,7 +664,5 @@ Those projects helped a lot in writting this tool:
 
 ## TODO
 
-- Finish refacto
 - Refaire le readme (ajouter une partie dpapi101) + documenter les functions + faire release
-- browser -> simplifier le traitement
 - Implement LOCAL triage (with extracted stuff)

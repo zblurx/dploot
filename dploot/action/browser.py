@@ -56,8 +56,8 @@ class BrowserAction:
                     print()
         
             triage = BrowserTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            logging.info('Triage Browser Credentials and Cookies for ALL USERS\n')
-            credentials, cookies = triage.triage_browsers()
+            logging.info('Triage Browser Credentials%sfor ALL USERS\n' % (' and Cookies ' if self.options.show_cookies else ' '))
+            credentials, cookies = triage.triage_browsers(gather_cookies=self.options.show_cookies)
             for credential in credentials:
                 if self.options.quiet:
                     credential.dump_quiet()
