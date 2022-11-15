@@ -669,5 +669,4 @@ Those projects helped a lot in writting this tool:
 
 ## TODO
 
-- Refaire le readme (ajouter une partie dpapi101) + documenter les functions + faire release
 - Implement LOCAL triage (with extracted stuff)
