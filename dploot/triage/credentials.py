@@ -22,6 +22,10 @@ class Credential:
 
     def dump(self) -> None:
         self.credblob.dump()
+    
+    def dump_quiet(self) -> None:
+        print("[CREDENTIAL] %s - %s:%s" % (self.target, self.username, self.password))
+
 
 class CredentialsTriage:
 

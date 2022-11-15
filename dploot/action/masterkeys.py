@@ -40,7 +40,7 @@ class MasterkeysAction:
     
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             triage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
             logging.info("Triage ALL USERS masterkeys\n")
@@ -50,6 +50,7 @@ class MasterkeysAction:
                     for masterkey in masterkeys:
                         masterkey.dump()
                         file.write(str(masterkey)+'\n')
+                        logging.critical("Writting masterkeys to %s" % self.outputfile)
             else:
                 for masterkey in masterkeys:
                     masterkey.dump()

@@ -37,7 +37,6 @@ class BrowserAction:
                 sys.exit(1)
 
         self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(self.options, self.target)
-        print(self.target.nthash)
 
     def connect(self) -> None:
         self.conn = DPLootSMBConnection(self.target)
@@ -45,23 +44,29 @@ class BrowserAction:
 
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
                 masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
-                for masterkey in self.masterkeys:
-                    masterkey.dump()
-                print()
+                if not self.options.quiet: 
+                    for masterkey in self.masterkeys:
+                        masterkey.dump()
+                    print()
         
             triage = BrowserTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
             logging.info('Triage Browser Credentials and Cookies for ALL USERS\n')
             credentials, cookies = triage.triage_browsers()
             for credential in credentials:
-                credential.dump()
+                if self.options.quiet:
+                    credential.dump_quiet()
+                else:
+                    credential.dump()
             if self.options.show_cookies:
                 for cookie in cookies:
+                    if self.options.quiet:
+                        cookie.dump_quiet()
                     cookie.dump() 
             if self.outputdir is not None:
                 for filename, bytes in triage.looted_files.items():

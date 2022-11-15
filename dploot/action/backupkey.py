@@ -32,22 +32,22 @@ class BackupkeyAction:
 
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         triage = BackupkeyTriage(target=self.target, conn=self.conn)
         backupkey = triage.triage_backupkey()
         if backupkey.backupkey_v1 is not None and self.legacy:
-            if self.options.quiet:
+            if not self.options.quiet:
                 print("Legacy key:")
                 print("0x%s" % hexlify(backupkey.backupkey_v1).decode('latin-1'))
                 print("\n")
             logging.info("Exporting key to file {}".format(self.outputfile  + ".key"))
             open(self.outputfile + ".key", 'wb').write(backupkey.backupkey_v1)
-        if self.options.quiet:
+        if not self.options.quiet:
             print("[DOMAIN BACKUPKEY V2]")
             backupkey.pvk_header.dump()
             print("PRIVATEKEYBLOB:{%s}" % (hexlify(backupkey.backupkey_v2).decode('latin-1')))
             print("\n")
-        logging.info("Exporting domain backupkey to file {}".format(self.outputfile ))
+        logging.critical("Exporting domain backupkey to file {}".format(self.outputfile ))
         open(self.outputfile, 'wb').write(backupkey.backupkey_v2)
 
     @property

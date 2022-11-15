@@ -51,16 +51,17 @@ class TriageAction:
 
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         
         if self.is_admin:
             if self.masterkeys is None:
                 masterkeys_triage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeys_triage.triage_masterkeys()
-                for masterkey in self.masterkeys:
-                    masterkey.dump()
-                print()
+                if not self.options.quiet: 
+                    for masterkey in self.masterkeys:
+                        masterkey.dump()
+                    print()
                 if self.outputdir is not None:
                     for filename, bytes in masterkeys_triage.looted_files.items():
                         with open(os.path.join(self.outputdir, 'masterkeys', filename),'wb') as outputfile:
@@ -70,17 +71,23 @@ class TriageAction:
             logging.info('Triage Credentials for ALL USERS\n')
             credentials = credentials_triage.triage_credentials()
             for credential in credentials:
-                credential.dump()
+                if self.options.quiet:
+                    credential.dump_quiet()
+                else:
+                    credential.dump()
             if self.outputdir is not None:
                 for filename, bytes in credentials_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
                         outputfile.write(bytes)
 
             vaults_triage = VaultsTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            logging.debug('Triage Vaults for ALL USERS\n')
+            logging.info('Triage Vaults for ALL USERS\n')
             vaults = vaults_triage.triage_vaults()
             for vault in vaults:
-                vault.dump()
+                if self.options.quiet:
+                    vault.dump_quiet()
+                else: 
+                    vault.dump()
             if self.outputdir is not None:
                 for filename, bytes in vaults_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
@@ -92,15 +99,21 @@ class TriageAction:
             for rdcman_file in rdcman_files:
                 if rdcman_file is None:
                     continue
-                logging.info("RDCMAN File: %s\n" %  (rdcman_file.filepath))
+                logging.debug("RDCMAN File: %s\n" %  (rdcman_file.filepath))
                 for rdg_cred in rdcman_file.rdg_creds:
-                    rdg_cred.dump()
+                    if self.options.quiet:
+                        rdg_cred.dump_quiet()
+                    else:
+                        rdg_cred.dump()
             for rdgfile in rdgfiles:
                 if rdgfile is None:
                     continue
-                logging.info("Found RDG file: %s\n" %  (rdgfile.filepath))
+                logging.debug("Found RDG file: %s\n" %  (rdgfile.filepath))
                 for rdg_cred in rdgfile.rdg_creds:
-                    rdg_cred.dump()   
+                    if self.options.quiet:
+                        rdg_cred.dump_quiet()
+                    else:
+                        rdg_cred.dump() 
             if self.outputdir is not None:
                 for filename, bytes in rdg_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
@@ -110,11 +123,12 @@ class TriageAction:
             logging.info('Triage Certificates for ALL USERS\n')
             certificates = certificates_triage.triage_certificates()
             for certificate in certificates:
-                certificate.dump()
                 if self.options.dump_all and not certificate.clientauth:
                     continue
+                if not self.options.quiet:
+                    certificate.dump()
                 filename = "%s_%s.pfx" % (certificate.username,certificate.filename[:16])
-                logging.info("Writting certificate to %s\n" % filename)
+                logging.critical("Writting certificate to %s" % filename)
                 with open(filename, "wb") as f:
                     f.write(certificate.pfx)
             if self.outputdir is not None:

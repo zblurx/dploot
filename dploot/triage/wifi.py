@@ -25,6 +25,12 @@ class WifiCred:
         print('Password:\t%s' % self.password)
         print()
 
+    def dump_quiet(self) -> None:
+        if self.auth.upper() == 'OPEN':
+            print("[WIFI] %s - OPEN" % (self.ssid))
+        elif self.auth.upper() in ['WPAPSK', 'WPA2PSK']:
+            print("[WIFI] %s - %s - Passphrase: %s" % (self.ssid, self.auth.upper(), self.password))
+
 class WifiTriage:
 
     false_positive = ['.','..', 'desktop.ini','Public','Default','Default User','All Users']

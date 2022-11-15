@@ -44,21 +44,25 @@ class WifiAction:
     
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
                 triage = MasterkeysTriage(target=self.target, conn=self.conn)
                 logging.info("Triage SYSTEM masterkeys\n")
                 self.masterkeys = triage.triage_system_masterkeys()
-                for masterkey in self.masterkeys:
-                    masterkey.dump()
-                print()
+                if not self.options.quiet:
+                    for masterkey in self.masterkeys:
+                        masterkey.dump()
+                    print()
 
             wifi_triage = WifiTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            logging.debug('Triage ALL Wifi profiles\n')
+            logging.info('Triage ALL WIFI profiles\n')
             wifi_creds = wifi_triage.triage_wifi()
             for wifi_cred in wifi_creds:
-                wifi_cred.dump()
+                if self.options.quiet:
+                    wifi_cred.dump_quiet()
+                else:
+                    wifi_cred.dump()
             if self.outputdir is not None:
                 for filename, bytes in wifi_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:

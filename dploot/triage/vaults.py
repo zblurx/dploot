@@ -42,6 +42,10 @@ class VaultCred:
             print('Decoded Password: %s' % self.password)
             print()
 
+    def dump_quiet(self) -> None:
+        if self.type == 'Internet Explorer':
+            print("[Internet Explorer] %s - %s:%s" % (self.resource, self.username, self.password))
+
 class VaultsTriage:
 
     false_positive = ['.','..', 'desktop.ini','Public','Default','Default User','All Users']

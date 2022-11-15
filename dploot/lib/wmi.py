@@ -27,6 +27,7 @@ class DPLootWmiExec:
         self.__win32Process = None
 
     def run(self, command):
+        logging.getLogger("impacket").disabled = True
         dcom = DCOMConnection(self.__addr, self.__username, self.__password, self.__domain, self.__lmhash, self.__nthash,
                               self.__aesKey, oxidResolver=True, doKerberos=self.__doKerberos)
         try:

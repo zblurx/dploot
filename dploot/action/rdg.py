@@ -43,15 +43,16 @@ class RDGAction:
 
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
                 masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
-                for masterkey in self.masterkeys:
-                    masterkey.dump()
-                print()
+                if not self.options.quiet: 
+                    for masterkey in self.masterkeys:
+                        masterkey.dump()
+                    print()
 
             triage = RDGTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
             logging.info('Triage RDCMAN Settings and RDG files for ALL USERS\n')
@@ -59,15 +60,21 @@ class RDGAction:
             for rdcman_file in rdcman_files:
                 if rdcman_file is None:
                     continue
-                logging.info("RDCMAN File: %s\n" %  (rdcman_file.filepath))
+                logging.debug("RDCMAN File: %s\n" %  (rdcman_file.filepath))
                 for rdg_cred in rdcman_file.rdg_creds:
-                    rdg_cred.dump()
+                    if self.options.quiet:
+                        rdg_cred.dump_quiet()
+                    else:
+                        rdg_cred.dump()
             for rdgfile in rdgfiles:
                 if rdgfile is None:
                     continue
-                logging.info("Found RDG file: %s\n" %  (rdgfile.filepath))
+                logging.debug("Found RDG file: %s\n" %  (rdgfile.filepath))
                 for rdg_cred in rdgfile.rdg_creds:
-                    rdg_cred.dump()   
+                    if self.options.quiet:
+                        rdg_cred.dump_quiet()
+                    else:
+                        rdg_cred.dump() 
             if self.outputdir is not None:
                 for filename, bytes in triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:

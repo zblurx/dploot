@@ -118,8 +118,10 @@ class DPLootSMBConnection:
                     offset  += len(data)
         except Exception as e:
             if 'STATUS_OBJECT_PATH_NOT_FOUND' in str(e):
-                logging.debug(str(e))
-            if bypass_shared_violation and 'STATUS_SHARING_VIOLATION' in str(e):
+                pass
+            elif 'STATUS_OBJECT_NAME_NOT_FOUND' in str(e):
+                pass
+            elif bypass_shared_violation and 'STATUS_SHARING_VIOLATION' in str(e):
                 wmiexec = DPLootWmiExec(target=self.target)
                 command = "cmd.exe /Q /c copy \"C:\\%s\" \"C:\\%s\"" % (path,wmiexec.output)
                 wmiexec.run(command)

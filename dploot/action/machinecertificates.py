@@ -40,25 +40,27 @@ class MachineCertificatesAction:
     
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
                 triage = MasterkeysTriage(target=self.target, conn=self.conn)
                 logging.info("Triage SYSTEM masterkeys\n")
                 self.masterkeys = triage.triage_system_masterkeys()
-                for masterkey in self.masterkeys:
-                    masterkey.dump()
-                print()
+                if not self.options.quiet: 
+                    for masterkey in self.masterkeys:
+                        masterkey.dump()
+                    print()
                 
             certificate_triage = CertificatesTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
             logging.info('Triage SYSTEM Certificates\n')
             certificates = certificate_triage.triage_system_certificates()
             for certificate in certificates:
-                certificate.dump()
                 if self.options.dump_all and not certificate.clientauth:
                     continue
+                if not self.options.quiet:
+                    certificate.dump()
                 filename = "%s_%s.pfx" % (certificate.username,certificate.filename[:16])
-                logging.info("Writting certificate to %s\n" % filename)
+                logging.critical("Writting certificate to %s" % filename)
                 with open(filename, "wb") as f:
                     f.write(certificate.pfx)
             if self.outputdir is not None:

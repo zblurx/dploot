@@ -35,6 +35,14 @@ class RDGCred:
             print('\tUsername:\t%s' % self.username)
             print('\tPassword:\t%s' % self.password.decode('latin-1'))
         print()
+    
+    def dump_quiet(self) -> None:
+        if self.type == 'cred':
+            print("[RDG] %s - %s:%s" % (self.profile_name, self.username, self.password.decode('latin-1')))
+        elif self.type == 'logon':
+            print("[RDG] %s - %s:%s" % (self.profile_name, self.username, self.password.decode('latin-1')))
+        elif self.type == 'server':
+            print("[RDG] %s - %s - %s:%s" % (self.profile_name, self.server_name, self.username, self.password.decode('latin-1')))
 
 class RDCMANFile:
     def __init__(self, winuser: str, filepath:str, rdg_creds:List[RDGCred]) -> None:

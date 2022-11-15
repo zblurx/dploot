@@ -65,6 +65,8 @@ def main() -> None:
 
     if options.debug is True:
         logging.getLogger().setLevel(logging.DEBUG)
+    elif options.quiet is True:
+        logging.getLogger().setLevel(logging.CRITICAL)
     else:
         logging.getLogger().setLevel(logging.INFO)
 

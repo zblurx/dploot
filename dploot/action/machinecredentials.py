@@ -40,21 +40,25 @@ class MachineCredentialsAction:
     
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
                 triage = MasterkeysTriage(target=self.target, conn=self.conn)
                 logging.info("Triage SYSTEM masterkeys\n")
                 self.masterkeys = triage.triage_system_masterkeys()
-                for masterkey in self.masterkeys:
-                    masterkey.dump()
-                print()
+                if not self.options.quiet: 
+                    for masterkey in self.masterkeys:
+                        masterkey.dump()
+                    print()
 
             cred_triage = CredentialsTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
             logging.info('Triage SYSTEM Credentials\n')
             credentials = cred_triage.triage_system_credentials()
             for credential in credentials:
-                credential.dump()
+                if self.options.quiet:
+                    credential.dump_quiet()
+                else:
+                    credential.dump()
             if self.outputdir is not None:
                 for filename, bytes in cred_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
