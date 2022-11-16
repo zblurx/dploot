@@ -71,9 +71,14 @@ class DPLootSMBConnection:
     def listPath(self,  *args, **kwargs) -> Any:
         return self.smb_session.listPath(*args, **kwargs)
 
-    def enable_remoteops(self) -> None:
+    def reconnect(self) -> bool:
+        self.smb_session.reconnect()
+        if self.remote_ops is not None:
+            self.enable_remoteops(force=True)
+
+    def enable_remoteops(self, force=False) -> None:
         logging.getLogger("impacket").disabled = True
-        if self.remote_ops is not None and self.bootkey is not None:
+        if self.remote_ops is not None and self.bootkey is not None and not force:
             return
         try:
             self.remote_ops  = RemoteOperations(self.smb_session, self.target.do_kerberos, self.target.dc_ip)
@@ -140,6 +145,10 @@ class DPLootSMBConnection:
                             time.sleep(1)
                             pass
                 self.smb_session.deleteFile(shareName, wmiexec.output)
+            elif str(e).find('Broken') >= 0:
+                logging.debug('Connection broken, trying to recreate it')
+                self.reconnect()
+                return self.readFile(shareName=shareName, path=path, mode=mode, offset=offset, password=password, shareAccessMode=shareAccessMode, bypass_shared_violation=bypass_shared_violation)
             else:
                 logging.debug(str(e))
         finally:
