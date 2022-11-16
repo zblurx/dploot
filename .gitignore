@@ -2,3 +2,5 @@ venv
 *.egg-info
 build
 dist
+*.pyc
+*.spec
