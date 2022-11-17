@@ -1,5 +1,5 @@
 import logging
-from typing import Any, List
+from typing import Any, Dict, List
 from Cryptodome.Cipher import AES, PKCS1_v1_5
 from Cryptodome.PublicKey import RSA
 from binascii import unhexlify
@@ -14,7 +14,9 @@ from impacket.dpapi import MasterKeyFile, MasterKey, CredHist, DomainKey,  DPAPI
 
 from dploot.lib.crypto import PRIVATE_KEY_RSA, PVKFile, PVKFile_SIG, PVKHeader, deriveKeysFromUser, deriveKeysFromUserkey, pvkblob_to_pkcs1
 
-def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_systemkey:dict()= None, sid: str = '', password:str = None, nthash:str = None) -> Any:
+def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_systemkey:Dict= None, sid: str = '', password:str = None, nthash:str = None) -> Any:
+    if domain_backupkey is None and password is None and nthash is None and dpapi_systemkey is None:
+        return None
     data = masterkey
     mkf= MasterKeyFile(data)
     dk = mk = ch = bkmk = None
@@ -25,17 +27,10 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
 
     if mkf['BackupKeyLen'] > 0:
         bkmk = MasterKey(data[:mkf['BackupKeyLen']])
-        # bkmk.dump()
         data = data[len(bkmk):]
-
-    if mkf['CredHistLen'] > 0:
-        ch = CredHist(data[:mkf['CredHistLen']])
-        # ch.dump()
-        data = data[len(ch):]
 
     if mkf['DomainKeyLen'] > 0:
         dk = DomainKey(data[:mkf['DomainKeyLen']])
-        # dk.dump()
         data = data[len(dk):]
 
     if domain_backupkey is not None and dk is not None:
@@ -48,91 +43,72 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
             domain_master_key = DPAPI_DOMAIN_RSA_MASTER_KEY(decryptedKey)
             key = domain_master_key['buffer'][:domain_master_key['cbMasterKey']]
             return key
-
-    if dpapi_systemkey is not None:
-        decryptedKey = mk.decrypt(dpapi_systemkey['UserKey'])
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = mk.decrypt(dpapi_systemkey['MachineKey'])
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = bkmk.decrypt(dpapi_systemkey['UserKey'])
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = bkmk.decrypt(dpapi_systemkey['MachineKey'])
-        if decryptedKey:
-            return decryptedKey
-
-    if dpapi_systemkey is not None and sid != '':
-        key1, key2 = deriveKeysFromUserkey(sid, dpapi_systemkey['UserKey'])
-        decryptedKey = mk.decrypt(key1)
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = mk.decrypt(key2)
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = bkmk.decrypt(key1)
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = bkmk.decrypt(key2)
-        if decryptedKey:
-            return decryptedKey
-        key1, key2 = deriveKeysFromUserkey(sid, dpapi_systemkey['MachineKey'])
-        decryptedKey = mk.decrypt(key1)
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = mk.decrypt(key2)
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = bkmk.decrypt(key1)
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = bkmk.decrypt(key2)
-        if decryptedKey:
-            return decryptedKey
-
     if nthash is not None and sid != '':
+        nthash = unhexlify(nthash)
         key1, key2 = deriveKeysFromUserkey(sid, nthash)
-        decryptedKey = mk.decrypt(key1)
-        if decryptedKey:
-            return decryptedKey
         decryptedKey = mk.decrypt(key2)
         if decryptedKey:
             return decryptedKey
-        decryptedKey = bkmk.decrypt(key1)
+        decryptedKey = mk.decrypt(key1)
         if decryptedKey:
             return decryptedKey
-        decryptedKey = bkmk.decrypt(key2)
-        if decryptedKey:
-            return decryptedKey
-
+        # decryptedKey = bkmk.decrypt(key2)
+        # if decryptedKey:
+        #     return decryptedKey
+        # decryptedKey = bkmk.decrypt(key1)
+        # if decryptedKey:
+        #     return decryptedKey
+        
     if password is not None and sid != '':
         key1, key2, key3 = deriveKeysFromUser(sid, password)
-
         decryptedKey = mk.decrypt(key3)
         if decryptedKey:
             return decryptedKey
-
         decryptedKey = mk.decrypt(key2)
         if decryptedKey:
             return decryptedKey
-
         decryptedKey = mk.decrypt(key1)
         if decryptedKey:
             return decryptedKey
-
-        decryptedKey = bkmk.decrypt(key3)
-        if decryptedKey:
-            return decryptedKey
-
-        decryptedKey = bkmk.decrypt(key2)
-        if decryptedKey:
-            return decryptedKey
-
-        decryptedKey = bkmk.decrypt(key1)
-        if decryptedKey:
-            return decryptedKey
-            
+        # decryptedKey = bkmk.decrypt(key3)
+        # if decryptedKey:
+        #     return decryptedKey
+        # decryptedKey = bkmk.decrypt(key2)
+        # if decryptedKey:
+        #     return decryptedKey
+        # decryptedKey = bkmk.decrypt(key1)
+        # if decryptedKey:
+        #     return decryptedKey 
+    if dpapi_systemkey is not None:
+        if sid != '':
+            key1, key2 = deriveKeysFromUserkey(sid, dpapi_systemkey['UserKey'])
+            if key2 is not None:
+                decryptedKey = mk.decrypt(key2)
+                if decryptedKey:
+                    return decryptedKey
+            decryptedKey = mk.decrypt(key1)
+            if decryptedKey:
+                return decryptedKey
+            if key2 is not None:
+                decryptedKey = bkmk.decrypt(key2)
+                if decryptedKey:
+                    return decryptedKey
+            decryptedKey = bkmk.decrypt(key1)
+            if decryptedKey:
+                return decryptedKey
+        else:
+            decryptedKey = mk.decrypt(dpapi_systemkey['UserKey'])
+            if decryptedKey:
+                return decryptedKey
+            decryptedKey = mk.decrypt(dpapi_systemkey['MachineKey'])
+            if decryptedKey:
+                return decryptedKey
+            decryptedKey = bkmk.decrypt(dpapi_systemkey['UserKey'])
+            if decryptedKey:
+                return decryptedKey
+            decryptedKey = bkmk.decrypt(dpapi_systemkey['MachineKey'])
+            if decryptedKey:
+                return decryptedKey  
     return None
 
 def decrypt_credential(credential_bytes:bytes, masterkey:MasterKey) -> Any:

@@ -255,7 +255,6 @@ def deriveKeysFromUser(sid, password):
     return key1, key2, key3
 
 def deriveKeysFromUserkey(sid, nthash):
-    nthash = unhexlify(nthash)
     key1 = key2 = None
     if len(nthash) == 20:
         # SHA1
