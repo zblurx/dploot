@@ -58,7 +58,7 @@ class CredentialsTriage:
         credential_dirs = self.conn.listDirs(self.share, self.system_credentials_generic_path)
         for system_credential_path,system_credential_dir in credential_dirs.items():
             if system_credential_dir is not None:
-                credentials = self.triage_credentials_folder(credential_folder_path=system_credential_path,credential_folder=system_credential_dir, winuser='SYSTEM')
+                credentials += self.triage_credentials_folder(credential_folder_path=system_credential_path,credential_folder=system_credential_dir, winuser='SYSTEM')
         return credentials
 
     def triage_credentials(self) -> List[Credential]:
