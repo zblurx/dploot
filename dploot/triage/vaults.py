@@ -14,7 +14,7 @@ from dploot.lib.utils import is_guid
 from dploot.triage.masterkeys import Masterkey
 
 class VaultCred:
-    def __init__(self, blob, type: VAULT_INTERNET_EXPLORER|VAULT_WIN_BIO_KEY|VAULT_NGC_ACCOOUNT| Any, username: str = None, resource: str = None, password: str = None, sid: str = None, friendly_name: str = None, biometric_key: str = None, unlock_key: str = None, IV: str = None, cipher_text: str = None):
+    def __init__(self, blob, type: "VAULT_INTERNET_EXPLORER|VAULT_WIN_BIO_KEY|VAULT_NGC_ACCOOUNT| Any", username: str = None, resource: str = None, password: str = None, sid: str = None, friendly_name: str = None, biometric_key: str = None, unlock_key: str = None, IV: str = None, cipher_text: str = None):
         self.blob = blob
         if type is VAULT_INTERNET_EXPLORER:
             self.type = 'Internet Explorer'

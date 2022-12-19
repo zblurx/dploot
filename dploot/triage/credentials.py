@@ -11,7 +11,7 @@ from dploot.lib.utils import is_credfile
 from dploot.triage.masterkeys import Masterkey
 
 class Credential:
-    def __init__(self, winuser: str, credblob: CREDENTIAL_BLOB | Any, target: str, description: str, unknown: str, username: str, password: str):
+    def __init__(self, winuser: str, credblob: "CREDENTIAL_BLOB | Any", target: str, description: str, unknown: str, username: str, password: str):
         self.winuser = winuser
         self.credblob = credblob
         self.target = target

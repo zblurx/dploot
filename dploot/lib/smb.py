@@ -51,7 +51,7 @@ class DPLootSMBConnection:
             sys.exit(1)
         return self.smb_session
 
-    def remote_list_dir(self, share, path, wildcard=True) -> (Any | None):
+    def remote_list_dir(self, share, path, wildcard=True) -> "Any | None":
         if wildcard:
             path = ntpath.join(path, '*')
         try:
@@ -95,7 +95,7 @@ class DPLootSMBConnection:
 
         return result
 
-    def getFile(self,  *args, **kwargs) -> (Any | None):
+    def getFile(self,  *args, **kwargs) -> "Any | None":
         return self.smb_session.getFile(*args, **kwargs)
 
     def readFile(self, shareName, path, mode = FILE_OPEN, offset = 0, password = None, shareAccessMode = FILE_SHARE_READ, bypass_shared_violation = False) -> bytes:

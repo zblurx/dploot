@@ -125,7 +125,7 @@ def decrypt_credential(credential_bytes:bytes, masterkey:MasterKey) -> Any:
         return creds
     return None
 
-def find_masterkey_for_credential_blob(credential_bytes:bytes, masterkeys: Any) -> Any | None:
+def find_masterkey_for_credential_blob(credential_bytes:bytes, masterkeys: Any) -> "Any | None":
     cred = CredentialFile(credential_bytes)
     return find_masterkey_for_blob(cred['Data'], masterkeys=masterkeys)
 
@@ -141,7 +141,7 @@ def decrypt_privatekey(privatekey_bytes:bytes, masterkey:Any, cng: bool = False)
     pkcs1 = pvkblob_to_pkcs1(rsa_temp)
     return pkcs1
 
-def find_masterkey_for_privatekey_blob(privatekey_bytes:bytes, masterkeys: List[Any], cng: bool = False) -> Any | None:
+def find_masterkey_for_privatekey_blob(privatekey_bytes:bytes, masterkeys: List[Any], cng: bool = False) -> "Any | None":
     blob= PVKHeader(privatekey_bytes)
     if len(blob['Remaining']) == 0:
         return None
@@ -153,7 +153,7 @@ def find_masterkey_for_privatekey_blob(privatekey_bytes:bytes, masterkeys: List[
     masterkey = bin_to_string(blob['Blob']['GuidMasterKey'])
     return find_masterkey(masterkey=masterkey, masterkeys=masterkeys)
 
-def decrypt_vpol(vpol_bytes:bytes, masterkey:Any) -> (VAULT_VPOL_KEYS | None):
+def decrypt_vpol(vpol_bytes:bytes, masterkey:Any) -> "VAULT_VPOL_KEYS | None":
     vpol = VAULT_VPOL(vpol_bytes)
     blob = vpol['Blob']
 
@@ -194,7 +194,7 @@ def decrypt_vcrd(vcrd_bytes:bytes, vpol_keys:List[bytes]) -> Any:
                 pass
     return None
 
-def find_masterkey_for_vpol_blob(vault_bytes:bytes, masterkeys: Any) -> Any | None:
+def find_masterkey_for_vpol_blob(vault_bytes:bytes, masterkeys: Any) -> "Any | None":
     vault = VAULT_VPOL(vault_bytes)
     blob = vault['Blob']
     masterkey = bin_to_string(blob['GuidMasterKey'])
@@ -210,7 +210,7 @@ def decrypt_blob(blob_bytes:bytes, masterkey:Any, entropy = None) -> Any:
         decrypted = decrypt(blob, key)
     return decrypted
 
-def decrypt(blob, keyHash, entropy = None) -> (bytes | None):
+def decrypt(blob, keyHash, entropy = None) -> "bytes | None":
     sessionKey = HMAC.new(keyHash, blob['Salt'], ALGORITHMS_DATA[blob['HashAlgo']][1])
     if entropy is not None:
         sessionKey.update(entropy)
@@ -255,12 +255,12 @@ def decrypt(blob, keyHash, entropy = None) -> (bytes | None):
     else:
         return None
 
-def find_masterkey_for_blob(blob_bytes:bytes, masterkeys: Any) -> Any | None:
+def find_masterkey_for_blob(blob_bytes:bytes, masterkeys: Any) -> "Any | None":
     blob = DPAPI_BLOB(blob_bytes)
     masterkey = bin_to_string(blob['GuidMasterKey'])
     return find_masterkey(masterkey=masterkey, masterkeys=masterkeys)
 
-def find_masterkey(masterkey:  str, masterkeys: Any) -> Any | None:
+def find_masterkey(masterkey:  str, masterkeys: Any) -> "Any | None":
     for mk in masterkeys:
         if masterkey.lower() == mk.guid.lower():
             return mk
