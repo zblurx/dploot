@@ -1,4 +1,4 @@
-install: build clean
+all: build clean
 
 clean:
 	rm -f -r build/
@@ -10,11 +10,11 @@ clean:
 	find . -name '__pycache__' -exec rm -rf  {} +
 
 rebuild: clean
-	python setup.py install
+	pip install .
 
 publish: clean
 	python setup.py sdist bdist_wheel
 	python -m twine upload dist/*
 
 build: clean
-	python setup.py install
+	pip install .
