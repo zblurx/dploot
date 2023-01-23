@@ -59,7 +59,7 @@ class CertificatesAction:
             logging.info('Triage Certificates for ALL USERS\n')
             certificates = triage.triage_certificates()
             for certificate in certificates:
-                if self.options.dump_all and not certificate.clientauth:
+                if not self.options.dump_all and not certificate.clientauth:
                     continue
                 if not self.options.quiet:
                     certificate.dump()

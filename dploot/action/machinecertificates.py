@@ -55,7 +55,7 @@ class MachineCertificatesAction:
             logging.info('Triage SYSTEM Certificates\n')
             certificates = certificate_triage.triage_system_certificates()
             for certificate in certificates:
-                if self.options.dump_all and not certificate.clientauth:
+                if not self.options.dump_all and not certificate.clientauth:
                     continue
                 if not self.options.quiet:
                     certificate.dump()
