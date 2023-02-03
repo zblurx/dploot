@@ -47,7 +47,9 @@ pip install dploot
 OR
 
 ```text
-pipx install dploot
+git clone https://github.com/zblurx/dploot.git
+cd dploot
+make
 ```
 
 ## Usage
