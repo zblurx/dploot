@@ -133,8 +133,8 @@ class MasterkeysTriage:
                                 masterkey=masterkey_bytes,
                                 domain_backupkey=self.pvkbytes,
                                 sid=sid, 
-                                password=self.passwords[user] if self.passwords is not None and user in self.passwords else None,
-                                nthash=self.nthashes[user] if self.nthashes is not None and user in self.nthashes else None,
+                                password=self.passwords[user.lower()] if self.passwords is not None and user.lower() in self.passwords else None,
+                                nthash=self.nthashes[user.lower()] if self.nthashes is not None and user.lower() in self.nthashes else None,
                                 )
                             if key is not None:
                                 masterkeys.append(Masterkey(guid=guid, sha1=hexlify(SHA1.new(key).digest()).decode('latin-1'), user=user))

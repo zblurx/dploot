@@ -105,7 +105,13 @@ def parse_masterkeys_options(options: argparse.Namespace, target: Target) -> Tup
     if target.nthash != '':
         if nthashes is None:
             nthashes = dict()
-        nthashes[target.username] = target.nthash
+        nthashes[target.username] = target.nthash.lower()
+
+    if nthashes is not None:
+        nthashes = {k.lower():v.lower() for k, v in nthashes.items()}
+    
+    if passwords is not None:
+        passwords = {k.lower():v for k, v in passwords.items()}
 
     return pvkbytes, passwords, nthashes
 
