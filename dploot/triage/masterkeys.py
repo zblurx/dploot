@@ -129,12 +129,22 @@ class MasterkeysTriage:
                         masterkey_bytes = self.conn.readFile(self.share, filepath)
                         if masterkey_bytes is not None:
                             self.looted_files[guid] = masterkey_bytes
+                            password = None
+                            nthash = None
+                            if self.passwords is not None and user.lower() in self.passwords:
+                                password = self.passwords[user.lower()]
+                            elif self.passwords is not None and user.rpartition('.')[0].lower() in self.passwords:
+                                password = self.passwords[user.rpartition('.')[0].lower()] # In case of duplicate (like admin and admin.waza) on usernames in c:\Users\
+                            if self.nthashes is not None and user.lower() in self.nthashes:
+                                nthash = self.nthashes[user.lower()]
+                            elif self.nthashes is not None and user.rpartition('.')[0].lower() in self.nthashes:
+                                nthash = self.nthashes[user.rpartition('.')[0].lower()]
                             key = decrypt_masterkey(
                                 masterkey=masterkey_bytes,
                                 domain_backupkey=self.pvkbytes,
                                 sid=sid, 
-                                password=self.passwords[user.lower()] if self.passwords is not None and user.lower() in self.passwords else None,
-                                nthash=self.nthashes[user.lower()] if self.nthashes is not None and user.lower() in self.nthashes else None,
+                                password=password,
+                                nthash=nthash,
                                 )
                             if key is not None:
                                 masterkeys.append(Masterkey(guid=guid, sha1=hexlify(SHA1.new(key).digest()).decode('latin-1'), user=user))
