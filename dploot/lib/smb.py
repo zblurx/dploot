@@ -1,3 +1,4 @@
+import socket
 import sys
 import ntpath
 import logging
@@ -7,6 +8,8 @@ from typing import Any, Dict, List
 from dploot.lib.target import Target
 
 from impacket.smbconnection import SMBConnection
+from impacket.smb import SMB_DIALECT
+from impacket.nmb import NetBIOSTimeout
 from impacket.examples.secretsdump import RemoteOperations
 from impacket.smb3structs import FILE_READ_DATA, FILE_OPEN, FILE_NON_DIRECTORY_FILE, FILE_SHARE_READ
 
@@ -18,12 +21,62 @@ class DPLootSMBConnection:
 
         self.smb_session = None
         self.remote_ops = None
+        self.smbv1 = False
+
+    def create_smbv1_conn(self, kdc=''):
+        try:
+            self.smb_session = SMBConnection(self.target.address if not kdc else kdc, self.target.address if not kdc else kdc, None, preferredDialect=SMB_DIALECT)
+            self.smbv1 = True
+        except socket.error as e:
+            if str(e).find('Connection reset by peer') != -1:
+                logging.debug('SMBv1 might be disabled on {}'.format(self.target.address if not kdc else kdc))
+            return False
+        except (Exception, NetBIOSTimeout) as e:
+            logging.debug('Error creating SMBv1 connection to {}: {}'.format(self.target.address if not kdc else kdc, e))
+            return False
+
+        return True
+
+    def create_smbv3_conn(self, kdc=''):
+        try:
+            self.smb_session = SMBConnection(self.target.address if not kdc else kdc, self.target.address if not kdc else kdc, None)
+            self.smbv1 = False
+        except socket.error as e:
+            if str(e).find('Too many open files') != -1:
+                logging.error('SMBv3 connection error on {}: {}'.format(self.target.address if not kdc else kdc, e))
+            return False
+        except (Exception, NetBIOSTimeout) as e:
+            logging.debug('Error creating SMBv3 connection to {}: {}'.format(self.target.address if not kdc else kdc, e))
+            return False
+
+        return True
+
+    def create_conn_obj(self, kdc=''):
+        if self.create_smbv3_conn(kdc):
+            return True
+        elif self.create_smbv1_conn(kdc):
+            return True
+
+        return False
 
     def connect(self) -> None:
         try:
-            self.smb_session = SMBConnection(self.target.address,self.target.address)
             if self.target.do_kerberos:
                 logging.debug("Authenticating with %s through Kerberos" % self.target.username)
+                # getting hostname
+                no_ntlm = False
+                self.create_conn_obj()
+                try:
+                    self.smb_session.login('' , '')
+                except Exception as e:
+                    if "STATUS_NOT_SUPPORTED" in str(e):
+                        no_ntlm = True
+                    pass
+                hostname = self.smb_session.getServerName() if not no_ntlm else self.target.address
+                self.smb_session.close()
+                self.target.address = hostname + "." + self.target.domain
+                logging.debug("Connecting to %s" % self.target.address)
+                self.create_conn_obj()
                 self.smb_session.kerberosLogin(
                     user=self.target.username,
                     password=self.target.password,
@@ -36,6 +89,8 @@ class DPLootSMBConnection:
                     )
             else:
                 logging.debug("Authenticating with %s through NTLM" % self.target.username)
+                logging.debug("Connecting to %s" % self.target.address)
+                self.create_conn_obj()
                 self.smb_session.login(
                     user=self.target.username,
                     password=self.target.password,
