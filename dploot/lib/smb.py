@@ -169,7 +169,8 @@ class DPLootSMBConnection:
             fileId = self.smb_session.openFile(treeId, path, FILE_READ_DATA, shareAccessMode, FILE_NON_DIRECTORY_FILE, mode, 0)
             fileInfo = self.smb_session.queryInfo(treeId, fileId)
             fileSize = fileInfo['EndOfFile']
-            if (fileSize-offset) < self.smb_session._SMBConnection._Connection['MaxReadSize']:
+            res = self.smb_session._SMBConnection.getIOCapabilities()
+            if (fileSize-offset) < res['MaxReadSize']:
                 # Skip reading 0 bytes files.
                 if (fileSize-offset) > 0:
                     data = self.smb_session._SMBConnection.read(treeId, fileId, offset, fileSize-offset)
@@ -177,7 +178,7 @@ class DPLootSMBConnection:
                 written = 0
                 toBeRead = fileSize-offset
                 while written < toBeRead:
-                    data = self.smb_session._SMBConnection.read(treeId, fileId, offset, self.smb_session._SMBConnection._Connection['MaxReadSize'])
+                    data = self.smb_session._SMBConnection.read(treeId, fileId, offset, res['MaxReadSize'])
                     written += len(data)
                     offset  += len(data)
         except Exception as e:
