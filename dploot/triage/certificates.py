@@ -95,41 +95,35 @@ class CertificatesTriage:
         ans = rrp.hOpenLocalMachine(self.conn.remote_ops._RemoteOperations__rrp)
         regHandle = ans['phKey']
         certificate_keys = []
-        enumerated = False
-        index = 0
         certificates = {}
+        ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, my_certificates_key, samDesired=rrp.KEY_ENUMERATE_SUB_KEYS)
+        keyHandle = ans['phkResult']
         try:
-            ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, my_certificates_key)
-            keyHandle = ans['phkResult']
-            while not enumerated:
-                enum_ans = rrp.hBaseRegEnumKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, str(index))
-                if len(certificate_keys) > 0:
-                    if  enum_ans['lpNameOut'][:-1] in certificate_keys:
-                        enumerated = True
-                        continue
+            for index in range(100):
+                enum_ans = rrp.hBaseRegEnumKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, index)
                 certificate_keys.append(enum_ans['lpNameOut'][:-1])
-                index += 1
             rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
-            for certificate_key in certificate_keys:
-                try:
-                    regKey = my_certificates_key + '\\' + certificate_key
-                    ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, regKey)
-                    keyHandle = ans['phkResult']
-                    _, certblob_bytes = rrp.hBaseRegQueryValue(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, 'Blob')
-                    certblob = CERTBLOB(certblob_bytes)
-                    if certblob.der is not None:
-                        cert = self.der_to_cert(certblob.der)
-                        certificates[certificate_key] = cert
-                    rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
-                except Exception as e:
-                    if logging.getLogger().level == logging.DEBUG:
-                        import traceback
-                        traceback.print_exc()
-                        logging.debug(str(e))
         except rrp.DCERPCSessionError as e:
-            if e.error_code == 2:
-                return 'ERROR_FILE_NOT_FOUND'
+            if e.error_code == 0x00000103:
+                pass
             elif logging.getLogger().level == logging.DEBUG:
+                    import traceback
+                    traceback.print_exc()
+                    logging.debug(str(e))
+        for certificate_key in certificate_keys:
+            try:
+                regKey = my_certificates_key + '\\' + certificate_key
+                ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, regKey)
+                keyHandle = ans['phkResult']
+                _, certblob_bytes = rrp.hBaseRegQueryValue(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, 'Blob')
+                logging.debug("Found Certificates Blob: \\\\%s\\%s" %  (self.target.address,regKey))
+                certblob = CERTBLOB(certblob_bytes)
+                if certblob.der is not None:
+                    cert = self.der_to_cert(certblob.der)
+                    certificates[certificate_key] = cert
+                rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
+            except Exception as e:
+                if logging.getLogger().level == logging.DEBUG:
                     import traceback
                     traceback.print_exc()
                     logging.debug(str(e))
