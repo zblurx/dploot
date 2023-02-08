@@ -42,10 +42,10 @@ class MachineMasterkeysAction:
             masterkeys = triage.triage_system_masterkeys()
             if self.outputfile is not None:
                 with open(self.outputfile + '.mkf', ('a+' if self.append else 'w')) as file:
+                    logging.critical("Writting masterkeys to %s" % self.outputfile)
                     for masterkey in masterkeys:
                         masterkey.dump()
                         file.write(str(masterkey)+'\n')
-                        logging.critical("Writting masterkeys to %s" % self.outputfile)
             else:
                 for masterkey in masterkeys:
                     masterkey.dump()
