@@ -4,7 +4,6 @@ import logging
 import ntpath
 import tempfile
 import sqlite3
-import time
 from typing import List, Tuple
 from dploot.lib.crypto import decrypt_chrome_password
 
@@ -185,26 +184,7 @@ class BrowserTriage:
                                     expires_utc=expires_utc,
                                     last_access_utc=last_access_utc))
                         fh.close()
-                        break
         return credentials, cookies
-
-    # def readFile_through_wmi(self, shareName, filepath):
-    #     wmiexec = DPLootWmiExec(target=self.target)
-    #     command = "cmd.exe /Q /c copy \"C:\\%s\" \"C:\\%s\"" % (filepath,wmiexec.output)
-    #     # command = "cmd.exe /Q /c esentutl.exe /y \"C:\\%s\" /d \"C:\\%s\"" % (path,'bonjour')
-    #     wmiexec.run(command)
-    #     while True:
-    #         try:
-    #             data = self.conn.readFile(shareName=shareName, path=wmiexec.output)
-    #             break
-    #         except Exception as e:
-    #             if str(e).find('STATUS_SHARING_VIOLATION') >=0:
-    #                 # Output not finished, let's wait
-    #                 time.sleep(1)
-    #                 print("hey "+str(e))
-    #                 pass
-    #     self.conn.sb.deleteFile(shareName, wmiexec.output)
-    #     return data
 
     @property
     def users(self) -> List[str]:
