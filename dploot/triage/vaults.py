@@ -78,7 +78,7 @@ class VaultsTriage:
         vault_dirs = self.conn.listDirs(self.share, self.system_vault_generic_path)
         for system_vault_path,system_vault_dir in vault_dirs.items():
             if system_vault_dir is not None:
-                vaults_creds += self.triage_vaults_folder(vaults_folder_path=system_vault_path,vaults_folder=system_vault_dir)
+                vaults_creds += self.triage_vaults_folder(user = 'SYSTEM', vaults_folder_path=system_vault_path,vaults_folder=system_vault_dir)
         return vaults_creds
 
     def triage_vaults(self) -> List[VaultCred]:
