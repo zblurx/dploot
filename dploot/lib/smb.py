@@ -188,7 +188,7 @@ class DPLootSMBConnection:
                 pass
             elif bypass_shared_violation and 'STATUS_SHARING_VIOLATION' in str(e):
                 wmiexec = DPLootWmiExec(target=self.target)
-                command = "cmd.exe /Q /c copy \"C:\\%s\" \"C:\\%s\"" % (path,wmiexec.output)
+                command = "cmd.exe /Q /c copy \"C:\\%s\" \"C:\\Windows\\Temp\\%s\"" % (path,wmiexec.output)
                 wmiexec.run(command)
                 time.sleep(1)
                 while True:

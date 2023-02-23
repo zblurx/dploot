@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="dploot",
-    version="2.1.15",
+    version="2.1.16",
     author="zblurx",
     author_email="seigneuret.thomas@pm.me",
     description="DPAPI looting remotely in Python",
