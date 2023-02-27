@@ -31,7 +31,7 @@ class Target:
             not password
             and username != ""
             and options.hashes is None
-            and options.aes is None
+            and options.aesKey is None
             and options.no_pass is not True
             and options.do_kerberos is not True
         ):
