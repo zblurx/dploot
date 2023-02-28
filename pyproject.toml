@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "dploot"
+version = "2.1.18"
+description = "DPAPI looting remotely in Python"
+readme = "README.md"
+homepage = "https://github.com/zblurx/dploot"
+repository = "https://github.com/zblurx/dploot"
+keywords = ["DPAPI", "credentials", "Windows"]
+authors = ["zblurx <seigneuret.thomas@protonmail.com>"]
+license = "MIT"
+classifiers = [
+    "Topic :: Security",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Environment :: Console"
+]
+packages = [
+    { include = "dploot"},
+    { include = "dploot/lib"},
+    { include = "dploot/action"},
+    { include = "dploot/triage"},
+]
+
+[tool.poetry.scripts]
+dploot = "dploot.entry:main"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+impacket = "^0.10.0"
+cryptography = "^37.0"
+pyasn1 = "^0.4.8"
+lxml = "4.9.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
