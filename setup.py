@@ -12,7 +12,7 @@ setup(
     license="MIT",
     install_requires=[
         "impacket>=0.10.0",
-        "cryptography>=37.0",
+        "cryptography>=39.0.1",
         "pyasn1>=0.4.8",
         "lxml==4.9.2"
     ],
