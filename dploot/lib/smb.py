@@ -76,7 +76,7 @@ class DPLootSMBConnection:
                 self.smb_session.close()
                 self.target.address = hostname + "." + self.target.domain
                 logging.debug("Connecting to %s" % self.target.address)
-                self.create_conn_obj()
+                self.create_conn_obj(self.target.address)
                 self.smb_session.kerberosLogin(
                     user=self.target.username,
                     password=self.target.password,

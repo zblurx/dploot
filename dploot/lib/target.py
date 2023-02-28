@@ -33,7 +33,6 @@ class Target:
             and options.hashes is None
             and options.aesKey is None
             and options.no_pass is not True
-            and options.do_kerberos is not True
         ):
             from getpass import getpass
 
@@ -47,7 +46,8 @@ class Target:
             else:
                 lmhash, nthash = hashes
         else:
-            lmhash = nthash = ''
+            nthash = ''
+            lmhash = ''
         
         if options.dc_ip is None:
             options.dc_ip = options.target
@@ -63,6 +63,7 @@ class Target:
         self.use_kcache = options.use_kcache
         self.dc_ip = options.dc_ip
         self.aesKey = options.aesKey
+
         return self
 
     @staticmethod
@@ -180,10 +181,7 @@ def add_target_argument_group(parser: argparse.ArgumentParser,) -> None:
     group.add_argument(
         "-k",
         action="store_true",
-        help="Use Kerberos authentication. Grabs credentials from ccache file "
-        "(KRB5CCNAME) based on target parameters. If valid credentials "
-        "cannot be found, it will use the ones specified in the command "
-        "line",
+        help="Use Kerberos authentication"
     )
     group.add_argument('-aesKey', action="store", metavar = "hex key", help='AES key to use for Kerberos Authentication (128 or 256 bits)')
     group.add_argument("-use-kcache", action='store_true', help="Use Kerberos authentication from ccache file (KRB5CCNAME)")
