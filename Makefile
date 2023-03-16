@@ -13,8 +13,8 @@ rebuild: clean
 	pip install .
 
 publish: clean
-	python setup.py sdist bdist_wheel
-	python -m twine upload dist/*
+	python3 -m build
+	python3 -m twine upload dist/*
 
 build: clean
 	pip install .

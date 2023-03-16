@@ -1,6 +1,7 @@
 import argparse
 import logging
 from binascii import hexlify
+import sys
 from typing import Callable, Tuple
 
 from dploot.lib.target import Target, add_target_argument_group
@@ -28,7 +29,9 @@ class BackupkeyAction:
 
     def connect(self) -> None:
         self.conn = DPLootSMBConnection(self.target)
-        self.conn.connect()
+        if self.conn.connect() is None:
+            logging.error("Could not connect to %s" % self.target.address)
+            sys.exit(1)
 
     def run(self) -> None:
         self.connect()

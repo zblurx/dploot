@@ -40,7 +40,9 @@ class CredentialsAction:
 
     def connect(self) -> None:
         self.conn = DPLootSMBConnection(self.target)
-        self.conn.connect()
+        if self.conn.connect() is None:
+            logging.error("Could not connect to %s" % self.target.address)
+            sys.exit(1)
 
     def run(self) -> None:
         self.connect()

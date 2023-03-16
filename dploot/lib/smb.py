@@ -56,16 +56,16 @@ class DPLootSMBConnection:
             return True
         elif self.create_smbv1_conn(kdc):
             return True
-
+        logging.debug("Could not create connection object to %s" % (self.target.address if not kdc else kdc))
         return False
 
-    def connect(self) -> None:
+    def connect(self) -> "Any | None":
         try:
             if self.target.do_kerberos:
-                logging.debug("Authenticating with %s through Kerberos" % self.target.username)
                 # getting hostname
                 no_ntlm = False
-                self.create_conn_obj()
+                if not self.create_conn_obj():
+                    return None
                 try:
                     self.smb_session.login('' , '')
                 except Exception as e:
@@ -76,7 +76,9 @@ class DPLootSMBConnection:
                 self.smb_session.close()
                 self.target.address = hostname + "." + self.target.domain
                 logging.debug("Connecting to %s" % self.target.address)
-                self.create_conn_obj(self.target.address)
+                if not self.create_conn_obj(self.target.address):
+                    return None
+                logging.debug("Authenticating with %s through Kerberos" % self.target.username)
                 self.smb_session.kerberosLogin(
                     user=self.target.username,
                     password=self.target.password,
@@ -88,9 +90,10 @@ class DPLootSMBConnection:
                     useCache=self.target.use_kcache,
                     )
             else:
-                logging.debug("Authenticating with %s through NTLM" % self.target.username)
                 logging.debug("Connecting to %s" % self.target.address)
-                self.create_conn_obj()
+                if not self.create_conn_obj():
+                    return None
+                logging.debug("Authenticating with %s through NTLM" % self.target.username)
                 self.smb_session.login(
                     user=self.target.username,
                     password=self.target.password,
@@ -103,7 +106,7 @@ class DPLootSMBConnection:
                 import traceback
                 traceback.print_exc()
                 logging.debug(str(e))
-            sys.exit(1)
+            return None
         return self.smb_session
 
     def remote_list_dir(self, share, path, wildcard=True) -> "Any | None":
