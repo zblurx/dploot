@@ -196,7 +196,8 @@ class DPLootSMBConnection:
                 time.sleep(1)
                 while True:
                     try:
-                        data = self.readFile(shareName=shareName, path=wmiexec.output)
+                        filepath = "Windows\\Temp\\" + wmiexec.output
+                        data = self.readFile(shareName=shareName, path=filepath)
                         break
                     except Exception as e:
                         if str(e).find('STATUS_SHARING_VIOLATION') >=0:
