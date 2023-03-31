@@ -180,10 +180,12 @@ class DPLootSMBConnection:
             else:
                 written = 0
                 toBeRead = fileSize-offset
+                data = b''
                 while written < toBeRead:
-                    data = self.smb_session._SMBConnection.read(treeId, fileId, offset, res['MaxReadSize'])
-                    written += len(data)
-                    offset  += len(data)
+                    bytesRead = self.smb_session._SMBConnection.read(treeId, fileId, offset, res['MaxReadSize'])
+                    written += len(bytesRead)
+                    offset  += len(bytesRead)
+                    data += bytesRead
         except Exception as e:
             if 'STATUS_OBJECT_PATH_NOT_FOUND' in str(e):
                 pass
