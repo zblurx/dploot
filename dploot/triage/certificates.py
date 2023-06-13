@@ -9,7 +9,7 @@ from Cryptodome.PublicKey import RSA
 from cryptography import x509
 from cryptography.hazmat._oid import ExtensionOID
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.asymmetric.types import PRIVATE_KEY_TYPES
+from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, pkcs12, PublicFormat, load_der_private_key
 from pyasn1.codec.der import decoder
 from pyasn1.type.char import UTF8String
@@ -24,7 +24,7 @@ from dploot.triage.masterkeys import Masterkey
 PRINCIPAL_NAME = x509.ObjectIdentifier("1.3.6.1.4.1.311.20.2.3")
 
 class Certificate:
-    def __init__(self, winuser: str, cert:x509.Certificate, pkey: PRIVATE_KEY_TYPES, pfx: bytes, username: str, filename: str, clientauth: bool):
+    def __init__(self, winuser: str, cert:x509.Certificate, pkey: PrivateKeyTypes, pfx: bytes, username: str, filename: str, clientauth: bool):
         self.winuser = winuser
         self.cert = cert
         self.pkey = pkey
