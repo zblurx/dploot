@@ -2,8 +2,9 @@ from binascii import unhexlify
 import logging
 import ntpath
 from typing import Any, List
-from xml.dom import minidom
 from lxml import objectify
+
+from impacket.dcerpc.v5 import rrp
 
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 
@@ -22,7 +23,7 @@ EAP_TYPES = {
 
 class WifiCred:
 
-    def __init__(self, ssid: str, auth: str, encryption: str, password: str = None, xml_data: Any = None) -> None:
+    def __init__(self, ssid: str, auth: str, encryption: str, password: str = None, xml_data: Any = None, eap_username: str = None, eap_password: str = None) -> None:
         self.ssid = ssid
         self.auth = auth
         self.encryption = encryption
@@ -33,6 +34,8 @@ class WifiCred:
         self.onex = None
         self.eap_host_config = None
         self.eap_type = None
+        self.eap_username = eap_username
+        self.eap_password = eap_password
 
         if self.auth == 'WPA2' or self.auth == 'WPA':
             self.onex = getattr(self.xml_data.MSM.security, "{http://www.microsoft.com/networking/OneX/v1}OneX")
@@ -43,7 +46,7 @@ class WifiCred:
     def dump(self) -> None:
         print('[WIFI]')
         print('SSID:\t\t%s' % self.ssid)
-        if self.auth.upper() in ['WPAPSK', 'WPA2PSK']:
+        if self.auth.upper() in ['WPAPSK', 'WPA2PSK','WPA3SAE']:
             print('AuthType:\t%s' % self.auth.upper())
             print('Encryption:\t%s' % self.encryption.upper())
             print('Preshared key:\t%s' % self.password.decode('latin-1'))
@@ -51,6 +54,8 @@ class WifiCred:
             print('AuthType:\t%s EAP' % self.auth.upper())
             print('Encryption:\t%s' % self.encryption.upper())
             print('EAP Type:\t%s' % self.eap_type)
+            if self.eap_username is not None and self.eap_password is not None:
+                print('Credentials:\t%s:%s' % (self.eap_username, self.eap_password))
             print()
             self.dump_all_xml(self.eap_host_config)
         elif self.auth.upper() == 'OPEN':
@@ -74,10 +79,15 @@ class WifiCred:
     def dump_quiet(self) -> None:
         if self.auth.upper() == 'OPEN':
             print("[WIFI] %s - OPEN" % (self.ssid))
-        if self.auth.upper() in ['WPAPSK', 'WPA2PSK']:
+        elif self.auth.upper() in ['WPAPSK', 'WPA2PSK','WPA3SAE']:
             print("[WIFI] %s - %s - Passphrase: %s" % (self.ssid, self.auth.upper(), self.password))
-        else:
-            print("[WIFI] %s - WPA EAP - %s" % (self.ssid, self.eap_type))
+        elif self.auth.upper() in ['WPA', 'WPA2']:
+            if self.eap_username is not None and self.eap_password is not None:
+                print("[WIFI] %s - WPA EAP - %s - %s:%s" % (self.ssid, self.eap_type, self.eap_username, self.eap_password))
+            else:
+                print("[WIFI] %s - WPA EAP - %s" % (self.ssid, self.eap_type))
+        else: 
+            print("[WIFI] %s - %s - %s" % (self.auth.upper(), self.ssid))
 
 class WifiTriage:
 
@@ -85,6 +95,7 @@ class WifiTriage:
 
     system_wifi_generic_path = "ProgramData\\Microsoft\\Wlansvc\\Profiles\\Interfaces"
     share = 'C$'
+    eap_profiles_key = "SOFTWARE\\Microsoft\\Wlansvc\\Profiles\\%s"
 
     def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey]) -> None:
         self.target = target
@@ -106,7 +117,7 @@ class WifiTriage:
                             filename = file.get_longname()
                             if file.is_directory() == 0 and filename not in self.false_positive and filename[-4:] == '.xml':
                                 wifi_interface_filepath = ntpath.join(wifi_interface_path, filename)
-                                logging.info("Found Wifi connection file: \\\\%s\\%s\\%s" %  (self.target.address,self.share,wifi_interface_filepath))
+                                logging.debug("Found Wifi connection file: \\\\%s\\%s\\%s" %  (self.target.address,self.share,wifi_interface_filepath))
                                 wifi_interface_data = self.conn.readFile(self.share, wifi_interface_filepath)
                                 self.looted_files[filename] = wifi_interface_data
 
@@ -116,7 +127,7 @@ class WifiTriage:
                                 auth_type = main.MSM.security.authEncryption.authentication.text
                                 encryption = main.MSM.security.authEncryption.encryption.text
 
-                                if auth_type == 'WPA2PSK' or auth_type == 'WPAPSK':
+                                if auth_type in ['WPA2PSK','WPAPSK','WPA3SAE']:
                                     
                                     dpapi_blob = main.MSM.security.sharedKey.keyMaterial
                                     masterkey = find_masterkey_for_blob(unhexlify(dpapi_blob.text), masterkeys=self.masterkeys)
@@ -129,49 +140,26 @@ class WifiTriage:
                                         encryption=encryption,
                                         password=password,
                                         xml_data=main))
+                                elif auth_type in ['WPA', 'WPA2']:
+                                    creds = self.triage_eap_creds(filename[:-4])
+                                    eap_username = None
+                                    eap_password = None
+                                    if creds is not None:
+                                        eap_username = creds[0].decode('latin-1')
+                                        eap_password = creds[1].decode('latin-1')
+                                    wifi_creds.append(WifiCred(
+                                        ssid=ssid,
+                                        auth=auth_type,
+                                        encryption=encryption,
+                                        xml_data=main,
+                                        eap_username=eap_username,
+                                        eap_password=eap_password))    
                                 else:
                                     wifi_creds.append(WifiCred(
                                         ssid=ssid,
                                         auth=auth_type,
                                         encryption=encryption,
-                                        xml_data=main))
-                                    # onex = getattr(main.MSM.security, "{http://www.microsoft.com/networking/OneX/v1}OneX")
-                                    # print(objectify.dump(onex.EAPConfig))
-                                    # eap_host_config = getattr(onex.EAPConfig, "{http://www.microsoft.com/provisioning/EapHostConfig}EapHostConfig")
-                                    # eap_type = getattr(eap_host_config.EapMethod, "{http://www.microsoft.com/provisioning/EapCommon}Type")
-                                    # print(eap_type)
-                                    # # onex = getattr(onex.EAPConfig, "{http://www.microsoft.com/networking/OneX/v1}EAPConfig")
-                                    # # print(objectify.dump(onex))
-                                    
-                                    # import sys
-                                    # sys.exit(1)
-
-                                # xml_data = minidom.parseString(wifi_interface_data)
-                                # ssid = xml_data.getElementsByTagName('SSID')[0].getElementsByTagName('name')[0].childNodes[0].data
-                                # auth_type = xml_data.getElementsByTagName('authentication')[0].childNodes[0].data
-                                # encryption = xml_data.getElementsByTagName('encryption')[0].childNodes[0].data
-                                # if auth_type == 'WPA2PSK' or auth_type == 'WPAPSK': # WPA Personnal
-                                #     dpapi_blob = xml_data.getElementsByTagName('keyMaterial')[0].childNodes[0].data
-                                #     masterkey = find_masterkey_for_blob(unhexlify(dpapi_blob), masterkeys=self.masterkeys)
-                                #     password = ''
-                                #     if masterkey is not None:
-                                #         password = decrypt_blob(unhexlify(dpapi_blob), masterkey=masterkey)
-                                #     wifi_creds.append(WifiCred(ssid, auth_type, encryption=encryption,password=password))
-                                # elif auth_type == 'WPA2' or auth_type == 'WPA': # WPA Entreprise
-                                #     print('waza')
-                                #     print(wifi_interface_data.decode('utf-8'))
-
-                                #     eap_type = xml_data.getElementsByTagName('Type')[0].childNodes[0].data
-                                #     eap_config = xml_data.getElementsByTagName('EAPConfig')
-                                #     print(eap_config)
-                                #     # eap_type = xml_data.getElementsByTagName('authMode')[0].childNodes[0].data
-
-                                #     # https://learn.microsoft.com/en-us/windows/win32/nativewifi/wpa2-enterprise-with-peap-mschapv2-profile-sample
-                                #     wifi_creds.append(WifiCred(ssid, auth_type, encryption=encryption,eap_type=eap_type))
-                                # elif auth_type == 'open': # OPEN
-                                #     wifi_creds.append(WifiCred(ssid, auth_type, encryption=encryption))
-                                # else:
-                                #     logging.debug('Unsupported authentication type: %s. Please open issue to improve the project!' % auth_type)
+                                        xml_data=main))               
         except Exception as e:
             if logging.getLogger().level == logging.DEBUG:
                 import traceback
@@ -179,3 +167,26 @@ class WifiTriage:
                 logging.debug(str(e))
             pass
         return wifi_creds
+    
+    def triage_eap_creds(self, eap_profile):
+        try:
+            self.conn.enable_remoteops()
+            regKey = self.eap_profiles_key % eap_profile
+            ans = rrp.hOpenLocalMachine(self.conn.remote_ops._RemoteOperations__rrp)
+            regHandle = ans['phKey']
+            ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, regKey)
+            keyHandle = ans['phkResult']
+            _, msm_bytes = rrp.hBaseRegQueryValue(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, 'MSMUserData')
+            masterkey = find_masterkey_for_blob(msm_bytes, masterkeys=self.masterkeys)
+            if masterkey is not None:
+                blob = decrypt_blob(blob_bytes=msm_bytes,masterkey=masterkey)
+                username = blob[176:].split(b'\0')[0]
+                password = blob[432:].split(b'\0')[1]
+                return (username, password)
+        except Exception as e:
+            if logging.getLogger().level == logging.DEBUG:
+                import traceback
+                traceback.print_exc()
+                logging.debug(str(e))
+            return None
+        return None
