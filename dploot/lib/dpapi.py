@@ -230,9 +230,10 @@ def decrypt(blob, keyHash, entropy = None) -> "bytes | None":
     toSign = (blob.rawData[20:][:len(blob.rawData)-20-len(blob['Sign'])-4])
 
     # Calculate the different HMACKeys
-    keyHash2 = keyHash + b"\x00"*ALGORITHMS_DATA[blob['HashAlgo']][1].block_size
-    ipad = bytearray([i ^ 0x36 for i in bytearray(keyHash2)][:ALGORITHMS_DATA[blob['HashAlgo']][1].block_size])
-    opad = bytearray([i ^ 0x5c for i in bytearray(keyHash2)][:ALGORITHMS_DATA[blob['HashAlgo']][1].block_size])
+    block_size = ALGORITHMS_DATA[blob['HashAlgo']][1].block_size
+    pad_block = keyHash.ljust(block_size, b'\x00')
+    ipad = bytearray(i ^ 0x36 for i in pad_block)
+    opad = bytearray(i ^ 0x5c for i in pad_block)
     a = ALGORITHMS_DATA[blob['HashAlgo']][1].new(ipad)
     a.update(blob['HMac'])
 
@@ -250,18 +251,15 @@ def decrypt(blob, keyHash, entropy = None) -> "bytes | None":
 
     hmacCalculated3.update(toSign)
 
-    if hmacCalculated1.digest() == blob['Sign'] or hmacCalculated3.digest() == blob['Sign']:
+    if blob['Sign'] in (hmacCalculated1.digest(), hmacCalculated3.digest()):
         return cleartext
-    else:
-        return None
+    return None
 
 def find_masterkey_for_blob(blob_bytes:bytes, masterkeys: Any) -> "Any | None":
     blob = DPAPI_BLOB(blob_bytes)
     masterkey = bin_to_string(blob['GuidMasterKey'])
     return find_masterkey(masterkey=masterkey, masterkeys=masterkeys)
 
-def find_masterkey(masterkey:  str, masterkeys: Any) -> "Any | None":
-    for mk in masterkeys:
-        if masterkey.lower() == mk.guid.lower():
-            return mk
-    return None
+def find_masterkey(masterkey: str, masterkeys: Any) -> "Any | None":
+    masterkey = masterkey.lower()
+    return next((key for key in masterkeys if key.guid.lower() == masterkey), None)
