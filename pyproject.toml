@@ -25,7 +25,7 @@ packages = [
 dploot = "dploot.entry:main"
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 impacket = ">=0.10.0"
 cryptography = "^40.0.1"
 pyasn1 = "^0.4.8"
