@@ -96,17 +96,28 @@ class CredentialsTriage:
                     masterkey = find_masterkey_for_credential_blob(credmanblob_bytes, self.masterkeys)
                     if masterkey is not None:
                         cred = decrypt_credential(credmanblob_bytes,masterkey)
-                        if cred['Unknown3'].decode('utf-16le') != '':
-                            credentials.append(Credential(
-                                winuser=winuser,
-                                credblob=cred,
-                                target=cred['Target'].decode('utf-16le'),
-                                description=cred['Description'].decode('utf-16le'),
-                                unknown=cred['Unknown'].decode('utf-16le'),
-                                username=cred['Username'].decode('utf-16le'),
-                                password=cred['Unknown3'].decode('utf-16le')
-                                ))
-
+                        try:
+                            if cred['Unknown3'].decode('utf-16le') != '':
+                                credentials.append(Credential(
+                                    winuser=winuser,
+                                    credblob=cred,
+                                    target=cred['Target'].decode('utf-16le'),
+                                    description=cred['Description'].decode('utf-16le'),
+                                    unknown=cred['Unknown'].decode('utf-16le'),
+                                    username=cred['Username'].decode('utf-16le'),
+                                    password=cred['Unknown3'].decode('utf-16le')
+                                    ))
+                        except UnicodeDecodeError:
+                            if cred['Unknown3'] != '':
+                                credentials.append(Credential(
+                                    winuser=winuser,
+                                    credblob=cred,
+                                    target=f"HEX[{cred['Target'].hex()}]",
+                                    description=f"HEX[{cred['Description'].hex()}]",
+                                    unknown=f"HEX[{cred['Unknown'].hex()}]",
+                                    username=f"HEX[{cred['Username'].hex()}]",
+                                    password=f"HEX[{cred['Unknown3'].hex()}]",
+                                    ))
                     else:
                         logging.debug("Could not decrypt...")
         return credentials
