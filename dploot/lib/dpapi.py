@@ -18,7 +18,7 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
     if domain_backupkey is None and password is None and nthash is None and dpapi_systemkey is None:
         return None
     data = masterkey
-    mkf= MasterKeyFile(data)
+    mkf = MasterKeyFile(data)
     dk = mk = ch = bkmk = None
     data = data[len(mkf):]
     if mkf['MasterKeyLen'] > 0:
@@ -43,55 +43,48 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
             domain_master_key = DPAPI_DOMAIN_RSA_MASTER_KEY(decryptedKey)
             key = domain_master_key['buffer'][:domain_master_key['cbMasterKey']]
             return key
-    if nthash is not None and sid != '':
-        nthash = unhexlify(nthash)
-        key1, key2 = deriveKeysFromUserkey(sid, nthash)
-        decryptedKey = mk.decrypt(key2)
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = mk.decrypt(key1)
-        if decryptedKey:
-            return decryptedKey
-        # decryptedKey = bkmk.decrypt(key2)
-        # if decryptedKey:
-        #     return decryptedKey
-        # decryptedKey = bkmk.decrypt(key1)
-        # if decryptedKey:
-        #     return decryptedKey
+
+    if sid != '':
+        if nthash is not None:
+            nthash = unhexlify(nthash)
+            key1, key2 = deriveKeysFromUserkey(sid, nthash)
+            decryptedKey = mk.decrypt(key2) or mk.decrypt(key1)
+            if decryptedKey:
+                return decryptedKey
+            # decryptedKey = bkmk.decrypt(key2)
+            # if decryptedKey:
+            #     return decryptedKey
+            # decryptedKey = bkmk.decrypt(key1)
+            # if decryptedKey:
+            #     return decryptedKey
         
-    if password is not None and sid != '':
-        key1, key2, key3 = deriveKeysFromUser(sid, password)
-        decryptedKey = mk.decrypt(key3)
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = mk.decrypt(key2)
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = mk.decrypt(key1)
-        if decryptedKey:
-            return decryptedKey
-        # decryptedKey = bkmk.decrypt(key3)
-        # if decryptedKey:
-        #     return decryptedKey
-        # decryptedKey = bkmk.decrypt(key2)
-        # if decryptedKey:
-        #     return decryptedKey
-        # decryptedKey = bkmk.decrypt(key1)
-        # if decryptedKey:
-        #     return decryptedKey
+        if password is not None:
+            key1, key2, key3 = deriveKeysFromUser(sid, password)
+            decryptedKey = (
+                mk.decrypt(key3)
+                or mk.decrypt(key2)
+                or mk.decrypt(key1)
+            )
+            if decryptedKey:
+                return decryptedKey
+            # decryptedKey = bkmk.decrypt(key3)
+            # if decryptedKey:
+            #     return decryptedKey
+            # decryptedKey = bkmk.decrypt(key2)
+            # if decryptedKey:
+            #     return decryptedKey
+            # decryptedKey = bkmk.decrypt(key1)
+            # if decryptedKey:
+            #     return decryptedKey
 
     if dpapi_systemkey is not None:
 
-        decryptedKey = mk.decrypt(dpapi_systemkey['UserKey'])
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = mk.decrypt(dpapi_systemkey['MachineKey'])
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = bkmk.decrypt(dpapi_systemkey['UserKey'])
-        if decryptedKey:
-            return decryptedKey
-        decryptedKey = bkmk.decrypt(dpapi_systemkey['MachineKey'])
+        decryptedKey = (
+            mk.decrypt(dpapi_systemkey['UserKey'])
+            or mk.decrypt(dpapi_systemkey['MachineKey'])
+            or bkmk.decrypt(dpapi_systemkey['UserKey'])
+            or bkmk.decrypt(dpapi_systemkey['MachineKey'])
+        )
         if decryptedKey:
             return decryptedKey
 
@@ -119,8 +112,8 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
 
 def decrypt_credential(credential_bytes:bytes, masterkey:MasterKey) -> Any:
     cred = CredentialFile(credential_bytes)
-    decrypted = decrypt_blob(cred['Data'],masterkey=masterkey)
-    if decrypted is not None:
+    decrypted = decrypt_blob(cred['Data'], masterkey)
+    if decreypted:
         creds = CREDENTIAL_BLOB(decrypted)
         return creds
     return None
@@ -130,11 +123,11 @@ def find_masterkey_for_credential_blob(credential_bytes:bytes, masterkeys: Any) 
     return find_masterkey_for_blob(cred['Data'], masterkeys=masterkeys)
 
 def decrypt_privatekey(privatekey_bytes:bytes, masterkey:Any, cng: bool = False) -> RSA.RsaKey:
-    blob= PVKHeader(privatekey_bytes)
+    blob = PVKHeader(privatekey_bytes)
     if blob['SigHeadLen'] > 0:
-        blob=PVKFile_SIG(privatekey_bytes)
+        blob = PVKFile_SIG(privatekey_bytes)
     else:
-        blob=PVKFile(privatekey_bytes)
+        blob = PVKFile(privatekey_bytes)
     key = unhexlify(masterkey.sha1)
     decrypted = decrypt(blob['Blob'], key)
     rsa_temp = PRIVATE_KEY_RSA(decrypted)
@@ -159,7 +152,7 @@ def decrypt_vpol(vpol_bytes:bytes, masterkey:Any) -> "VAULT_VPOL_KEYS | None":
 
     key = unhexlify(masterkey.sha1)
     decrypted = decrypt(blob, key)
-    if decrypted is not None:
+    if decrypted:
         vpol_decrypted = VAULT_VPOL_KEYS(decrypted)
         return vpol_decrypted
     return None
@@ -211,7 +204,8 @@ def decrypt_blob(blob_bytes:bytes, masterkey:Any, entropy = None) -> Any:
     return decrypted
 
 def decrypt(blob, keyHash, entropy = None) -> "bytes | None":
-    sessionKey = HMAC.new(keyHash, blob['Salt'], ALGORITHMS_DATA[blob['HashAlgo']][1])
+    hash_algo = ALGORITHMS_DATA[blob['HashAlgo']][1]
+    sessionKey = HMAC.new(keyHash, blob['Salt'], hash_algo)
     if entropy is not None:
         sessionKey.update(entropy)
 
@@ -220,9 +214,9 @@ def decrypt(blob, keyHash, entropy = None) -> "bytes | None":
     # Derive the key
     derivedKey = blob.deriveKey(sessionKey)
 
-    cipher = ALGORITHMS_DATA[blob['CryptAlgo']][1].new(derivedKey[:ALGORITHMS_DATA[blob['CryptAlgo']][0]],
-                            mode=ALGORITHMS_DATA[blob['CryptAlgo']][2], iv=b'\x00'*ALGORITHMS_DATA[blob['CryptAlgo']][3])
-    cleartext = unpad(cipher.decrypt(blob['Data']), ALGORITHMS_DATA[blob['CryptAlgo']][1].block_size)
+    crypto = ALGORITHMS_DATA[blob['CryptAlgo']]
+    cipher = crypto[1].new(derivedKey[:crypto[0]], mode=crypto[2], iv=b'\x00'*crypto[3])
+    cleartext = unpad(cipher.decrypt(blob['Data']), crypto[1].block_size)
 
     # Now check the signature
 
@@ -230,13 +224,14 @@ def decrypt(blob, keyHash, entropy = None) -> "bytes | None":
     toSign = (blob.rawData[20:][:len(blob.rawData)-20-len(blob['Sign'])-4])
 
     # Calculate the different HMACKeys
-    keyHash2 = keyHash + b"\x00"*ALGORITHMS_DATA[blob['HashAlgo']][1].block_size
-    ipad = bytearray([i ^ 0x36 for i in bytearray(keyHash2)][:ALGORITHMS_DATA[blob['HashAlgo']][1].block_size])
-    opad = bytearray([i ^ 0x5c for i in bytearray(keyHash2)][:ALGORITHMS_DATA[blob['HashAlgo']][1].block_size])
-    a = ALGORITHMS_DATA[blob['HashAlgo']][1].new(ipad)
+    block_size = hash_algo.block_size
+    pad_block = keyHash.ljust(block_size, b'\x00')
+    ipad = bytearray(i ^ 0x36 for i in pad_block)
+    opad = bytearray(i ^ 0x5c for i in pad_block)
+    a = hash_algo.new(ipad)
     a.update(blob['HMac'])
 
-    hmacCalculated1 = ALGORITHMS_DATA[blob['HashAlgo']][1].new(opad)
+    hmacCalculated1 = hash_algo.new(opad)
     hmacCalculated1.update(a.digest())
 
     if entropy is not None:
@@ -244,24 +239,21 @@ def decrypt(blob, keyHash, entropy = None) -> "bytes | None":
 
     hmacCalculated1.update(toSign)
 
-    hmacCalculated3 = HMAC.new(keyHash, blob['HMac'], ALGORITHMS_DATA[blob['HashAlgo']][1])
+    hmacCalculated3 = HMAC.new(keyHash, blob['HMac'], hash_algo)
     if entropy is not None:
         hmacCalculated3.update(entropy)
 
     hmacCalculated3.update(toSign)
 
-    if hmacCalculated1.digest() == blob['Sign'] or hmacCalculated3.digest() == blob['Sign']:
+    if blob['Sign'] in (hmacCalculated1.digest(), hmacCalculated3.digest()):
         return cleartext
-    else:
-        return None
+    return None
 
 def find_masterkey_for_blob(blob_bytes:bytes, masterkeys: Any) -> "Any | None":
     blob = DPAPI_BLOB(blob_bytes)
     masterkey = bin_to_string(blob['GuidMasterKey'])
     return find_masterkey(masterkey=masterkey, masterkeys=masterkeys)
 
-def find_masterkey(masterkey:  str, masterkeys: Any) -> "Any | None":
-    for mk in masterkeys:
-        if masterkey.lower() == mk.guid.lower():
-            return mk
-    return None
+def find_masterkey(masterkey: str, masterkeys: Any) -> "Any | None":
+    masterkey = masterkey.lower()
+    return next((key for key in masterkeys if key.guid.lower() == masterkey), None)
