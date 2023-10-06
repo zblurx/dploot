@@ -38,7 +38,8 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
         private = privatekeyblob_to_pkcs1(key)
         cipher = PKCS1_v1_5.new(private)
         
-        if decryptedKey := cipher.decrypt(dk['SecretData'][::-1], None):
+        decryptedKey = cipher.decrypt(dk['SecretData'][::-1], None)
+        if decryptedKey:
             domain_master_key = DPAPI_DOMAIN_RSA_MASTER_KEY(decryptedKey)
             key = domain_master_key['buffer'][:domain_master_key['cbMasterKey']]
             return key
@@ -91,23 +92,28 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
             test = dpapi_systemkey['UserKey']
             key1, key2 = deriveKeysFromUserkey(sid, test)
             if key2 is not None:
-                if decryptedKey := mk.decrypt(key2):
+                decryptedKey = mk.decrypt(key2)
+                if decryptedKey:
                     return decryptedKey
                     
-            if decryptedKey := mk.decrypt(key1):
+            decryptedKey = mk.decrypt(key1)
+            if decryptedKey:
                 return decryptedKey
             
             if key2 is not None:
-                if decryptedKey := bkmk.decrypt(key2):
+                decryptedKey = bkmk.decrypt(key2)
+                if decryptedKey:
                     return decryptedKey
 
-            if decryptedKey := bkmk.decrypt(key1):
+            decryptedKey = bkmk.decrypt(key1)
+            if decryptedKey:
                 return decryptedKey
     return None
 
 def decrypt_credential(credential_bytes:bytes, masterkey:MasterKey) -> Any:
     cred = CredentialFile(credential_bytes)
-    if decrypted := decrypt_blob(cred['Data'], masterkey):
+    decrypted = decrypt_blob(cred['Data'], masterkey)
+    if decreypted:
         creds = CREDENTIAL_BLOB(decrypted)
         return creds
     return None
@@ -145,7 +151,8 @@ def decrypt_vpol(vpol_bytes:bytes, masterkey:Any) -> "VAULT_VPOL_KEYS | None":
     blob = vpol['Blob']
 
     key = unhexlify(masterkey.sha1)
-    if decrypted := decrypt(blob, key):
+    decrypted = decrypt(blob, key)
+    if decrypted:
         vpol_decrypted = VAULT_VPOL_KEYS(decrypted)
         return vpol_decrypted
     return None
