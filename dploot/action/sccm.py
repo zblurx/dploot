@@ -91,7 +91,7 @@ def entry(options: argparse.Namespace) -> None:
 
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
 
-    subparser = subparsers.add_parser(NAME, help="Dump NAA stored password from remote target")
+    subparser = subparsers.add_parser(NAME, help="Dump SCCM secrets (NAA, Collection variables, tasks sequences credentials)  from remote target")
 
     group = subparser.add_argument_group("sccm options")
 
@@ -110,7 +110,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         action="store",
         metavar="DIR_SCCM",
         help=(
-            "Dump looted NAA accounts to specified directory"
+            "Dump looted SCCM secrets to specified directory"
         )
     )
 
@@ -118,7 +118,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         "-wmi",
         action="store_true",
         help=(
-            "Dump NAA accounts from WMI requests results"
+            "Dump SCCM secrets from WMI requests results"
         )
     )
 
