@@ -3,19 +3,20 @@ import ntpath
 from typing import Any, List, Tuple
 import xml.etree.ElementTree as ET
 import base64
+from dataclasses import dataclass
 
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
 from dploot.triage.masterkeys import Masterkey
 
+@dataclass
 class RDGCred:
-    def __init__(self, type, profile_name, username, password, server_name = None) -> None:
-        self.type = type
-        self.profile_name = profile_name
-        self.server_name = server_name
-        self.username = username
-        self.password = password
+    type: str
+    profile_name: str
+    username: str
+    password: str
+    server_name: str = None
 
     def dump(self) -> None:
         if self.type == 'cred':
@@ -44,17 +45,17 @@ class RDGCred:
         elif self.type == 'server':
             print("[RDG] %s - %s - %s:%s" % (self.profile_name, self.server_name, self.username, self.password.decode('latin-1')))
 
+@dataclass
 class RDCMANFile:
-    def __init__(self, winuser: str, filepath:str, rdg_creds:List[RDGCred]) -> None:
-        self.winuser = winuser
-        self.filepath = filepath
-        self.rdg_creds = rdg_creds
+    winuser: str
+    filepath: str
+    rdg_creds: List[RDGCred]
 
+@dataclass
 class RDGFile:
-    def __init__(self, winuser: str, filepath:str, rdg_creds:List[RDGCred]) -> None:
-        self.winuser = winuser
-        self.filepath = filepath
-        self.rdg_creds = rdg_creds
+    winuser: str
+    filepath: str
+    rdg_creds: List[RDGCred]
 
 class RDGTriage:
 

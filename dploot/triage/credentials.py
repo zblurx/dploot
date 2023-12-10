@@ -1,6 +1,7 @@
 import logging
 import ntpath
 from typing import Any, List
+from dataclasses import dataclass
 
 from impacket.dpapi import CREDENTIAL_BLOB
 
@@ -10,15 +11,15 @@ from dploot.lib.target import Target
 from dploot.lib.utils import is_credfile
 from dploot.triage.masterkeys import Masterkey
 
+@dataclass
 class Credential:
-    def __init__(self, winuser: str, credblob: "CREDENTIAL_BLOB | Any", target: str, description: str, unknown: str, username: str, password: str):
-        self.winuser = winuser
-        self.credblob = credblob
-        self.target = target
-        self.description = description
-        self.unknown = unknown
-        self.username = username
-        self.password = password
+    winuser: str
+    credblob: "CREDENTIAL_BLOB | Any"
+    target: str
+    description: str
+    unknown: str
+    username: str
+    password: str
 
     def dump(self) -> None:
         self.credblob.dump()
