@@ -113,7 +113,7 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
 def decrypt_credential(credential_bytes:bytes, masterkey:MasterKey) -> Any:
     cred = CredentialFile(credential_bytes)
     decrypted = decrypt_blob(cred['Data'], masterkey)
-    if decreypted:
+    if decrypted:
         creds = CREDENTIAL_BLOB(decrypted)
         return creds
     return None
