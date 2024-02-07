@@ -41,7 +41,7 @@ class MasterkeysTriage:
     system_masterkeys_generic_path = 'Windows\\System32\\Microsoft\\Protect'
     share = 'C$'
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, pvkbytes: bytes = None, passwords: Dict[str,str] = None, nthashes: Dict[str,str] = None) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection, pvkbytes: bytes = None, passwords: Dict[str,str] = None, nthashes: Dict[str,str] = None, dpapiSystem: Dict[str,str] = {}) -> None:
         self.target = target
         self.conn = conn
         self.pvkbytes = pvkbytes
@@ -50,20 +50,21 @@ class MasterkeysTriage:
         
         self._users = None
         self.looted_files = dict()
-        self.dpapiSystem = dict()
+        self.dpapiSystem = dpapiSystem
+        # should be {"MachineKey":"key","Userkey":"key"}
 
     def triage_system_masterkeys(self) -> List[Masterkey]:
         masterkeys = list()
         logging.getLogger("impacket").disabled = True
-        self.conn.enable_remoteops()
-        if self.conn.remote_ops and self.conn.bootkey:
+        if len(self.dpapiSystem) == 0:
+            self.conn.enable_remoteops()
+            if self.conn.remote_ops and self.conn.bootkey:
 
-            SECURITYFileName = self.conn.remote_ops.saveSECURITY()
-            LSA = LSASecrets(SECURITYFileName, self.conn.bootkey, self.conn.remote_ops, isRemote=True,
-                             perSecretCallback=self.getDPAPI_SYSTEM)
-            LSA.dumpSecrets()
-            LSA.finish()
-        
+                SECURITYFileName = self.conn.remote_ops.saveSECURITY()
+                LSA = LSASecrets(SECURITYFileName, self.conn.bootkey, self.conn.remote_ops, isRemote=True,
+                                perSecretCallback=self.getDPAPI_SYSTEM)
+                LSA.dumpSecrets()
+                LSA.finish()
         system_protect_dir = self.conn.remote_list_dir(self.share, path=self.system_masterkeys_generic_path)
         for d in system_protect_dir:
             if d not in self.false_positive and d.is_directory()>0 and d.get_longname()[:2] == 'S-':# could be a better way to deal with sid
@@ -150,7 +151,7 @@ class MasterkeysTriage:
                                 masterkeys.append(Masterkey(guid=guid, sha1=hexlify(SHA1.new(key).digest()).decode('latin-1'), user=user))
         return masterkeys
 
-    def getDPAPI_SYSTEM(self,secretType, secret) -> None:
+    def getDPAPI_SYSTEM(self,_, secret) -> None:
         if secret.startswith("dpapi_machinekey:"):
             machineKey, userKey = secret.split('\n')
             machineKey = machineKey.split(':')[1]
