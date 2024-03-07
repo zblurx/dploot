@@ -2,6 +2,7 @@ import hashlib
 import logging
 import ntpath
 from typing import Dict, List, Tuple
+from dataclasses import dataclass
 
 from impacket.dcerpc.v5 import rrp
 
@@ -23,15 +24,15 @@ from dploot.triage.masterkeys import Masterkey
 
 PRINCIPAL_NAME = x509.ObjectIdentifier("1.3.6.1.4.1.311.20.2.3")
 
+@dataclass
 class Certificate:
-    def __init__(self, winuser: str, cert:x509.Certificate, pkey: PrivateKeyTypes, pfx: bytes, username: str, filename: str, clientauth: bool):
-        self.winuser = winuser
-        self.cert = cert
-        self.pkey = pkey
-        self.pfx = pfx
-        self.username = username
-        self.filename = filename
-        self.clientauth = clientauth
+    winuser: str
+    cert: x509.Certificate
+    pkey: PrivateKeyTypes
+    pfx: bytes
+    username: str
+    filename: str
+    clientauth: bool
 
     def dump(self) -> None:
         print('Issuer:\t\t\t%s' % str(self.cert.issuer.rfc4514_string()))

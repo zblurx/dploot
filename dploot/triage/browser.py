@@ -13,14 +13,15 @@ from dploot.lib.target import Target
 from dploot.lib.utils import datetime_to_time
 from dploot.lib.wmi import DPLootWmiExec
 from dploot.triage.masterkeys import Masterkey
+from dataclasses import dataclass
 
+@dataclass
 class LoginData:
-    def __init__(self, winuser: str, browser:str, url:str, username:str, password:str):
-        self.winuser = winuser
-        self.browser = browser
-        self.url = url
-        self.username = username
-        self.password = password
+    winuser: str
+    browser: str
+    url: str
+    username: str
+    password: str
 
     def dump(self) -> None:
         print('[%s LOGIN DATA]' % self.browser.upper())
@@ -33,17 +34,17 @@ class LoginData:
     def dump_quiet(self) -> None:
         print("[%s] %s - %s:%s" % (self.browser.upper(), self.url, self.username, self.password))
 
+@dataclass
 class Cookie:
-    def __init__(self, winuser: str, browser:str, host:str, path: str, cookie_name:str, cookie_value:str, creation_utc:str, expires_utc:str, last_access_utc:str):
-        self.winuser = winuser
-        self.browser = browser
-        self.host = host
-        self.path = path
-        self.cookie_name = cookie_name
-        self.cookie_value = cookie_value
-        self.creation_utc = creation_utc
-        self.expires_utc = expires_utc
-        self.last_access_utc = last_access_utc
+    winuser: str
+    browser:str
+    host:str
+    path: str
+    cookie_name:str
+    cookie_value:str
+    creation_utc:str
+    expires_utc:str
+    last_access_utc:str
 
     def dump(self) -> None:
         print('[%s COOKIE DATA]' % self.browser.upper())
