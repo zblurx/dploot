@@ -1,4 +1,5 @@
 import argparse
+import importlib.metadata
 import logging
 import sys
 import traceback
@@ -44,8 +45,8 @@ ENTRY_PARSERS = [
 
 def main() -> None:
     logger.init()
-
-    parser = argparse.ArgumentParser(description="DPAPI looting remotely in Python", add_help=True)
+    version = importlib.metadata.version("dploot")
+    parser = argparse.ArgumentParser(description=f"DPAPI looting remotely in Python.\nVersion {version}", add_help=True)
 
     parser.add_argument("-debug", action="store_true", help="Turn DEBUG output ON")
 
