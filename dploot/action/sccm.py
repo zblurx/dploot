@@ -1,13 +1,12 @@
 import argparse
 import logging
-import os
 import sys
 from typing import Callable, Tuple
-from dploot.action.masterkeys import add_masterkeys_argument_group, parse_masterkeys_options
+from dploot.action.masterkeys import parse_masterkeys_options
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option, parse_file_as_list
+from dploot.lib.utils import handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.sccm import SCCMTriage
 
@@ -24,7 +23,6 @@ class SCCMAction:
         self._users = None
         self.outputdir = None
         self.masterkeys = None
-        self.pvkbytes = None
 
         self.outputdir = handle_outputdir_option(dir= self.options.export_sccm)
 
@@ -102,8 +100,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
             "File containing {GUID}:SHA1 masterkeys mappings"
         ),
     )
-
-    add_masterkeys_argument_group(group)
 
     group.add_argument(
         "-export-sccm",
