@@ -78,18 +78,17 @@ class SCCMTriage:
         result = ''
         if masterkey is not None:
             result = decrypt_blob(blob_bytes, masterkey=masterkey)
-            return result
         else:
-            print("Master keys not found for SCCM blob")
-            return ""
+            logging.debug("Master keys not found for SCCM blob")
+        return result
 
     def parseFile(self, objectfile) -> Tuple[List[SCCMCred], List[SCCMSecret], List[SCCMCollection]]:
         sccmcred = list()
         sccmsecret = list()
         sccmcollection = list()
-        regex_naa = b"CCM_NetworkAccessAccount.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
-        regex_task = b"</SWDReserved>.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
-        regex_collection = b"CCM_CollectionVariable\x00\x00(.*?)\x00\x00.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
+        regex_naa = br"CCM_NetworkAccessAccount.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
+        regex_task = br"</SWDReserved>.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
+        regex_collection = br"CCM_CollectionVariable\x00\x00(.*?)\x00\x00.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
         logging.debug("Looking for NAA Credentials from OBJECTS.DATA file")
         pattern = re.compile(regex_naa)
         for match in pattern.finditer(objectfile):
@@ -114,7 +113,7 @@ class SCCMTriage:
     
     def parseReply(self, iEnum):
             finding = list()
-            regex = "<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
+            regex = r"<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
             while True:
                 try:
                     pEnum = iEnum.Next(0xffffffff,1)[0]
