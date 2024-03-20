@@ -6,12 +6,10 @@ from typing import Callable, Tuple
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option, parse_file_as_list
-from dploot.triage.browser import BrowserTriage
+from dploot.lib.utils import handle_outputdir_option
 from dploot.triage.certificates import CertificatesTriage
 from dploot.triage.credentials import CredentialsTriage
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
-from dploot.triage.rdg import RDGTriage
 from dploot.triage.vaults import VaultsTriage
 
 NAME = 'machinetriage'

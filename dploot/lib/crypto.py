@@ -1,4 +1,4 @@
-from binascii import hexlify, unhexlify
+from binascii import hexlify
 from hashlib import pbkdf2_hmac
 from Cryptodome.Cipher import AES
 from Cryptodome.Hash import HMAC, SHA1, MD4
@@ -221,9 +221,9 @@ def pvkblob_to_pkcs1(key):
     modulus = bytes_to_long(key['modulus'][::-1]) # n
     prime1 = bytes_to_long(key['prime1'][::-1]) # p
     prime2 = bytes_to_long(key['prime2'][::-1]) # q
-    exp1 = bytes_to_long(key['exponent1'][::-1])
-    exp2 = bytes_to_long(key['exponent2'][::-1])
-    coefficient = bytes_to_long(key['coefficient'][::-1])
+    _ = bytes_to_long(key['exponent1'][::-1])
+    _ = bytes_to_long(key['exponent2'][::-1])
+    _ = bytes_to_long(key['coefficient'][::-1])
     privateExp = bytes_to_long(key['privateExponent'][::-1]) # d
     pubExp = int(key['pubexp']) # e
     # RSA.Integer(prime2).inverse(prime1) # u

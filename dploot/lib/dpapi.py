@@ -8,7 +8,7 @@ from Cryptodome.Util.Padding import unpad
 from Cryptodome.Hash import HMAC
 
 from impacket.uuid import bin_to_string
-from impacket.dpapi import MasterKeyFile, MasterKey, CredHist, DomainKey,  DPAPI_BLOB, \
+from impacket.dpapi import MasterKeyFile, MasterKey, DomainKey,  DPAPI_BLOB, \
     CREDENTIAL_BLOB, VAULT_VCRD, VAULT_VPOL, VAULT_KNOWN_SCHEMAS, VAULT_VPOL_KEYS, \
     PVK_FILE_HDR, PRIVATE_KEY_BLOB, ALGORITHMS_DATA, privatekeyblob_to_pkcs1, DPAPI_DOMAIN_RSA_MASTER_KEY, CredentialFile
 
@@ -19,7 +19,7 @@ def decrypt_masterkey(masterkey:bytes, domain_backupkey:bytes= None, dpapi_syste
         return None
     data = masterkey
     mkf = MasterKeyFile(data)
-    dk = mk = ch = bkmk = None
+    dk = mk = bkmk = None
     data = data[len(mkf):]
     if mkf['MasterKeyLen'] > 0:
         mk = MasterKey(data[:mkf['MasterKeyLen']])

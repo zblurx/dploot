@@ -1,7 +1,4 @@
 import logging
-import random
-import socket
-import string
 import time
 
 from impacket.dcerpc.v5.dcom import wmi

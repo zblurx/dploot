@@ -55,7 +55,7 @@ def parse_file_as_dict(filename: str) -> Dict[str,str]:
 	arr = dict()
 	with open(filename, 'r') as lines:
 		for line in lines:
-			l = line.rstrip('\n')
-			l = l.split(':',1)
-			arr[l[0]]=l[1]
+			tmp_line = line.rstrip('\n')
+			tmp_line = tmp_line.split(':',1)
+			arr[tmp_line[0]]=tmp_line[1]
 	return arr

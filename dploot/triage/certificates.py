@@ -193,7 +193,7 @@ class CertificatesTriage:
                             if certblob.der is not None:
                                 cert = self.der_to_cert(certblob.der)
                                 certificates[certname] = cert
-                        except:
+                        except Exception:
                             pass
         return certificates
 
@@ -248,7 +248,7 @@ class CertificatesTriage:
 
             for name in san.value.get_values_for_type(x509.DNSName):
                 return "DNS Host Name", name
-        except:
+        except Exception:
             pass
 
         return None, None

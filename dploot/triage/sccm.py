@@ -1,10 +1,6 @@
 import logging
-import ntpath
-from typing import Any, List, Tuple
-import xml.etree.ElementTree as ET
-import base64
+from typing import List, Tuple
 import re
-from binascii import unhexlify
 
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection

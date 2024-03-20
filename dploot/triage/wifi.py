@@ -87,7 +87,7 @@ class WifiCred:
             else:
                 print("[WIFI] %s - WPA EAP - %s" % (self.ssid, self.eap_type))
         else: 
-            print("[WIFI] %s - %s - %s" % (self.auth.upper(), self.ssid))
+            print("[WIFI] %s - %s" % (self.auth.upper(), self.ssid))
 
 class WifiTriage:
 

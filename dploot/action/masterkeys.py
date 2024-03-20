@@ -2,11 +2,11 @@ import argparse
 import logging
 import os
 import sys
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, Tuple
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option, parse_file_as_dict, parse_file_as_list
+from dploot.lib.utils import handle_outputdir_option, parse_file_as_dict
 from dploot.triage.masterkeys import MasterkeysTriage
 
 

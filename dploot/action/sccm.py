@@ -2,7 +2,6 @@ import argparse
 import logging
 import sys
 from typing import Callable, Tuple
-from dploot.action.masterkeys import parse_masterkeys_options
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
@@ -32,8 +31,6 @@ class SCCMAction:
             except Exception as e:
                 logging.error(str(e))
                 sys.exit(1)
-
-        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(self.options, self.target)
 
     def connect(self) -> None:
         self.conn = DPLootSMBConnection(self.target)

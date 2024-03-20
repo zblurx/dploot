@@ -1,5 +1,4 @@
 import socket
-import sys
 import ntpath
 import logging
 import time
@@ -114,14 +113,14 @@ class DPLootSMBConnection:
             path = ntpath.join(path, '*')
         try:
             return self.smb_session.listPath(shareName=share, path=ntpath.normpath(path))
-        except :
+        except Exception:
             return None
 
     def is_admin(self) -> bool:
         try:
             self.smb_session.connectTree('C$')
             is_admin = True
-        except:
+        except Exception:
             is_admin = False
             pass
         return is_admin

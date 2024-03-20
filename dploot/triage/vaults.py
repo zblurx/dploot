@@ -3,7 +3,6 @@ import ntpath
 from typing import Any, List
 from binascii import hexlify
 
-from impacket.structure import hexdump
 from impacket.dcerpc.v5.dtypes import RPC_SID
 from impacket.dpapi import VAULT_INTERNET_EXPLORER, VAULT_WIN_BIO_KEY, VAULT_NGC_ACCOOUNT
 

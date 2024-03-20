@@ -7,7 +7,7 @@ from dploot.action.masterkeys import add_masterkeys_argument_group, parse_master
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option, parse_file_as_list
+from dploot.lib.utils import handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.rdg import RDGTriage
 
