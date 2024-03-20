@@ -78,21 +78,21 @@ def entry(options: argparse.Namespace) -> None:
 
 def parse_masterkeys_options(options: argparse.Namespace, target: Target) -> Tuple[bytes,Dict[str,str],Dict[str,str]]:
     pvkbytes = passwords = nthashes = None
-    if options.pvk is not None:
+    if hasattr(options,'pvk') and options.pvk is not None:
         try:
             pvkbytes = open(options.pvk, 'rb').read()
         except Exception as e:
             logging.error(str(e))
             sys.exit(1)
 
-    if options.passwords is not None:
+    if hasattr(options,'passwords') and options.passwords is not None:
         try:
             passwords = parse_file_as_dict(options.passwords)
         except Exception as e:
             logging.error(str(e))
             sys.exit(1)
 
-    if options.nthashes is not None:
+    if hasattr(options,'nthashes') and options.nthashes is not None:
         try:
             nthashes = parse_file_as_dict(options.nthashes)
         except Exception as e:
