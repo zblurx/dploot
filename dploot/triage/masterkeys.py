@@ -106,8 +106,10 @@ class MasterkeysTriage:
             try:
                 masterkeys += self.triage_masterkeys_for_user(user)
             except Exception as e:
-                logging.debug(str(e))
-                pass
+                if logging.getLogger().level == logging.DEBUG:
+                    import traceback
+                    traceback.print_exc()
+                    logging.debug(str(e))
         return masterkeys
             
     def triage_masterkeys_for_user(self, user:str) -> List[Masterkey]:
