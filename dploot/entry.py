@@ -22,6 +22,7 @@ from dploot.action import (
     machinetriage,
     browser,
     wifi,
+    mobaxterm,
     )
 
 
@@ -41,6 +42,7 @@ ENTRY_PARSERS = [
     machinetriage,
     browser,
     wifi,
+    mobaxterm,
 ]
 
 def main() -> None:
