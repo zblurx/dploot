@@ -198,56 +198,56 @@ def decrypt_blob(blob_bytes:bytes, masterkey:Any, entropy = None) -> Any:
     key = unhexlify(masterkey.sha1)
     decrypted = None
     if entropy is not None:
-        decrypted = blob.decrypt(blob, key, entropy=entropy)
+        decrypted = decrypt(blob, key, entropy=entropy)
     else:
         decrypted = decrypt(blob, key)
     return decrypted
 
 def decrypt(blob, keyHash, entropy = None) -> "bytes | None":
     hash_algo = ALGORITHMS_DATA[blob['HashAlgo']][1]
-    sessionKey = HMAC.new(keyHash, blob['Salt'], hash_algo)
-    if entropy is not None:
-        sessionKey.update(entropy)
-
-    sessionKey = sessionKey.digest()
-
-    # Derive the key
-    derivedKey = blob.deriveKey(sessionKey)
-
-    crypto = ALGORITHMS_DATA[blob['CryptAlgo']]
-    cipher = crypto[1].new(derivedKey[:crypto[0]], mode=crypto[2], iv=b'\x00'*crypto[3])
-    cleartext = unpad(cipher.decrypt(blob['Data']), crypto[1].block_size)
-
-    # Now check the signature
-
-    # ToDo Fix this, it's just ugly, more testing so we can remove one
-    toSign = (blob.rawData[20:][:len(blob.rawData)-20-len(blob['Sign'])-4])
-
-    # Calculate the different HMACKeys
     block_size = hash_algo.block_size
-    pad_block = keyHash.ljust(block_size, b'\x00')
+    for algo in [compute_sessionKey_1, compute_sessionKey_2]:
+        sessionKey = algo(keyHash, blob['Salt'], hash_algo, block_size, entropy)
+        sessionKey = sessionKey.digest()
+        derivedKey = blob.deriveKey(sessionKey)  
+        crypto = ALGORITHMS_DATA[blob['CryptAlgo']]
+        cipher = crypto[1].new(derivedKey[:crypto[0]], mode=crypto[2], iv=b'\x00'*crypto[3])
+        cleartext = cipher.decrypt(blob['Data'])
+        try:
+            cleartext = unpad(cleartext, crypto[1].block_size)
+        except ValueError as e:
+            if "Padding is incorrect" in str(e):
+                pass
+        # Now check the signature
+        # ToDo Fix this, it's just ugly, more testing so we can remove one
+        toSign = (blob.rawData[20:][:len(blob.rawData)-20-len(blob['Sign'])-4])
+        hmac_calculated = algo(keyHash, blob['HMac'], hash_algo, block_size, entropy)
+        hmac_calculated.update(toSign)
+        if blob['Sign'] == hmac_calculated.digest():
+            return cleartext
+    return None
+
+def compute_sessionKey_1(key_hash: bytes, salt: bytes, hash_algo: object, block_size: int, entropy: bytes):
+    pad_block = key_hash.ljust(block_size, b'\x00')
     ipad = bytearray(i ^ 0x36 for i in pad_block)
     opad = bytearray(i ^ 0x5c for i in pad_block)
+
     a = hash_algo.new(ipad)
-    a.update(blob['HMac'])
+    a.update(salt)
 
-    hmacCalculated1 = hash_algo.new(opad)
-    hmacCalculated1.update(a.digest())
+    computed_key = hash_algo.new(opad)
+    computed_key.update(a.digest())
 
     if entropy is not None:
-        hmacCalculated1.update(entropy)
+        computed_key.update(entropy)
+    return computed_key
 
-    hmacCalculated1.update(toSign)
-
-    hmacCalculated3 = HMAC.new(keyHash, blob['HMac'], hash_algo)
+def compute_sessionKey_2(key_hash: bytes, salt: bytes, hash_algo: object, block_size: int, entropy: bytes):
+    computed_key = HMAC.new(key_hash, salt, hash_algo)
     if entropy is not None:
-        hmacCalculated3.update(entropy)
-
-    hmacCalculated3.update(toSign)
-
-    if blob['Sign'] in (hmacCalculated1.digest(), hmacCalculated3.digest()):
-        return cleartext
-    return None
+        computed_key.update(entropy)
+    
+    return computed_key
 
 def find_masterkey_for_blob(blob_bytes:bytes, masterkeys: Any) -> "Any | None":
     blob = DPAPI_BLOB(blob_bytes)
