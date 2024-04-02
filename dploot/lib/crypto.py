@@ -242,13 +242,13 @@ def decrypt_chrome_password(encrypted_password: str, aeskey: bytes):
 
 def deriveKeysFromUser(sid, password):
     password = password.encode('utf-16le')
-    sid = sid.encode('utf-16le')
     z_sid = (sid + '\0').encode('utf-16le')
     password_md4 = MD4.new(password).digest()
     # Will generate two keys, one with SHA1 and another with MD4
     key1 = HMAC.new(SHA1.new(password).digest(), z_sid, SHA1).digest()
     key2 = HMAC.new(password_md4, z_sid, SHA1).digest()
     # For Protected users
+    sid = sid.encode('utf-16le')
     tmpKey = pbkdf2_hmac('sha256', password_md4, sid, 10000)
     tmpKey2 = pbkdf2_hmac('sha256', tmpKey, sid, 1)[:16]
     key3 = HMAC.new(tmpKey2, z_sid, SHA1).digest()[:20]

@@ -5,6 +5,7 @@ from typing import Dict, List, Tuple
 from dataclasses import dataclass
 
 from impacket.dcerpc.v5 import rrp
+from impacket.system_errors import ERROR_NO_MORE_ITEMS
 
 from Cryptodome.PublicKey import RSA
 from cryptography import x509
@@ -99,18 +100,21 @@ class CertificatesTriage:
         certificates = {}
         ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, my_certificates_key, samDesired=rrp.KEY_ENUMERATE_SUB_KEYS)
         keyHandle = ans['phkResult']
-        try:
-            for index in range(100):
-                enum_ans = rrp.hBaseRegEnumKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, index)
+        i = 0
+        while True:
+            try:
+                enum_ans = rrp.hBaseRegEnumKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, i)
                 certificate_keys.append(enum_ans['lpNameOut'][:-1])
-            rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
-        except rrp.DCERPCSessionError as e:
-            if e.error_code == 0x00000103:
-                pass
-            elif logging.getLogger().level == logging.DEBUG:
-                    import traceback
-                    traceback.print_exc()
-                    logging.debug(str(e))
+                i += 1
+            except rrp.DCERPCSessionError as e:
+                if e.get_error_code() == ERROR_NO_MORE_ITEMS:
+                    break
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                logging.error(str(e))
+        rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
+                    
         for certificate_key in certificate_keys:
             try:
                 regKey = my_certificates_key + '\\' + certificate_key
