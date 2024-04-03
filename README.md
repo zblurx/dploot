@@ -40,18 +40,22 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
 
 ## Installation
 
-You can install dploot directly from PyPI:
+You can install dploot directly from PyPI with [pipx](https://github.com/pypa/pipx):
 
 ```text
-pip install dploot
+pipx install git+https://github.com/zblurx/dploot.git
 ```
 
 OR
 
 ```text
-git clone https://github.com/zblurx/dploot.git
-cd dploot
-make
+pipx install dploot
+```
+
+On [Kali Linux](https://www.kali.org/), you can install dploot from the repositories:
+
+```text
+sudo apt install python3-dploot
 ```
 
 ## Usage
@@ -723,7 +727,7 @@ The **mobaxterm** command will extract MobaXterm secrets and masterpassword key 
 With `pvk`:
 
 ```text
-dploot rdg -d waza.local -u jsmith -p 'Password#123' 192.168.56.14 -pvk key.pvk
+dploot mobaxterm -d waza.local -u jsmith -p 'Password#123' 192.168.56.14 -pvk key.pvk
 [*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
 
 [*] Triage ALL USERS masterkeys
