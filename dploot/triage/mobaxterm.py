@@ -105,7 +105,7 @@ class MobaXtermTriage:
         self._users = None
         self.masterkeys = masterkeys
 
-    def triage_mobaxterm(self) -> Tuple[List[MobaXtermMasterPassword], List[MobaXtermCredential | MobaXtermPassword]]:
+    def triage_mobaxterm(self) -> Tuple[List[MobaXtermMasterPassword], List["MobaXtermCredential | MobaXtermPassword"]]:
         logging.getLogger("impacket").disabled = True
         mobaxterm_credentials = []
         mobaxterm_masterpassword_key = []
@@ -122,7 +122,7 @@ class MobaXtermTriage:
                     logging.debug(str(e))
         return mobaxterm_masterpassword_key, mobaxterm_credentials
     
-    def triage_mobaxterm_for_user(self, user: str, sid: str = None) -> Tuple[MobaXtermMasterPassword, List[MobaXtermCredential | MobaXtermPassword]]:
+    def triage_mobaxterm_for_user(self, user: str, sid: str = None) -> Tuple[MobaXtermMasterPassword, List["MobaXtermCredential | MobaXtermPassword"]]:
         mobaxterm_masterpassword = None
         mobaxterm_credentials = []
         try:
@@ -153,7 +153,7 @@ class MobaXtermTriage:
 
         return mobaxterm_masterpassword, mobaxterm_credentials
 
-    def extract_mobaxtermkeys_for_user_from_ntuser_dat(self, ntuser_dat_filename: str, user: str) -> Tuple[MobaXtermMasterPassword, List[MobaXtermCredential | MobaXtermPassword]]:
+    def extract_mobaxtermkeys_for_user_from_ntuser_dat(self, ntuser_dat_filename: str, user: str) -> Tuple[MobaXtermMasterPassword, List["MobaXtermCredential | MobaXtermPassword"]]:
         reg = winregistry.Registry(ntuser_dat_filename, isRemote=False)
         parent_key = reg.findKey(self.mobaxterm_registry_key_path)
         if parent_key is None:
@@ -239,10 +239,10 @@ class MobaXtermTriage:
             mobaxterm_masterpassword.entropy = entropy
         mobaxterm_masterpassword.decrypt_masterpassword_raw_value(masterkeys=self.masterkeys)
     
-    def decrypt_mobaxterm_password(self, mobaxterm_password: MobaXtermCredential|MobaXtermPassword, mobaxterm_masterpassword: MobaXtermMasterPassword) -> None:
+    def decrypt_mobaxterm_password(self, mobaxterm_password: "MobaXtermCredential|MobaXtermPassword", mobaxterm_masterpassword: MobaXtermMasterPassword) -> None:
         mobaxterm_password.decrypt(masterpassword_key=mobaxterm_masterpassword.masterpassword_decrypted)
     
-    def extract_mobaxtermkeys_for_user_from_remote_registry(self, user: str, sid: str) -> Tuple[MobaXtermMasterPassword, List[MobaXtermCredential | MobaXtermPassword]]:
+    def extract_mobaxtermkeys_for_user_from_remote_registry(self, user: str, sid: str) -> Tuple[MobaXtermMasterPassword, List["MobaXtermCredential | MobaXtermPassword"]]:
         self.conn.enable_remoteops()
 
         entropy = None

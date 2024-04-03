@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dploot"
-version = "2.7.0"
+version = "2.7.1"
 description = "DPAPI looting remotely in Python"
 readme = "README.md"
 homepage = "https://github.com/zblurx/dploot"
