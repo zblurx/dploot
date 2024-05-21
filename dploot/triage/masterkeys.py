@@ -41,7 +41,7 @@ class MasterkeysTriage:
     system_masterkeys_generic_path = 'Windows\\System32\\Microsoft\\Protect'
     share = 'C$'
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, pvkbytes: bytes = None, passwords: Dict[str,str] = None, nthashes: Dict[str,str] = None, dpapiSystem: Dict[str,str] = {}) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection, pvkbytes: bytes = None, passwords: Dict[str,str] = None, nthashes: Dict[str,str] = None, dpapiSystem: Dict[str,str] = None) -> None:
         self.target = target
         self.conn = conn
         self.pvkbytes = pvkbytes
@@ -51,6 +51,8 @@ class MasterkeysTriage:
         self._users = None
         self.looted_files = dict()
         self.dpapiSystem = dpapiSystem
+        if self.dpapiSystem is None:
+            self.dpapiSystem = {}
         # should be {"MachineKey":"key","Userkey":"key"}
 
     def triage_system_masterkeys(self) -> List[Masterkey]:
