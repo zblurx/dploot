@@ -1,6 +1,7 @@
 from binascii import hexlify, unhexlify
 import logging
 import ntpath
+import os
 from typing import Dict, List
 from Cryptodome.Hash import SHA1
 
@@ -59,11 +60,17 @@ class MasterkeysTriage:
         masterkeys = list()
         logging.getLogger("impacket").disabled = True
         if len(self.dpapiSystem) == 0:
-            self.conn.enable_remoteops()
-            if self.conn.remote_ops and self.conn.bootkey:
+            if self.conn.local_session:
+                self.conn.enable_localops(os.path.join(self.target.local_root, r'Windows/System32/config/SYSTEM'))
+            else:
+                self.conn.enable_remoteops()
+            if self.conn.bootkey:
+                logging.debug(f"Got Bootkey: {hexlify(self.conn.bootkey)}")
 
-                SECURITYFileName = self.conn.remote_ops.saveSECURITY()
-                LSA = LSASecrets(SECURITYFileName, self.conn.bootkey, self.conn.remote_ops, isRemote=True,
+                SECURITYFileName = \
+                    os.path.join(self.target.local_root, r'Windows/System32/config/SECURITY') if self.conn.local_session \
+                    else self.conn.remote_ops.saveSECURITY()
+                LSA = LSASecrets(SECURITYFileName, self.conn.bootkey, self.conn.remote_ops, isRemote=(not bool(self.conn.local_session)),
                                 perSecretCallback=self.getDPAPI_SYSTEM)
                 LSA.dumpSecrets()
                 LSA.finish()
