@@ -1,6 +1,7 @@
 from base64 import b64decode
 import logging
 import ntpath
+import os
 import tempfile
 from typing import List, Tuple
 from Cryptodome.Cipher import AES
@@ -325,41 +326,59 @@ class MobaXtermTriage:
             return self._users
         
         users = dict()
-        userlist_key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
-
-        self.conn.enable_remoteops()
-        ans = rrp.hOpenLocalMachine(self.conn.remote_ops._RemoteOperations__rrp)
-        regHandle = ans['phKey']
-
-        ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, userlist_key, samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS | rrp.KEY_QUERY_VALUE)
-        keyHandle = ans['phkResult']
-
         sids = []
+        userlist_key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+        
+        if self.conn.local_session:
+            reg = winregistry.Registry(os.path.join(self.conn.target.local_root, r'Windows/System32/config/SOFTWARE'), isRemote=False)
+            parentKey=reg.findKey(userlist_key[8:])
+            if parentKey is None:
+                self._users = users
+                reg.close()
+                return self._users
 
-        i = 0
-        while True:
-            try:
-                ans2 = rrp.hBaseRegEnumKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, i)
-                sids.append(ans2["lpNameOut"])
-            except rrp.DCERPCSessionError as e:
-                if e.get_error_code() == ERROR_NO_MORE_ITEMS:
-                    break
-            except Exception as e:
-                if logging.getLogger().level == logging.DEBUG:
-                    import traceback
-                    traceback.print_exc()
-                logging.error(e)
-            i +=1
-        rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
-        for sid in sids:
-            ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, ntpath.join(userlist_key,sid), samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS | rrp.KEY_QUERY_VALUE)
+            sids=list(reg.enumKey(parentKey))
+            
+            for sid in sids:
+                (v_type, v_data)= reg.getValue(ntpath.join(userlist_key[8:], sid, 'ProfileImagePath'))
+                profile_path=v_data.decode('utf-16le').rstrip("\0")
+                if r"%systemroot%" in profile_path:
+                    continue
+                users[ntpath.basename(profile_path)] = sid
+            
+            reg.close()
+    
+        else:
+            self.conn.enable_remoteops()
+            ans = rrp.hOpenLocalMachine(self.conn.remote_ops._RemoteOperations__rrp)
+            regHandle = ans['phKey']
+
+            ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, userlist_key, samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS | rrp.KEY_QUERY_VALUE)
             keyHandle = ans['phkResult']
-            _,  profile_path = rrp.hBaseRegQueryValue(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, 'ProfileImagePath')
-            if r"%systemroot%" in profile_path:
-                continue
-            users[ntpath.basename(profile_path.rstrip("\0"))] = sid.rstrip("\0")
+
+            i = 0
+            while True:
+                try:
+                    ans2 = rrp.hBaseRegEnumKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, i)
+                    sids.append(ans2["lpNameOut"])
+                except rrp.DCERPCSessionError as e:
+                    if e.get_error_code() == ERROR_NO_MORE_ITEMS:
+                        break
+                except Exception as e:
+                    if logging.getLogger().level == logging.DEBUG:
+                        import traceback
+                        traceback.print_exc()
+                    logging.error(e)
+                i +=1
             rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
+            for sid in sids:
+                ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, ntpath.join(userlist_key,sid), samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS | rrp.KEY_QUERY_VALUE)
+                keyHandle = ans['phkResult']
+                _,  profile_path = rrp.hBaseRegQueryValue(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, 'ProfileImagePath')
+                if r"%systemroot%" in profile_path:
+                    continue
+                users[ntpath.basename(profile_path.rstrip("\0"))] = sid.rstrip("\0")
+                rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
 
         self._users = users
-
         return self._users

@@ -249,7 +249,6 @@ class DPLootLocal(DPLootSMBConnection):
         self.smb_session   = DPLootDummySession()
         # the following are functions that should never be called on this class.
         self.enable_remoteops   = None
-        self.listPath           = None
         self.reconnect          = None
 
         #logging.debug(f"DPLootLocal.__init__ returning from {self}. taregt is {target}")
@@ -290,6 +289,14 @@ class DPLootLocal(DPLootSMBConnection):
         # logging.debug(f"remote_list_dir called with {path}, returning {result} ")
         return result
 
+    def listPath(self, shareName:str = 'C$', path:str = None, password:str = None):
+        if path[-2:] == r'\*':
+            return self.remote_list_dir(shareName, path[:-2], wildcard=True)
+        if path[-1] == '*':
+            return self.remote_list_dir(shareName, path[:-1], wildcard=True)
+        else:
+            raise NotImplementedError("Not implemented for wildcard == False")
+    
     def readFile(self, shareName, path, mode = FILE_OPEN, offset = 0, password = None, shareAccessMode = FILE_SHARE_READ, bypass_shared_violation = False) -> bytes:
         # logging.debug(f"readFile called with {path}")
         with open(os.path.join(self.target.local_root, path.replace('\\', os.sep)), 'rb') as f:

@@ -99,12 +99,12 @@ def parse_masterkeys_options(options: argparse.Namespace, target: Target) -> Tup
             logging.error(str(e))
             sys.exit(1)
 
-    if target.password != '':
+    if target.password is not None and target.password != '':
         if passwords is None:
             passwords = dict()
         passwords[target.username] = target.password
 
-    if target.nthash != '':
+    if target.nthash is not None and target.nthash != '':
         if nthashes is None:
             nthashes = dict()
         nthashes[target.username] = target.nthash.lower()

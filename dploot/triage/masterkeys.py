@@ -77,26 +77,26 @@ class MasterkeysTriage:
                     LSA.dumpSecrets()
                     LSA.finish()
                     # dump secrets
-                    LSA = LSASecrets(SECURITYFileName, self.conn.bootkey, self.conn.remote_ops, isRemote=(not bool(self.conn.local_session)))
-                    print("LSA Cached Hashes:")
-                    LSA.dumpCachedHashes()
-                    print("LSA Secrets:")
-                    LSA.dumpSecrets()
-                    LSA.finish()
+                    # LSA = LSASecrets(SECURITYFileName, self.conn.bootkey, self.conn.remote_ops, isRemote=(not bool(self.conn.local_session)))
+                    # print("LSA Cached Hashes:")
+                    # LSA.dumpCachedHashes()
+                    # print("LSA Secrets:")
+                    # LSA.dumpSecrets()
+                    # LSA.finish()
                 except Exception as e:
                     logging.error('LSA hashes extraction failed: %s' % str(e))
 
                 # dump SAM
-                try:
-                    SAMFileName = \
-                        os.path.join(self.target.local_root, r'Windows/System32/config/SAM') if self.conn.local_session \
-                        else self.conn.remote_ops.saveSAM()
-                    SAM = SAMHashes(SAMFileName, self.conn.bootkey, isRemote = (not bool(self.conn.local_session)))
-                    print("SAM Secrets:")
-                    SAM.dump()
-                    SAM.finish()
-                except Exception as e:
-                    logging.error('SAM hashes extraction failed: %s' % str(e))
+                # try:
+                #     SAMFileName = \
+                #         os.path.join(self.target.local_root, r'Windows/System32/config/SAM') if self.conn.local_session \
+                #         else self.conn.remote_ops.saveSAM()
+                #     SAM = SAMHashes(SAMFileName, self.conn.bootkey, isRemote = (not bool(self.conn.local_session)))
+                #     print("SAM Secrets:")
+                #     SAM.dump()
+                #     SAM.finish()
+                # except Exception as e:
+                #     logging.error('SAM hashes extraction failed: %s' % str(e))
 
         system_protect_dir = self.conn.remote_list_dir(self.share, path=self.system_masterkeys_generic_path)
         for d in system_protect_dir:
