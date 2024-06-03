@@ -18,19 +18,36 @@ from impacket.smb3structs import FILE_READ_DATA, FILE_OPEN, FILE_NON_DIRECTORY_F
 from dploot.lib.wmi import DPLootWmiExec
 
 class DPLootSMBConnection:
-    # if called with target = LOCAL, return an instance of DPLootLocal
-    def __new__(cls, target=None) -> "DPLootSMBConnection | DPlootLocal":
-        # logging.debug(f"Creating instance of DPLootSMBConnection. cls is {cls}, target is {target}")
-        if target is not None and target.address.upper() == "LOCAL":
-            return DPLootLocal(target)
+    # if called with target = LOCAL, return an instance of DPLootLocalSMConnection,
+    # else return an instance of DPLootRemoteSMBConnection
+    def __new__(cls, target=None) -> "DPLootRemoteSMBConnection | DPLootLocalSMBConnection":
+        # logging.debug(f"Creating instance of DPLootSMBConnection. {cls=}, {cls.__name__=}, {target=} ")
+        if target is not None and target.address.upper() == "LOCAL" and cls.__name__ != DPLootLocalSMBConnection.__name__:
+            return DPLootLocalSMBConnection.__new__(DPLootLocalSMBConnection, target)
+        elif cls.__name__ == DPLootSMBConnection.__name__:
+            return DPLootRemoteSMBConnection.__new__(DPLootRemoteSMBConnection, target)
         else:
+            # we end up here when a child class is instantiated.
             return super().__new__(cls)
 
     def __init__(self, target: Target) -> None:
-        self.target = target
+        self.target         = target
+        self.remote_ops     = None
+        self.local_session  = None
+
+    def listDirs(self, share: str, dirlist: List[str]) -> Dict[str, Any]:
+        result = dict()
+        for path in dirlist:
+            tmp = self.remote_list_dir(share, path=path)
+            result[path] = tmp
+        # logging.debug(f"listDirs called with {dirlist}, returning {result.items()}")
+        return result
+
+class DPLootRemoteSMBConnection(DPLootSMBConnection):
+    def __init__(self, target: Target) -> None:
+        super().__init__(target)
 
         self.smb_session = None
-        self.remote_ops = None
         self.smbv1 = False
         # logging.debug(f"DPLootSMBConnection.__init__ returning from {self}")
 
@@ -161,14 +178,6 @@ class DPLootSMBConnection:
         except Exception as e:
             logging.error('RemoteOperations failed: {}'.format(e))
 
-    def listDirs(self, share: str, dirlist: List[str]) -> Dict[str, Any]:
-        result = dict()
-        for path in dirlist:
-            tmp = self.remote_list_dir(share, path=path)
-            result[path] = tmp
-        # logging.debug(f"listDirs called with {dirlist}, returning {result.items()}")
-        return result
-
     def getFile(self,  *args, **kwargs) -> "Any | None":
         result = self.smb_session.getFile(*args, **kwargs)
         # logging.debug(f"getFile called with {args} , {kwargs}")
@@ -237,14 +246,11 @@ class DPLootSMBConnection:
             self.smb_session.disconnectTree(treeId)
             return data
 
-class DPLootLocal(DPLootSMBConnection):
-    def __new__(cls, target=None) -> "DPLootLocal":
-        return super().__new__(cls)
+class DPLootLocalSMBConnection(DPLootSMBConnection):
 
     def __init__(self, target=None) -> None:
-        self.target        = target
+        super().__init__(target)
         self.local_ops     = None
-        self.remote_ops    = None
         self.local_session = True
         self.smb_session   = DPLootDummySession()
         # the following are functions that should never be called on this class.
@@ -296,18 +302,16 @@ class DPLootLocal(DPLootSMBConnection):
             return self.remote_list_dir(shareName, path[:-1], wildcard=True)
         else:
             raise NotImplementedError("Not implemented for wildcard == False")
-    
+
+    def getFile(self,  *args, **kwargs) -> "Any | None":
+        raise NotImplementedError("getFile is not implemented in LOCAL mode")
+
     def readFile(self, shareName, path, mode = FILE_OPEN, offset = 0, password = None, shareAccessMode = FILE_SHARE_READ, bypass_shared_violation = False) -> bytes:
         # logging.debug(f"readFile called with {path}")
         with open(os.path.join(self.target.local_root, path.replace('\\', os.sep)), 'rb') as f:
             data=f.read()
         return data
 
-    def getFile(self,  *args, **kwargs) -> "Any | None":
-        raise NotImplementedError("getFile is not implemented in LOCAL mode")
-
 class DPLootDummySession():
-    def __init__(self):
-        pass
     def login(*args, **kwargs):
         return True
