@@ -214,6 +214,7 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
                     offset  += len(bytesRead)
                     data += bytesRead
         except Exception as e:
+            logging.debug(f"Exception occurred while trying to read {path}: {e}")
             if 'STATUS_OBJECT_PATH_NOT_FOUND' in str(e):
                 pass
             elif 'STATUS_OBJECT_NAME_NOT_FOUND' in str(e):
@@ -308,8 +309,13 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
 
     def readFile(self, shareName, path, mode = FILE_OPEN, offset = 0, password = None, shareAccessMode = FILE_SHARE_READ, bypass_shared_violation = False) -> bytes:
         # logging.debug(f"readFile called with {path}")
-        with open(os.path.join(self.target.local_root, path.replace('\\', os.sep)), 'rb') as f:
-            data=f.read()
+        data = None
+        try:
+            with open(os.path.join(self.target.local_root, path.replace('\\', os.sep)), 'rb') as f:
+                data=f.read()
+        except Exception as e:
+            logging.debug(f"Exception occurred while trying to read {path}: {e}")
+
         return data
 
 class DPLootDummySession():
