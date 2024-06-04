@@ -19,6 +19,8 @@ class SCCMCred:
         print('[NAA Account]')
         print('\tUsername:\t%s' % self.username.decode('latin-1'))
         print('\tPassword:\t%s' % self.password.decode('latin-1'))
+        logging.debug(f"\tBinary Username:\t{self.username}")
+        logging.debug(f"\tBinary Password:\t{self.username}")
 
 
     def dump_quiet(self) -> None:
@@ -32,6 +34,7 @@ class SCCMSecret:
     def dump(self) -> None:
         print('[Task sequences secret]')
         print('\tSecret:\t%s' % self.secret.decode('latin-1'))
+        logging.debug(f"Binary Secret:\t{self.secret}")
 
 
     def dump_quiet(self) -> None:
@@ -46,7 +49,8 @@ class SCCMCollection:
         print('[Collection Variable]')
         print("\tName:\t%s" % self.variable.decode('latin-1'))
         print("\tValue:\t%s" % self.value.decode('latin-1'))
-
+        logging.debug(f"Binary Name:\t{self.variable}")
+        logging.debug(f"Binary Value:\t{self.value}")
 
     def dump_quiet(self) -> None:
         print("[Collection] %s:%s" % (self.variable.decode('latin-1'), self.value.decode('latin-1')))
