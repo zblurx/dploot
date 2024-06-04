@@ -127,7 +127,7 @@ class MobaXtermTriage:
         mobaxterm_masterpassword = None
         mobaxterm_credentials = []
         try:
-            ntuser_dat_bytes = self.conn.readFile(self.share,self.ntuser_dat_path.format(username=user))
+            ntuser_dat_bytes = self.conn.readFile(self.share,self.ntuser_dat_path.format(username=user),bypass_shared_violation = True)
         except Exception as e:
             import traceback
             traceback.print_exc()
