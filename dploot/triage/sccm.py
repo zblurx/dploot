@@ -17,28 +17,34 @@ class SCCMCred:
 
     def dump(self) -> None:
         print('[NAA Account]')
-        print('\tUsername:\t%s' % self.username.decode('latin-1'))
-        print('\tPassword:\t%s' % self.password.decode('latin-1'))
-        logging.debug(f"\tBinary Username:\t{self.username}")
-        logging.debug(f"\tBinary Password:\t{self.username}")
-
+        print('\tUsername:\t%s' % self.username.decode('utf-16le'))
+        print('\tPassword:\t%s' % self.password.decode('utf-16le'))
 
     def dump_quiet(self) -> None:
-        print("[NAA] %s:%s" % (self.username.decode('latin-1'), self.password.decode('latin-1')))
+        print("[NAA] %s:%s" % (self.username.decode('utf-16le'), self.password.decode('utf-16le')))
+    
+    def __eq__(self, other) -> bool:
+        return self.username == other.username and self.password == other.password
+    
+    def __hash__(self) -> int:
+        return hash((self.username, self.password))
 
 class SCCMSecret:
-    def __init__(self, type, secret) -> None:
-        self.type = type
+    def __init__(self, secret) -> None:
         self.secret = secret
 
     def dump(self) -> None:
         print('[Task sequences secret]')
-        print('\tSecret:\t%s' % self.secret.decode('latin-1'))
-        logging.debug(f"Binary Secret:\t{self.secret}")
-
+        print('\tSecret:\t%s' % self.secret.decode('utf-16le'))
 
     def dump_quiet(self) -> None:
-        print("[Task] %s" % (self.secret.decode('latin-1')))  
+        print("[Task] %s" % (self.secret.decode('utf-16le')))
+    
+    def __eq__(self,other) -> bool:
+        return self.secret == other.secret
+    
+    def __hash__(self) -> int:
+        return hash(self.secret)
 
 class SCCMCollection:
     def __init__(self, variable, value) -> None:
@@ -47,13 +53,17 @@ class SCCMCollection:
 
     def dump(self) -> None:
         print('[Collection Variable]')
-        print("\tName:\t%s" % self.variable.decode('latin-1'))
-        print("\tValue:\t%s" % self.value.decode('latin-1'))
-        logging.debug(f"Binary Name:\t{self.variable}")
-        logging.debug(f"Binary Value:\t{self.value}")
+        print("\tName:\t%s" % self.variable.decode('utf-16le'))
+        print("\tValue:\t%s" % self.value.decode('utf-16le'))
 
     def dump_quiet(self) -> None:
-        print("[Collection] %s:%s" % (self.variable.decode('latin-1'), self.value.decode('latin-1')))
+        print("[Collection] %s:%s" % (self.variable.decode('utf-16le'), self.value.decode('utf-16le')))
+    
+    def __eq__(self, other) -> bool:
+        return self.variable == other.variable and self.value == other.value
+    
+    def __hash__(self) -> int:
+        return hash((self.variable, self.value))
 
 class SCCMTriage:
 
@@ -83,32 +93,37 @@ class SCCMTriage:
         return result
 
     def parseFile(self, objectfile) -> Tuple[List[SCCMCred], List[SCCMSecret], List[SCCMCollection]]:
-        sccmcred = list()
-        sccmsecret = list()
-        sccmcollection = list()
-        regex_naa = br"CCM_NetworkAccessAccount.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
-        regex_task = br"</SWDReserved>.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
-        regex_collection = br"CCM_CollectionVariable\x00\x00(.*?)\x00\x00.*<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
+        sccmcred = set()
+        sccmsecret = set()
+        sccmcollection = set()
+        regex_naa = br"CCM_NetworkAccessAccount\x00\x00<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>\x00\x00<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
+        regex_task = br"</SWDReserved>.*?<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
+        regex_collection = br"CCM_CollectionVariable\x00\x00(.*?)\x00\x00.*?<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
         logging.debug("Looking for NAA Credentials from OBJECTS.DATA file")
         pattern = re.compile(regex_naa)
         for match in pattern.finditer(objectfile):
-            logging.debug("Found NAA Credentials from OBJECTS.DATA file")
+            logging.debug(f"Found NAA Credentials from OBJECTS.DATA file: {match.start()} - {match.end()}")
+#            logging.debug(f"{objectfile[match.start():match.end()]}")
             password = self.sccmdecrypt(match.group(1))
             username = self.sccmdecrypt(match.group(2))
-            sccmcred.append(SCCMCred(username, password))
+            sccmcred.add(SCCMCred(username, password))
         pattern = re.compile(regex_task)
         logging.debug("Looking for task sequences secret from OBJECTS.DATA file")
         for match in pattern.finditer(objectfile):
-            logging.debug("Found task sequences secret from OBJECTS.DATA file")
-            secret = self.sccmdecrypt(match.group(1))
-            sccmsecret.append(SCCMSecret(secret))
+            logging.debug(f"Found task sequences secret from OBJECTS.DATA file: {match.start()} - {match.end()}")
+            sccmsecret.add(SCCMSecret(self.sccmdecrypt(match.group(1))))
         pattern = re.compile(regex_collection)
         logging.debug("Looking for collection variables from OBJECTS.DATA file")
         for match in pattern.finditer(objectfile):
-            logging.debug("Found collection variable from OBJECTS.DATA file")
-            name = self.sccmdecrypt(match.group(1))
-            value = self.sccmdecrypt(match.group(2))
-            sccmcollection.append(SCCMCollection(name, value))
+            try:
+                logging.debug(f"Found collection variable from OBJECTS.DATA file: {match.start()} - {match.end()}")
+#                logging.debug(f"{objectfile[match.start():match.end()]}")
+                name = match.group(1).decode('utf-8').encode('utf-16le')
+                value = self.sccmdecrypt(match.group(2))
+                sccmcollection.add(SCCMCollection(name, value))
+            except Exception as e:
+                logging.debug(f'Exception encountered in {__name__}: {e}.')
+                
         return sccmcred, sccmsecret, sccmcollection
     
     def parseReply(self, iEnum):
