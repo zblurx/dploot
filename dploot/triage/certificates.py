@@ -204,10 +204,13 @@ class CertificatesTriage:
                                 pkey_bytes = self.conn.readFile(self.share, filepath)
                                 if pkey_bytes is not None and self.masterkeys is not None:
                                     self.looted_files[pkey_guid] = pkey_bytes
-                                    masterkey = find_masterkey_for_privatekey_blob(pkey_bytes, masterkeys=self.masterkeys)
-                                    if masterkey is not None:
-                                        pkey = decrypt_privatekey(privatekey_bytes=pkey_bytes, masterkey=masterkey)
-                                        pkeys[hashlib.md5(pkey.public_key().export_key('DER')).hexdigest()] = (pkey_guid,pkey)
+                                    try:
+                                        masterkey = find_masterkey_for_privatekey_blob(pkey_bytes, masterkeys=self.masterkeys)
+                                        if masterkey is not None:
+                                            pkey = decrypt_privatekey(privatekey_bytes=pkey_bytes, masterkey=masterkey)
+                                            pkeys[hashlib.md5(pkey.public_key().export_key('DER')).hexdigest()] = (pkey_guid,pkey)
+                                    except Exception as e:
+                                        logging.debug(f'Exception encountered in {__name__}: {e}.')
         return pkeys
 
     def loot_certificates(self, certificates_paths: List[str]) -> Dict[str, x509.Certificate]:
