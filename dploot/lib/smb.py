@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 from dploot.lib.target import Target
 
 from impacket.smbconnection import SMBConnection
+from impacket.winregistry import Registry
 from impacket.smb import ATTR_DIRECTORY
 from impacket.smb import SMB_DIALECT
 from impacket.smb import SharedFile
@@ -35,6 +36,8 @@ class DPLootSMBConnection:
         self.remote_ops     = None
         self.local_session  = None
 
+        self._usersProfiles = None
+
     def listDirs(self, share: str, dirlist: List[str]) -> Dict[str, Any]:
         result = dict()
         for path in dirlist:
@@ -49,6 +52,7 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
 
         self.smb_session = None
         self.smbv1 = False
+        
         # logging.debug(f"DPLootSMBConnection.__init__ returning from {self}")
 
     def create_smbv1_conn(self, kdc=''):
@@ -248,6 +252,8 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
             return data
 
 class DPLootLocalSMBConnection(DPLootSMBConnection):
+    systemroot = 'C:\\Windows'
+    hklm_software_path = r'Windows/System32/config/SOFTWARE'
 
     def __init__(self, target=None) -> None:
         super().__init__(target)
@@ -318,6 +324,40 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
 
         return data
 
+    def getUsersProfiles(self) -> dict[str, str] | None:
+        ''' Returns the list of user profiles (from registry) in a dict
+            
+        Each subkey of HKLM/SOFTWARE/Microsoft/Windows NT/CurrentVersion/ProfileList is a user SID,
+        and the ProfileImagePath value inside is the path to the user's profile
+        :return: dict of user_sid: path_to_profile
+
+        '''
+        if self._usersProfiles is not None:
+            return self._usersProfiles
+        
+        result = dict()
+        # open hive
+        reg_file_path = os.path.join(self.target.local_root, self.hklm_software_path)
+        reg = Registry(reg_file_path, isRemote=False)
+
+        # open key
+        key_path='Microsoft\\Windows NT\\CurrentVersion\\ProfileList'
+        parentKey=reg.findKey(key_path)
+        if parentKey is None:
+            logging.error(f"Key {key_path} not found in {reg_file_path}")
+            return None
+        
+        for user_sid in reg.enumKey(parentKey):
+            # get 'ProfileImagePath' value
+            (_, path) = reg.getValue(ntpath.join(key_path, user_sid, 'ProfileImagePath'))
+            path=path.decode('utf-16le').rstrip('\0').replace(r'%systemroot%', self.systemroot)
+            path=ntpath.normpath(path)
+            # store in result dict
+            result[user_sid] = path
+
+        self._usersProfiles = result
+        return self._usersProfiles
+      
 class DPLootDummySession():
-    def login(*args, **kwargs):
+    def login(*args, **kwargs) -> bool:
         return True

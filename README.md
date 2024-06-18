@@ -755,6 +755,7 @@ Those projects helped a lot in writting this tool:
 - [SharpDPAPI](https://github.com/GhostPack/SharpDPAPI) by [Harmj0y](https://twitter.com/harmj0y)
 - [Mimikatz](https://github.com/gentilkiwi/mimikatz/) by [gentilkiwi](https://twitter.com/gentilkiwi)
 - [DonPAPI](https://github.com/login-securite/DonPAPI) by [LoginSecurite](https://twitter.com/LoginSecurite)
+- [wifi-squid](https://github.com/K-Mistele/wifi-squid) by [0xBlacklight](https://twitter.com/0xBlacklight)
 
 ## TODO
 
