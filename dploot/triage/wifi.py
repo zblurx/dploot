@@ -143,7 +143,9 @@ class WifiTriage:
                                     masterkey = find_masterkey_for_blob(unhexlify(dpapi_blob.text), masterkeys=self.masterkeys)
                                     password = ''
                                     if masterkey is not None:
-                                        password = decrypt_blob(unhexlify(dpapi_blob.text), masterkey=masterkey).removesuffix(b'\x00')
+                                        cleartext = decrypt_blob(unhexlify(dpapi_blob.text), masterkey=masterkey)
+                                        if cleartext is not None:
+                                            password = cleartext.removesuffix(b'\x00')
                                     wifi_creds.append(WifiCred(
                                         ssid=ssid,
                                         auth=auth_type,
@@ -284,7 +286,9 @@ class WifiTriage:
                 return None
 
             blob = decrypt_blob(blob_bytes=msm_bytes,masterkey=masterkey)
-            # it seems decrypt_blob adds zeroes at then end of the cleartext...
+            # FIXME: it seems decrypt_blob sometimes adds zeroes at then end of the cleartext.
+            # when the result is passed to decrypt_blob again later, the DPAPI_BLOB built from blob_bytes
+            # will be valid, but its .rawData will contain extra bytes 
 
 
             # This (loosely) follows what is described in "Dumping Stored Enterprise Wifi Credentials with Invoke-WifiSquid"
