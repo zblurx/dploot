@@ -10,60 +10,54 @@ from impacket.dcerpc.v5.dcom import wmi
 from impacket.dcerpc.v5.dtypes import NULL
 from impacket.dcerpc.v5.dcomrt import DCOMConnection
 
-class SCCMCred:
-    def __init__(self, username, password) -> None:
+class SCCM:
+
+    @classmethod
+    def member_to_string(cls, member):
+        return member.decode('utf-16le', errors='backslashreplace').rstrip('\0')
+
+    def dump(self) -> None:
+        print(self.description_header)
+        for name, value in self.__dict__.items():
+            print('\t%8s:\t%s' % (name.capitalize(), self.member_to_string(value)))
+    
+    def dump_quiet(self) -> None:
+        print(f'{self.quiet_description_header} {':'.join([self.member_to_string(_) for _ in self.__dict__.values()])}')
+    
+    def __eq__(self, other) -> bool:
+        for name in self.__dict__:
+            if getattr(self, name) != getattr(other, name):
+                return False
+        return True
+
+    def __hash__(self) -> int:
+        return hash(tuple(self.__dict__.values()))
+
+class SCCMCred(SCCM):
+
+    description_header       = '[NAA Account]'
+    quiet_description_header = '[NAA]'
+
+    def __init__(self, username: bytes, password: bytes) -> None:
         self.username = username
         self.password = password
 
-    def dump(self) -> None:
-        print('[NAA Account]')
-        print('\tUsername:\t%s' % self.username.decode('utf-16le'))
-        print('\tPassword:\t%s' % self.password.decode('utf-16le'))
+class SCCMSecret(SCCM):
 
-    def dump_quiet(self) -> None:
-        print("[NAA] %s:%s" % (self.username.decode('utf-16le'), self.password.decode('utf-16le')))
-    
-    def __eq__(self, other) -> bool:
-        return self.username == other.username and self.password == other.password
-    
-    def __hash__(self) -> int:
-        return hash((self.username, self.password))
+    description_header       = '[Task sequences secret]'
+    quiet_description_header = '[Task]'
 
-class SCCMSecret:
     def __init__(self, secret) -> None:
         self.secret = secret
 
-    def dump(self) -> None:
-        print('[Task sequences secret]')
-        print('\tSecret:\t%s' % self.secret.decode('utf-16le'))
-
-    def dump_quiet(self) -> None:
-        print("[Task] %s" % (self.secret.decode('utf-16le')))
+class SCCMCollection(SCCM):
     
-    def __eq__(self,other) -> bool:
-        return self.secret == other.secret
-    
-    def __hash__(self) -> int:
-        return hash(self.secret)
+    description_header       = '[Collection Variable]'
+    quiet_description_header = '[Collection]'
 
-class SCCMCollection:
-    def __init__(self, variable, value) -> None:
+    def __init__(self, variable: bytes, value: bytes) -> None:
         self.variable = variable
         self.value = value
-
-    def dump(self) -> None:
-        print('[Collection Variable]')
-        print("\tName:\t%s" % self.variable.decode('utf-16le'))
-        print("\tValue:\t%s" % self.value.decode('utf-16le'))
-
-    def dump_quiet(self) -> None:
-        print("[Collection] %s:%s" % (self.variable.decode('utf-16le'), self.value.decode('utf-16le')))
-    
-    def __eq__(self, other) -> bool:
-        return self.variable == other.variable and self.value == other.value
-    
-    def __hash__(self) -> int:
-        return hash((self.variable, self.value))
 
 class SCCMTriage:
 
@@ -103,7 +97,6 @@ class SCCMTriage:
         pattern = re.compile(regex_naa)
         for match in pattern.finditer(objectfile):
             logging.debug(f"Found NAA Credentials from OBJECTS.DATA file: {match.start()} - {match.end()}")
-#            logging.debug(f"{objectfile[match.start():match.end()]}")
             password = self.sccmdecrypt(match.group(1))
             username = self.sccmdecrypt(match.group(2))
             sccmcred.add(SCCMCred(username, password))
@@ -117,7 +110,6 @@ class SCCMTriage:
         for match in pattern.finditer(objectfile):
             try:
                 logging.debug(f"Found collection variable from OBJECTS.DATA file: {match.start()} - {match.end()}")
-#                logging.debug(f"{objectfile[match.start():match.end()]}")
                 name = match.group(1).decode('utf-8').encode('utf-16le')
                 value = self.sccmdecrypt(match.group(2))
                 sccmcollection.add(SCCMCollection(name, value))
