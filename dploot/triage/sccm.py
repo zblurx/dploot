@@ -22,7 +22,7 @@ class SCCM:
             print('\t%8s:\t%s' % (name.capitalize(), self.member_to_string(value)))
     
     def dump_quiet(self) -> None:
-        print(f'{self.quiet_description_header} {':'.join([self.member_to_string(_) for _ in self.__dict__.values()])}')
+        print(f'{self.quiet_description_header} {":".join([self.member_to_string(_) for _ in self.__dict__.values()])}')
     
     def __eq__(self, other) -> bool:
         for name in self.__dict__:
