@@ -75,6 +75,7 @@ def main() -> None:
     else:
         logging.getLogger().setLevel(logging.INFO)
 
+    logging.debug(f"{options=}")
     try:
         actions[options.action](options)
     except Exception as e:

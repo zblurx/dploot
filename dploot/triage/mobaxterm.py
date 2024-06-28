@@ -1,8 +1,9 @@
 from base64 import b64decode
 import logging
 import ntpath
+import os
 import tempfile
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 from Cryptodome.Cipher import AES
 
 from impacket import winregistry
@@ -26,7 +27,7 @@ class MobaXtermPassword:
         iv = AES.new(key=masterpassword_key, mode=AES.MODE_ECB).encrypt(b'\x00' * AES.block_size)
         cipher = AES.new(key=masterpassword_key, iv=iv, mode=AES.MODE_CFB, segment_size=8)
         self.password = cipher.decrypt(b64decode(self.password_encrypted))
-    
+
     def dump(self) -> None:
         print("[MOBAXTERM PASSWORD]")
         print("Username:\t%s" % self.username)
@@ -89,7 +90,7 @@ class MobaXtermMasterPassword:
 
 class MobaXtermTriage:
     false_positive = [".","..", "desktop.ini","Public","Default","Default User","All Users"]
-    mobaxterm_registry_key_path = "Software\\Mobatek\\MobaXterm"
+    mobaxterm_registry_key_path = "SOFTWARE\\Mobatek\\MobaXterm"
     mobaxterm_sessionp_key_path = ntpath.join(mobaxterm_registry_key_path,"SessionP")
     mobaxterm_masterpassword_registry_key = "M"
     mobaxterm_passwords_registry_key = "P"
@@ -101,7 +102,7 @@ class MobaXtermTriage:
     def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey]) -> None:
         self.target = target
         self.conn = conn
-        
+
         self._users = None
         self.masterkeys = masterkeys
 
@@ -121,12 +122,12 @@ class MobaXtermTriage:
                     traceback.print_exc()
                     logging.debug(str(e))
         return mobaxterm_masterpassword_key, mobaxterm_credentials
-    
+
     def triage_mobaxterm_for_user(self, user: str, sid: str = None) -> Tuple[MobaXtermMasterPassword, List["MobaXtermCredential | MobaXtermPassword"]]:
         mobaxterm_masterpassword = None
         mobaxterm_credentials = []
         try:
-            ntuser_dat_bytes = self.conn.readFile(self.share,self.ntuser_dat_path.format(username=user))
+            ntuser_dat_bytes = self.conn.readFile(self.share,self.ntuser_dat_path.format(username=user),bypass_shared_violation = True)
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -138,11 +139,10 @@ class MobaXtermTriage:
             fh = tempfile.NamedTemporaryFile()
             fh.write(ntuser_dat_bytes)
             fh.seek(0)
-            
             # Extracting everything
             mobaxterm_masterpassword, mobaxterm_credentials =  self.extract_mobaxtermkeys_for_user_from_ntuser_dat(fh.name, user)
 
-        
+
         if mobaxterm_masterpassword is None:
             return None, []
         self.decrypt_mobaxterm_masterpassword(mobaxterm_masterpassword)
@@ -160,7 +160,7 @@ class MobaXtermTriage:
             # MobaXterm is not installed for this user
             return None, []
         logging.debug(f"Found MobaXterm registry keys for user {user}")
-        
+
         mobaxterm_masterpassword_key = None
         mobaxterm_credentials = []
 
@@ -173,7 +173,7 @@ class MobaXtermTriage:
                 traceback.print_exc()
                 logging.debug(str(e))
 
-            
+
         try:
             key_path = ntpath.join(self.mobaxterm_registry_key_path,self.mobaxterm_masterpassword_registry_key)
             new_key = reg.findKey(key_path)
@@ -199,12 +199,12 @@ class MobaXtermTriage:
             values = reg.enumValues(key)
             logging.debug(f"Found {len(values)} Mobaxterm Credentials for user {user}")
             for value in values:
-                data = reg.getValue(ntpath.join(key_path, value.decode('latin-1')))
-                username, password_encrypted = data[1].decode('latin-1').split(':')
+                _, data = reg.getValue(ntpath.join(key_path, value.decode('latin-1')))
+                username, password_encrypted = data.split(b':')
                 mobaxterm_credential = MobaXtermCredential(
                     winuser=user,
                     name=value.decode('latin-1'),
-                    username=username,
+                    username=username.decode('utf-16le', errors='backslashreplace'),
                     password_encrypted=password_encrypted,
                 )
                 mobaxterm_credentials.append(mobaxterm_credential)
@@ -238,10 +238,10 @@ class MobaXtermTriage:
         if entropy is not None:
             mobaxterm_masterpassword.entropy = entropy
         mobaxterm_masterpassword.decrypt_masterpassword_raw_value(masterkeys=self.masterkeys)
-    
+
     def decrypt_mobaxterm_password(self, mobaxterm_password: "MobaXtermCredential|MobaXtermPassword", mobaxterm_masterpassword: MobaXtermMasterPassword) -> None:
         mobaxterm_password.decrypt(masterpassword_key=mobaxterm_masterpassword.masterpassword_decrypted)
-    
+
     def extract_mobaxtermkeys_for_user_from_remote_registry(self, user: str, sid: str) -> Tuple[MobaXtermMasterPassword, List["MobaXtermCredential | MobaXtermPassword"]]:
         self.conn.enable_remoteops()
 
@@ -266,7 +266,7 @@ class MobaXtermTriage:
                 traceback.print_exc()
                 logging.error(f"Error while hBaseRegOpenKey HKU\\{regKey}: {e}")
             return None, []
-            
+
         # Extract M
         try:
             ans2 = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, ntpath.join(regKey,self.mobaxterm_masterpassword_registry_key), samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS | rrp.KEY_QUERY_VALUE)
@@ -295,14 +295,14 @@ class MobaXtermTriage:
             while True:
                 try:
                     value = rrp.hBaseRegEnumValue(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, i)
-                    data = b''.join(value["lpData"]).decode('latin-1')
+                    data = b''.join(value["lpData"])
                     name = value["lpValueNameOut"].rstrip("\00")
-                    if ":" in data:
-                        username, password_encrypted = data.split(":")
+                    if b":" in data:
+                        username, password_encrypted = data.split(b":")
                         mobaxterm_credential = MobaXtermCredential(
                             winuser=user,
                             name=name,
-                            username=username,
+                            username=username.decode('utf-16le', errors='backslashreplace'),
                             password_encrypted=password_encrypted,
                         )
                     else:
@@ -320,46 +320,65 @@ class MobaXtermTriage:
         return mobaxterm_masterpassword_key, mobaxterm_credentials
 
     @property
-    def users(self) -> List[str]:
+    def users(self) -> Dict[str, str]:
+        """ returns dict of username: sid """
         if self._users is not None:
             return self._users
-        
+
         users = dict()
+        sids = []
         userlist_key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
 
-        self.conn.enable_remoteops()
-        ans = rrp.hOpenLocalMachine(self.conn.remote_ops._RemoteOperations__rrp)
-        regHandle = ans['phKey']
+        if self.conn.local_session:
+            reg = winregistry.Registry(os.path.join(self.conn.target.local_root, r'Windows/System32/config/SOFTWARE'), isRemote=False)
+            parentKey=reg.findKey(userlist_key[8:])
+            if parentKey is None:
+                self._users = users
+                reg.close()
+                return self._users
 
-        ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, userlist_key, samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS | rrp.KEY_QUERY_VALUE)
-        keyHandle = ans['phkResult']
+            sids=list(reg.enumKey(parentKey))
 
-        sids = []
+            for sid in sids:
+                (v_type, v_data)= reg.getValue(ntpath.join(userlist_key[8:], sid, 'ProfileImagePath'))
+                profile_path=v_data.decode('utf-16le').rstrip("\0")
+                if r"%systemroot%" in profile_path:
+                    continue
+                users[ntpath.basename(profile_path)] = sid
 
-        i = 0
-        while True:
-            try:
-                ans2 = rrp.hBaseRegEnumKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, i)
-                sids.append(ans2["lpNameOut"])
-            except rrp.DCERPCSessionError as e:
-                if e.get_error_code() == ERROR_NO_MORE_ITEMS:
-                    break
-            except Exception as e:
-                if logging.getLogger().level == logging.DEBUG:
-                    import traceback
-                    traceback.print_exc()
-                logging.error(e)
-            i +=1
-        rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
-        for sid in sids:
-            ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, ntpath.join(userlist_key,sid), samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS | rrp.KEY_QUERY_VALUE)
+            reg.close()
+
+        else:
+            self.conn.enable_remoteops()
+            ans = rrp.hOpenLocalMachine(self.conn.remote_ops._RemoteOperations__rrp)
+            regHandle = ans['phKey']
+
+            ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, userlist_key, samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS | rrp.KEY_QUERY_VALUE)
             keyHandle = ans['phkResult']
-            _,  profile_path = rrp.hBaseRegQueryValue(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, 'ProfileImagePath')
-            if r"%systemroot%" in profile_path:
-                continue
-            users[ntpath.basename(profile_path.rstrip("\0"))] = sid.rstrip("\0")
+
+            i = 0
+            while True:
+                try:
+                    ans2 = rrp.hBaseRegEnumKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, i)
+                    sids.append(ans2["lpNameOut"])
+                except rrp.DCERPCSessionError as e:
+                    if e.get_error_code() == ERROR_NO_MORE_ITEMS:
+                        break
+                except Exception as e:
+                    if logging.getLogger().level == logging.DEBUG:
+                        import traceback
+                        traceback.print_exc()
+                    logging.error(e)
+                i +=1
             rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
+            for sid in sids:
+                ans = rrp.hBaseRegOpenKey(self.conn.remote_ops._RemoteOperations__rrp, regHandle, ntpath.join(userlist_key,sid), samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS | rrp.KEY_QUERY_VALUE)
+                keyHandle = ans['phkResult']
+                _,  profile_path = rrp.hBaseRegQueryValue(self.conn.remote_ops._RemoteOperations__rrp, keyHandle, 'ProfileImagePath')
+                if r"%systemroot%" in profile_path:
+                    continue
+                users[ntpath.basename(profile_path.rstrip("\0"))] = sid.rstrip("\0")
+                rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
 
         self._users = users
-
         return self._users

@@ -107,6 +107,21 @@ $ dploot machinecertificates -d waza.local -u Administrator -p 'Password!123' 19
 [-] Writting certificate to DESKTOP-OJ3N8TJ.waza.local_796449B12B788ABA.pfx
 ```
 
+### With offline access to the Windows' filesystem
+
+A different way of gaining local administrator access to a system, for instance via physical access, extracting the drive and mounting the filesystem directly on your machine. To use this mode, specify `LOCAL` as the target. By default the target filesystem is expected to be the current directory, you can specify a different path with `-root`:
+
+```text
+$ dploot sccm -root /media/C_drive/ LOCAL
+[*] Connected to LOCAL as \None (admin)
+```
+
+It can still be useful to give valid username and password as arguments, which will be used to decrypt masterkeys (see the instructions in [User Triage](#user-triage) below):
+```text
+$ dploot masterkeys -root /mnt -u bob -p Password LOCAL
+[*] Connected to LOCAL as \bob (admin)
+```
+
 ### As a domain administrator (or equivalent)
 
 If you have domain admin privileges, you can obtain the domain DPAPI backup key with the backupkey command. This key can decrypt any DPAPI masterkeys for domain users and computers, and it will never change. Therefore, this key allow attacker to loot any DPAPI protected password realted to a domain user.
@@ -755,7 +770,5 @@ Those projects helped a lot in writting this tool:
 - [SharpDPAPI](https://github.com/GhostPack/SharpDPAPI) by [Harmj0y](https://twitter.com/harmj0y)
 - [Mimikatz](https://github.com/gentilkiwi/mimikatz/) by [gentilkiwi](https://twitter.com/gentilkiwi)
 - [DonPAPI](https://github.com/login-securite/DonPAPI) by [LoginSecurite](https://twitter.com/LoginSecurite)
+- [wifi-squid](https://github.com/K-Mistele/wifi-squid) by [0xBlacklight](https://twitter.com/0xBlacklight)
 
-## TODO
-
-- Implement LOCAL triage (with extracted stuff)
