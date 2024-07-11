@@ -210,6 +210,7 @@ class CertificatesTriage:
                 logging.debug("Found match between %s certificate and %s private key !" % (name, pkey[0]))
                 key = load_der_private_key(pkey[1].export_key('DER'), password=None)
                 pfx = self.create_pfx(key=key,cert=cert)
+                # TODO CAN BE NULL self.get_id_from_certificate(certificate=cert)[1]
                 username = self.get_id_from_certificate(certificate=cert)[1].replace('@','_')
                 clientauth = False
                 for i in cert.extensions.get_extension_for_oid(oid=ExtensionOID.EXTENDED_KEY_USAGE).value:
@@ -255,7 +256,7 @@ class CertificatesTriage:
         except Exception:
             pass
 
-        return None, None
+        return "", "SAN not found"
 
     @property
     def users(self) -> List[str]:
