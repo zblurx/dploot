@@ -71,9 +71,9 @@ class DPLootSMBConnection:
                     if "STATUS_NOT_SUPPORTED" in str(e):
                         no_ntlm = True
                     pass
-                hostname = self.smb_session.getServerName() if not no_ntlm else self.target.address
+                hostname = self.smb_session.getServerDNSHostName() if not no_ntlm else self.target.address
                 self.smb_session.close()
-                self.target.address = hostname + "." + self.target.domain
+                self.target.address = hostname
                 logging.debug("Connecting to %s" % self.target.address)
                 if not self.create_conn_obj(self.target.address):
                     return None
@@ -88,6 +88,7 @@ class DPLootSMBConnection:
                     kdcHost=self.target.kdcHost,
                     useCache=self.target.use_kcache,
                     )
+                self.target.username = self.smb_session.getCredentials()[0]
             else:
                 logging.debug("Connecting to %s" % self.target.address)
                 if not self.create_conn_obj():

@@ -53,7 +53,7 @@ class Target:
             options.dc_ip = options.target
 
         self.domain = domain
-        self.username = username
+        self.username = username if username is not None else ""
         self.password = password
         self.address = options.target
         self.lmhash = lmhash
@@ -68,7 +68,7 @@ class Target:
 
     @staticmethod
     def create(domain: str = None,
-        username: str = None,
+        username: str = "",
         password: str = None,
         target: str = None,
         hashes: str = None,
