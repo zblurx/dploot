@@ -77,7 +77,9 @@ def entry(options: argparse.Namespace) -> None:
     a.run()
 
 def parse_masterkeys_options(options: argparse.Namespace, target: Target) -> Tuple[bytes,Dict[str,str],Dict[str,str]]:
-    pvkbytes = passwords = nthashes = None
+    pvkbytes = None
+    passwords = {}
+    nthashes = {}
     if hasattr(options,'pvk') and options.pvk is not None:
         try:
             pvkbytes = open(options.pvk, 'rb').read()
@@ -98,16 +100,12 @@ def parse_masterkeys_options(options: argparse.Namespace, target: Target) -> Tup
         except Exception as e:
             logging.error(str(e))
             sys.exit(1)
+    if target.username:
+        if target.password != '':
+            passwords[target.username] = target.password
 
-    if target.password != '':
-        if passwords is None:
-            passwords = dict()
-        passwords[target.username] = target.password
-
-    if target.nthash != '':
-        if nthashes is None:
-            nthashes = dict()
-        nthashes[target.username] = target.nthash.lower()
+        if target.nthash != '':
+            nthashes[target.username] = target.nthash.lower()
 
     if nthashes is not None:
         nthashes = {k.lower():v.lower() for k, v in nthashes.items()}
