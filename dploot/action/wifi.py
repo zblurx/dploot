@@ -7,6 +7,7 @@ from typing import Callable, Tuple
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import handle_outputdir_option
+from dploot.action.masterkeys import parse_masterkeys_options
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.wifi import WifiTriage
 
@@ -24,11 +25,10 @@ class WifiAction:
         self._is_admin = None
         self.masterkeys = None
         self.outputdir = None
-        self.pvkbytes = None
-        self.passwords = None
-        self.nthashes = None
 
         self.outputdir = handle_outputdir_option(dir= self.options.export_wifi)
+
+        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(self.options, self.target)
 
         if self.options.mkfile is not None:
             try:
@@ -48,9 +48,12 @@ class WifiAction:
         logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
-                triage = MasterkeysTriage(target=self.target, conn=self.conn)
+                triage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
                 logging.info("Triage SYSTEM masterkeys\n")
                 self.masterkeys = triage.triage_system_masterkeys()
+                # we need user masterkeys, too.
+                logging.info("Triage ALL USERS masterkeys\n")
+                self.masterkeys.extend(triage.triage_masterkeys())
                 if not self.options.quiet:
                     for masterkey in self.masterkeys:
                         masterkey.dump()

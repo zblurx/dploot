@@ -1,4 +1,5 @@
 import argparse
+import sys
 
 class Target:
     def __init__(self) -> None:
@@ -14,58 +15,31 @@ class Target:
         self.use_kcache: bool = False
         self.dc_ip: str = None
         self.aesKey: str = None
+        self.local_root: str = None
+        self.is_local: bool = False
 
     @staticmethod
     def from_options(options) -> "Target":
-        self = Target()
 
-        username = options.username
-
-        domain = options.domain
-
-        if domain is None:
-            domain = ""
-
-        password = options.password
-        if (
-            not password
-            and username != ""
-            and options.hashes is None
-            and options.aesKey is None
-            and options.no_pass is not True
-        ):
-            from getpass import getpass
-
-            password = getpass("Password:")
-        hashes = options.hashes
-        if hashes is not None:
-            hashes = hashes.split(':')
-            if len(hashes) == 1:
-                (nthash,) = hashes
-                lmhash = nthash
-            else:
-                lmhash, nthash = hashes
-        else:
-            nthash = ''
-            lmhash = ''
-        
         if options.dc_ip is None:
             options.dc_ip = options.target
 
-        self.domain = domain
-        self.username = username if username is not None else ""
-        self.password = password if password is not None else ""
-        self.address = options.target
-        self.lmhash = lmhash if lmhash is not None else ""
-        self.nthash = nthash if nthash is not None else ""
-        self.do_kerberos = options.k or options.aesKey is not None or options.use_kcache
-        self.kdcHost = options.kdcHost
-        self.use_kcache = options.use_kcache
-        self.dc_ip = options.dc_ip
-        self.aesKey = options.aesKey
-
-        return self
-
+        return Target.create(
+            domain  = options.domain,
+            username = options.username if options.username is not None else "",
+            password = options.password if options.password is not None else "",
+            target   = options.target,
+            hashes   = options.hashes,
+            lmhash   = None,
+            nthash   = None,
+            do_kerberos = options.k or options.aesKey is not None or options.use_kcache ,
+            kdcHost    = options.kdcHost,
+            use_kcache = options.use_kcache,
+            no_pass    = options.no_pass,
+            dc_ip = options.dc_ip,
+            aesKey= options.aesKey,
+            local_root=options.localroot)
+       
     @staticmethod
     def create(domain: str = None,
         username: str = "",
@@ -79,9 +53,21 @@ class Target:
         use_kcache: bool = False,
         no_pass: bool = False,
         dc_ip: str = None,
-        aesKey: str = None) -> "Target":
+        aesKey: str = None,
+        local_root: str = None) -> "Target":
 
         self = Target()
+
+        if target == "LOCAL":
+            self.is_local = True
+        
+        if self.is_local is True:
+            if do_kerberos or use_kcache or kdcHost is not None:
+                print("Invalid options: Use kerberos does not make sense when target=LOCAL", file=sys.stderr)
+                sys.exit(1)
+            if dc_ip is not None and dc_ip != "LOCAL":
+                print("Invalid options: dc-ip conflicts with target=LOCAL", file=sys.stderr)
+                sys.exit(1)
 
         if domain is None:
             domain = ""
@@ -93,6 +79,7 @@ class Target:
             and aesKey is None
             and no_pass is not True
             and do_kerberos is not True
+            and self.is_local is not True
         ):
             from getpass import getpass
 
@@ -122,6 +109,8 @@ class Target:
         self.use_kcache = use_kcache
         self.dc_ip = dc_ip
         self.aesKey = aesKey
+        self.local_root = local_root
+
         return self
 
     def __repr__(self) -> str:
@@ -133,7 +122,7 @@ def add_target_argument_group(parser: argparse.ArgumentParser,) -> None:
         "target",
         action="store",
         metavar="<target name or address>",
-        help="Target ip or address",
+        help="Target ip or address, or LOCAL",
     )
 
     parser.add_argument(
@@ -195,3 +184,14 @@ def add_target_argument_group(parser: argparse.ArgumentParser,) -> None:
             "part (FQDN) specified in the target parameter"
         ),
     )
+    group.add_argument(
+        "-root",
+        action="store",
+        dest='localroot',
+        metavar='path',
+        default='.',
+        help=(
+            "Root directory (for local operations). This directory should contain Windows and Users subdirectories"
+        ),
+    )
+

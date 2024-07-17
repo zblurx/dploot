@@ -1,5 +1,6 @@
 import socket
 import ntpath
+import os
 import logging
 import time
 from typing import Any, Dict, List
@@ -7,20 +8,52 @@ from typing import Any, Dict, List
 from dploot.lib.target import Target
 
 from impacket.smbconnection import SMBConnection
+from impacket.winregistry import Registry
+from impacket.smb import ATTR_DIRECTORY
 from impacket.smb import SMB_DIALECT
+from impacket.smb import SharedFile
 from impacket.nmb import NetBIOSTimeout
-from impacket.examples.secretsdump import RemoteOperations
+from impacket.examples.secretsdump import RemoteOperations,LocalOperations
 from impacket.smb3structs import FILE_READ_DATA, FILE_OPEN, FILE_NON_DIRECTORY_FILE, FILE_SHARE_READ
 
 from dploot.lib.wmi import DPLootWmiExec
 
 class DPLootSMBConnection:
+    # if called with target = LOCAL, return an instance of DPLootLocalSMConnection,
+    # else return an instance of DPLootRemoteSMBConnection
+    def __new__(cls, target=None) -> "DPLootRemoteSMBConnection | DPLootLocalSMBConnection":
+        # logging.debug(f"Creating instance of DPLootSMBConnection. {cls=}, {cls.__name__=}, {target=} ")
+        if target is not None and target.address.upper() == "LOCAL" and cls.__name__ != DPLootLocalSMBConnection.__name__:
+            return DPLootLocalSMBConnection.__new__(DPLootLocalSMBConnection, target)
+        elif cls.__name__ == DPLootSMBConnection.__name__:
+            return DPLootRemoteSMBConnection.__new__(DPLootRemoteSMBConnection, target)
+        else:
+            # we end up here when a child class is instantiated.
+            return super().__new__(cls)
+
     def __init__(self, target: Target) -> None:
-        self.target = target
+        self.target         = target
+        self.remote_ops     = None
+        self.local_session  = None
+
+        self._usersProfiles = None
+
+    def listDirs(self, share: str, dirlist: List[str]) -> Dict[str, Any]:
+        result = dict()
+        for path in dirlist:
+            tmp = self.remote_list_dir(share, path=path)
+            result[path] = tmp
+        # logging.debug(f"listDirs called with {dirlist}, returning {result.items()}")
+        return result
+
+class DPLootRemoteSMBConnection(DPLootSMBConnection):
+    def __init__(self, target: Target) -> None:
+        super().__init__(target)
 
         self.smb_session = None
-        self.remote_ops = None
         self.smbv1 = False
+        
+        # logging.debug(f"DPLootSMBConnection.__init__ returning from {self}")
 
     def create_smbv1_conn(self, kdc=''):
         try:
@@ -113,7 +146,10 @@ class DPLootSMBConnection:
         if wildcard:
             path = ntpath.join(path, '*')
         try:
-            return self.smb_session.listPath(shareName=share, path=ntpath.normpath(path))
+            result = self.smb_session.listPath(shareName=share, path=ntpath.normpath(path))
+            # logging.debug(f"remote_list_dir called with {path}, returning {result} ")
+            return result
+
         except Exception:
             return None
 
@@ -127,7 +163,9 @@ class DPLootSMBConnection:
         return is_admin
 
     def listPath(self,  *args, **kwargs) -> Any:
-        return self.smb_session.listPath(*args, **kwargs)
+        result = self.smb_session.listPath(*args, **kwargs)
+        # logging.debug(f"listPath called with {args}, {kwarsgs}, returning {result}")
+        return result
 
     def reconnect(self) -> bool:
         self.smb_session.reconnect()
@@ -143,18 +181,12 @@ class DPLootSMBConnection:
             self.remote_ops.enableRegistry()
             self.bootkey = self.remote_ops.getBootKey()
         except Exception as e:
-            self.logger.error('RemoteOperations failed: {}'.format(e))
-
-    def listDirs(self, share: str, dirlist: List[str]) -> Dict[str, Any]:
-        result = dict()
-        for path in dirlist:
-            tmp = self.remote_list_dir(share, path=path)
-            result[path] = tmp
-
-        return result
+            logging.error('RemoteOperations failed: {}'.format(e))
 
     def getFile(self,  *args, **kwargs) -> "Any | None":
-        return self.smb_session.getFile(*args, **kwargs)
+        result = self.smb_session.getFile(*args, **kwargs)
+        # logging.debug(f"getFile called with {args} , {kwargs}")
+        return result
 
     def readFile(self, shareName, path, mode = FILE_OPEN, offset = 0, password = None, shareAccessMode = FILE_SHARE_READ, bypass_shared_violation = False) -> bytes:
         # ToDo: Handle situations where share is password protected
@@ -162,7 +194,7 @@ class DPLootSMBConnection:
         path = ntpath.normpath(path)
         if len(path) > 0 and path[0] == '\\':
             path = path[1:]
-
+        #logging.debug(f"readFile called with {path}")
         treeId = self.smb_session.connectTree(shareName)
         fileId = None
 
@@ -187,6 +219,7 @@ class DPLootSMBConnection:
                     offset  += len(bytesRead)
                     data += bytesRead
         except Exception as e:
+            logging.debug(f"Exception occurred while trying to read {path}: {e}")
             if 'STATUS_OBJECT_PATH_NOT_FOUND' in str(e):
                 pass
             elif 'STATUS_OBJECT_NAME_NOT_FOUND' in str(e):
@@ -218,3 +251,114 @@ class DPLootSMBConnection:
                 self.smb_session._SMBConnection.close(treeId, fileId)
             self.smb_session.disconnectTree(treeId)
             return data
+
+class DPLootLocalSMBConnection(DPLootSMBConnection):
+    systemroot = 'C:\\Windows'
+    hklm_software_path = r'Windows/System32/config/SOFTWARE'
+
+    def __init__(self, target=None) -> None:
+        super().__init__(target)
+        self.local_ops     = None
+        self.local_session = True
+        self.smb_session   = DPLootDummySession()
+        # the following are functions that should never be called on this class.
+        self.enable_remoteops   = None
+        self.reconnect          = None
+
+        #logging.debug(f"DPLootLocal.__init__ returning from {self}. taregt is {target}")
+
+    def connect(self) -> "Any | None":
+        return self.smb_session
+
+    def is_admin(self) -> bool:
+        return True
+
+    def enable_localops(self, systemHive, force=False) -> None:
+        if self.local_ops is not None and self.bootkey is not None and not force:
+            return
+        try:
+            self.local_ops = LocalOperations(systemHive)
+            self.bootkey  = self.local_ops.getBootKey()
+        except Exception as e:
+            logging.error(f'LocalOperations failed: {e}')
+
+    # we 'emulate' remote file operations by converting local os.DirEntry() to impacket.SharedFile()
+    def _sharedfile_fromdirentry(d: os.DirEntry):
+        (filesize, atime, mtime, ctime) = d.stat(follow_symlinks=False)[6:]
+        attribs = 0
+        if d.is_dir(follow_symlinks=False):
+            attribs |= ATTR_DIRECTORY
+        # SharedFile(ctime, atime, mtime, filesize, allocsize, attribs, shortname, longname)
+        return SharedFile(ctime, atime, mtime, filesize, None, attribs, d.name, d.name)
+    SharedFile.fromDirEntry = _sharedfile_fromdirentry
+
+    def remote_list_dir(self, share, path, wildcard=True) -> "Any | None":
+        path=os.path.join(self.target.local_root, path.replace('\\', os.sep))
+        if not wildcard:
+            raise NotImplementedError("Not implemented for wildcard == False")
+        try:
+            result = list(map(SharedFile.fromDirEntry, os.scandir(path)))
+        except FileNotFoundError:
+            result = []
+        # logging.debug(f"remote_list_dir called with {path}, returning {result} ")
+        return result
+
+    def listPath(self, shareName:str = 'C$', path:str = None, password:str = None):
+        if path[-2:] == r'\*':
+            return self.remote_list_dir(shareName, path[:-2], wildcard=True)
+        if path[-1] == '*':
+            return self.remote_list_dir(shareName, path[:-1], wildcard=True)
+        else:
+            raise NotImplementedError("Not implemented for wildcard == False")
+
+    def getFile(self,  *args, **kwargs) -> "Any | None":
+        raise NotImplementedError("getFile is not implemented in LOCAL mode")
+
+    def readFile(self, shareName, path, mode = FILE_OPEN, offset = 0, password = None, shareAccessMode = FILE_SHARE_READ, bypass_shared_violation = False) -> bytes:
+        # logging.debug(f"readFile called with {path}")
+        data = None
+        try:
+            with open(os.path.join(self.target.local_root, path.replace('\\', os.sep)), 'rb') as f:
+                data=f.read()
+        except Exception as e:
+            logging.debug(f"Exception occurred while trying to read {path}: {e}")
+
+        return data
+
+    def getUsersProfiles(self) -> dict[str, str] | None:
+        ''' Returns the list of user profiles (from registry) in a dict
+            
+        Each subkey of HKLM/SOFTWARE/Microsoft/Windows NT/CurrentVersion/ProfileList is a user SID,
+        and the ProfileImagePath value inside is the path to the user's profile
+        :return: dict of user_sid: path_to_profile
+
+        '''
+        if self._usersProfiles is not None:
+            return self._usersProfiles
+        
+        result = dict()
+        # open hive
+        reg_file_path = os.path.join(self.target.local_root, self.hklm_software_path)
+        reg = Registry(reg_file_path, isRemote=False)
+
+        # open key
+        key_path='Microsoft\\Windows NT\\CurrentVersion\\ProfileList'
+        parentKey=reg.findKey(key_path)
+        if parentKey is None:
+            logging.error(f"Key {key_path} not found in {reg_file_path}")
+            return None
+        
+        for user_sid in reg.enumKey(parentKey):
+            # get 'ProfileImagePath' value
+            (_, path) = reg.getValue(ntpath.join(key_path, user_sid, 'ProfileImagePath'))
+            path=path.decode('utf-16le').rstrip('\0').replace(r'%systemroot%', self.systemroot)
+            path=ntpath.normpath(path)
+            # store in result dict
+            result[user_sid] = path
+
+        self._usersProfiles = result
+        return self._usersProfiles
+      
+class DPLootDummySession():
+    def login(*args, **kwargs) -> bool:
+        return True
