@@ -54,10 +54,10 @@ class Target:
 
         self.domain = domain
         self.username = username if username is not None else ""
-        self.password = password
+        self.password = password if password is not None else ""
         self.address = options.target
-        self.lmhash = lmhash
-        self.nthash = nthash
+        self.lmhash = lmhash if lmhash is not None else ""
+        self.nthash = nthash if nthash is not None else ""
         self.do_kerberos = options.k or options.aesKey is not None or options.use_kcache
         self.kdcHost = options.kdcHost
         self.use_kcache = options.use_kcache
@@ -69,11 +69,11 @@ class Target:
     @staticmethod
     def create(domain: str = None,
         username: str = "",
-        password: str = None,
+        password: str = "",
         target: str = None,
         hashes: str = None,
-        lmhash: str = None,
-        nthash: str = None,
+        lmhash: str = "",
+        nthash: str = "",
         do_kerberos: bool = False, 
         kdcHost: str = None, 
         use_kcache: bool = False,

@@ -62,6 +62,8 @@ class SCCMTriage:
         self.use_wmi = use_wmi
         self.masterkeys = masterkeys
 
+        self.dcom_conn = None
+
 
     def sccmdecrypt(self, dpapi_blob):
         if self.use_wmi:
@@ -151,8 +153,8 @@ class SCCMTriage:
         query_task = 'SELECT TS_Sequence FROM CCM_TaskSequence'
         query_collection = 'SELECT Name, Value FROM CCM_CollectionVariable'
         try:
-            dcom = DCOMConnection(self.target.address, self.target.username, self.target.password, self.target.domain, self.target.lmhash, self.target.nthash, self.target.aesKey, oxidResolver=True, doKerberos=self.target.do_kerberos, kdcHost=self.target.dc_ip)
-            iInterface = dcom.CoCreateInstanceEx(wmi.CLSID_WbemLevel1Login,wmi.IID_IWbemLevel1Login)
+            self.dcom_conn = DCOMConnection(self.target.address, self.target.username, self.target.password, self.target.domain, self.target.lmhash, self.target.nthash, self.target.aesKey, oxidResolver=True, doKerberos=self.target.do_kerberos, kdcHost=self.target.dc_ip)
+            iInterface = self.dcom_conn.CoCreateInstanceEx(wmi.CLSID_WbemLevel1Login,wmi.IID_IWbemLevel1Login)
             iWbemLevel1Login = wmi.IWbemLevel1Login(iInterface)
             iWbemServices = iWbemLevel1Login.NTLMLogin(namespace, NULL, NULL)
             iWbemLevel1Login.RemRelease()
@@ -171,7 +173,9 @@ class SCCMTriage:
                 import traceback
                 traceback.print_exc()
                 logging.debug(str(e))
-        dcom.disconnect()
+        finally:
+            if self.dcom_conn is not None:
+                self.dcom_conn.disconnect()
         return sccmcred, sccmtask, sccmcollection
     
     def triage_sccm(self) -> Tuple[List[SCCMCred], List[SCCMSecret], List[SCCMCollection]]:
