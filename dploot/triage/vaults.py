@@ -38,7 +38,7 @@ class VaultCred:
     
     def dump(self) -> None:
         self.blob.dump()
-        if self.password is not None:
+        if hasattr(self, 'password') and self.password is not None:
             print('Decoded Password: %s' % self.password)
             print()
 
@@ -143,15 +143,40 @@ class VaultsTriage:
                         self.looted_files[vault_dirname + '_' + vrcd_filepath] = vpolblob_bytes  
                         if vrcd_bytes is not None and filename[-4:] in ['vsch','vcrd'] and len(vpol_keys) > 0:
                             vault = decrypt_vcrd(vrcd_bytes, vpol_keys)
-                            if isinstance(vault, (VAULT_INTERNET_EXPLORER, VAULT_WIN_BIO_KEY, VAULT_NGC_ACCOOUNT)):
-                                if isinstance(vault, VAULT_INTERNET_EXPLORER):
-                                    vaults_creds.append(VaultCred(winuser=user, blob=vault, type=type(vault), username=vault['Username'].decode('utf-16le'),resource=vault['Resource'].decode('utf-16le'), password=vault['Password'].decode('utf-16le') ))
-                                elif isinstance(vault, VAULT_WIN_BIO_KEY):
-                                    vaults_creds.append(VaultCred(winuser=user, blob=vault, type=type(vault), sid=RPC_SID(b'\x05\x00\x00\x00'+vault['Sid']).formatCanonical(), friendly_name=vault['Name'].decode('utf-16le'), biometric_key=(hexlify(vault['BioKey']['bKey'])).decode('latin-1')))
-                                elif isinstance(vault, VAULT_NGC_ACCOOUNT):
-                                    vaults_creds.append(VaultCred(winuser=user, blob=vault, type=type(vault), sid=RPC_SID(b'\x05\x00\x00\x00'+vault['Sid']).formatCanonical(), friendly_name=vault['Name'].decode('utf-16le'), biometric_key=(hexlify(vault['BioKey']['bKey'])).decode('latin-1'), unlock_key=hexlify(vault["UnlockKey"]), IV=hexlify(vault["IV"]), cipher_text=hexlify(vault["CipherText"])))
-                            else:
-                                logging.debug('Vault decrypted but unknown data structure:')
+                            try:
+                                if isinstance(vault, (VAULT_INTERNET_EXPLORER, VAULT_WIN_BIO_KEY, VAULT_NGC_ACCOOUNT)):
+                                    if isinstance(vault, VAULT_INTERNET_EXPLORER):
+                                        vaults_creds.append(VaultCred(winuser=user, blob=vault, type=type(vault), username=vault['Username'].decode('utf-16le'),resource=vault['Resource'].decode('utf-16le'), password=vault['Password'].decode('utf-16le') ))
+                                    elif isinstance(vault, VAULT_WIN_BIO_KEY):
+                                        vaults_creds.append(VaultCred(winuser=user, blob=vault, type=type(vault), sid=RPC_SID(b'\x05\x00\x00\x00'+vault['Sid']).formatCanonical(), friendly_name=vault['Name'].decode('utf-16le'), biometric_key=(hexlify(vault['BioKey']['bKey'])).decode('latin-1')))
+                                    elif isinstance(vault, VAULT_NGC_ACCOOUNT):
+                                        # take non existing keys into account
+                                        try:
+                                            biometric_key = (hexlify(vault['BioKey']['bKey'])).decode('latin-1')
+                                        except KeyError:
+                                            biometric_key = None
+                                        try:
+                                            unlock_key = hexlify(vault["UnlockKey"])
+                                        except KeyError:
+                                            unlock_key = None
+                                        try:
+                                            iv = hexlify(vault["IV"])
+                                        except KeyError:
+                                            iv = None
+                                        try:
+                                            cipher_text = hexlify(vault["CipherText"])
+                                        except KeyError:
+                                            cipher_text = None
+                                        vaults_creds.append(VaultCred(winuser=user, blob=vault, type=type(vault), sid=RPC_SID(b'\x05\x00\x00\x00'+vault['Sid']).formatCanonical(), friendly_name=vault['Name'].decode('utf-16le'), biometric_key=biometric_key, unlock_key=unlock_key, IV=iv, cipher_text=cipher_text))
+                                else:
+                                    logging.debug('Vault decrypted but unknown data structure:')
+                            except Exception as e:
+                                # report the exception, and continue the for loop
+                                if logging.getLogger().level == logging.DEBUG:
+                                    import traceback
+                                    traceback.print_exc()
+                                logging.debug(f'{str(e)} while parsing vault:{vault.__class__} {vault.__dict__}')
+                                pass
         return vaults_creds
 
     @property

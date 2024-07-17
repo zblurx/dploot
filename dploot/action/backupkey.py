@@ -32,6 +32,9 @@ class BackupkeyAction:
         if self.conn.connect() is None:
             logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)
+        if self.conn.local_session:
+            logging.error("Backup key is not implemented with LOCAL target.")
+            sys.exit(1)
 
     def run(self) -> None:
         self.connect()

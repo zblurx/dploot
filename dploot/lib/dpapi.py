@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict, List
 from Cryptodome.Cipher import AES, PKCS1_v1_5
 from Cryptodome.PublicKey import RSA
-from binascii import unhexlify
+from binascii import hexlify,unhexlify
 
 from Cryptodome.Util.Padding import unpad
 from Cryptodome.Hash import HMAC
@@ -193,8 +193,13 @@ def find_masterkey_for_vpol_blob(vault_bytes:bytes, masterkeys: Any) -> "Any | N
     masterkey = bin_to_string(blob['GuidMasterKey'])
     return find_masterkey(masterkey=masterkey, masterkeys=masterkeys)
 
-def decrypt_blob(blob_bytes:bytes, masterkey:Any, entropy = None) -> Any:
+def decrypt_blob(blob_bytes:bytes, masterkey:Any, entropy = None) -> "bytes | None":
     blob = DPAPI_BLOB(blob_bytes)
+    # Ugly fix below:
+    # if blob_bytes was too long, strip blob.rawData so its len matches len(blob)
+    if len(blob.rawData) > len(blob):
+        logging.debug(f'{__name__}.decrypt_blob(): rawData too long. Stripping {len(blob.rawData) - len(blob)} bytes.')
+        blob.rawData = blob.rawData[0:len(blob)]
     key = unhexlify(masterkey.sha1)
     decrypted = None
     if entropy is not None:
@@ -203,7 +208,7 @@ def decrypt_blob(blob_bytes:bytes, masterkey:Any, entropy = None) -> Any:
         decrypted = decrypt(blob, key)
     return decrypted
 
-def decrypt(blob, keyHash, entropy = None) -> "bytes | None":
+def decrypt(blob: DPAPI_BLOB, keyHash, entropy = None) -> "bytes | None":
     hash_algo = ALGORITHMS_DATA[blob['HashAlgo']][1]
     block_size = hash_algo.block_size
     for algo in [compute_sessionKey_1, compute_sessionKey_2]:
@@ -220,11 +225,18 @@ def decrypt(blob, keyHash, entropy = None) -> "bytes | None":
                 pass
         # Now check the signature
         # ToDo Fix this, it's just ugly, more testing so we can remove one
-        toSign = (blob.rawData[20:][:len(blob.rawData)-20-len(blob['Sign'])-4])
+        toSign = (blob.rawData[20:len(blob)-len(blob['Sign'])-4])
+        if toSign[-4:] != blob['Data'][-4:]:
+            logging.debug(f'{__name__}.decrypt(): toSign is wrong!')
+            logging.debug("toSign           : %s" % (hexlify(toSign)))
+            logging.debug("Sign (%2d)      : %s" % (len(blob['Sign']), hexlify(blob['Sign'])))
+
         hmac_calculated = algo(keyHash, blob['HMac'], hash_algo, block_size, entropy)
         hmac_calculated.update(toSign)
+        # logging.debug(f'decrypt: {cleartext=}')
         if blob['Sign'] == hmac_calculated.digest():
             return cleartext
+
     return None
 
 def compute_sessionKey_1(key_hash: bytes, salt: bytes, hash_algo: object, block_size: int, entropy: bytes):
