@@ -119,8 +119,10 @@ class Target:
 def add_target_argument_group(parser: argparse.ArgumentParser,) -> None:
 
     parser.add_argument(
-        "target",
+        "-t"
+        "-target",
         action="store",
+        dest="target",
         metavar="<target name or address>",
         help="Target ip or address, or LOCAL",
     )
