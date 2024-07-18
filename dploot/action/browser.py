@@ -59,7 +59,7 @@ class BrowserAction:
         
             triage = BrowserTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
             logging.info('Triage Browser Credentials%sfor ALL USERS\n' % (' and Cookies ' if self.options.show_cookies else ' '))
-            credentials, cookies = triage.triage_browsers(gather_cookies=self.options.show_cookies)
+            credentials, cookies = triage.triage_browsers(gather_cookies=self.options.show_cookies, bypass_shared_violation=self.options.bypass_shared_violation)
             for credential in credentials:
                 if self.options.quiet:
                     credential.dump_quiet()
@@ -119,6 +119,14 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         metavar="DIR_BROWSER",
         help=(
             "Dump looted Browser data blobs to specified directory, regardless they were decrypted"
+        )
+    )
+
+    group.add_argument(
+        "-bypass-shared-violation",
+        action="store_true",
+        help=(
+            "Will try to bypass Shared Violation Error with a silly esentutl trick"
         )
     )
 

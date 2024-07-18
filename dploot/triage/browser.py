@@ -121,13 +121,13 @@ class BrowserTriage:
         self.looted_files = dict()
         self.masterkeys = masterkeys
 
-    def triage_browsers(self, gather_cookies:bool = False) -> Tuple[List[LoginData], List[Cookie]]:
+    def triage_browsers(self, gather_cookies:bool = False, bypass_shared_violation:bool = False) -> Tuple[List[LoginData], List[Cookie]]:
         credentials = list()
         cookies = list()
 
         for user in self.users:
             try:
-                user_credentials, user_cookies=self.triage_browsers_for_user(user, gather_cookies)
+                user_credentials, user_cookies=self.triage_browsers_for_user(user, gather_cookies, bypass_shared_violation=bypass_shared_violation)
                 credentials += user_credentials
                 cookies += user_cookies
             except Exception as e:
@@ -138,15 +138,15 @@ class BrowserTriage:
                 pass
         return credentials, cookies
 
-    def triage_browsers_for_user(self, user: str, gather_cookies:bool = False) -> Tuple[List[LoginData], List[Cookie]]:
-        return self.triage_chrome_browsers_for_user(user=user, gather_cookies=gather_cookies)
+    def triage_browsers_for_user(self, user: str, gather_cookies:bool = False, bypass_shared_violation:bool = False) -> Tuple[List[LoginData], List[Cookie]]:
+        return self.triage_chrome_browsers_for_user(user=user, gather_cookies=gather_cookies, bypass_shared_violation=bypass_shared_violation)
 
-    def triage_chrome_browsers_for_user(self,user:str, gather_cookies:bool = False) -> Tuple[List[LoginData], List[Cookie]]:
+    def triage_chrome_browsers_for_user(self,user:str, gather_cookies:bool = False, bypass_shared_violation:bool = False) -> Tuple[List[LoginData], List[Cookie]]:
         credentials = list()
         cookies = list()
         for browser,paths in self.user_generic_chrome_paths.items():
             aeskey = None
-            aesStateKey_bytes = self.conn.readFile(shareName=self.share, path=paths['aesStateKeyPath'] % user, bypass_shared_violation=True)
+            aesStateKey_bytes = self.conn.readFile(shareName=self.share, path=paths['aesStateKeyPath'] % user, bypass_shared_violation=bypass_shared_violation)
             if aesStateKey_bytes is not None and len(aesStateKey_bytes) > 0:
                 logging.debug('Found %s AppData files for user %s' % (browser.upper(), user))
                 aesStateKey_json = json.loads(aesStateKey_bytes)
@@ -157,7 +157,7 @@ class BrowserTriage:
                     if masterkey is not None:
                         aeskey = decrypt_blob(blob_bytes=dpapi_blob, masterkey=masterkey)
 
-            loginData_bytes = self.conn.readFile(shareName=self.share, path=paths['loginDataPath'] % user, bypass_shared_violation=True)
+            loginData_bytes = self.conn.readFile(shareName=self.share, path=paths['loginDataPath'] % user, bypass_shared_violation=bypass_shared_violation)
             if aeskey is not None and loginData_bytes is not None and len(loginData_bytes) > 0:
                 fh = tempfile.NamedTemporaryFile()
                 fh.write(loginData_bytes)
@@ -179,7 +179,7 @@ class BrowserTriage:
                 fh.close()
             if gather_cookies:
                 for cookiepath in paths['cookiesDataPath']:
-                    cookiesData_bytes = self.conn.readFile(shareName=self.share, path=cookiepath % user, bypass_shared_violation=True)
+                    cookiesData_bytes = self.conn.readFile(shareName=self.share, path=cookiepath % user, bypass_shared_violation=bypass_shared_violation)
                     if aeskey is not None and cookiesData_bytes is not None and len(cookiesData_bytes) > 0:
                         fh = tempfile.NamedTemporaryFile()
                         fh.write(cookiesData_bytes)
@@ -203,7 +203,7 @@ class BrowserTriage:
                                     expires_utc=expires_utc,
                                     last_access_utc=last_access_utc))
                         fh.close()
-            webData_bytes = self.conn.readFile(shareName=self.share, path=paths['webDataPath'] % user, bypass_shared_violation=True)
+            webData_bytes = self.conn.readFile(shareName=self.share, path=paths['webDataPath'] % user, bypass_shared_violation=bypass_shared_violation)
             if aeskey is not None and webData_bytes is not None and len(webData_bytes) > 0:
                 fh = tempfile.NamedTemporaryFile()
                 fh.write(webData_bytes)
