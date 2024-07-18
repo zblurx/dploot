@@ -2,7 +2,7 @@ import hashlib
 import logging
 import ntpath
 import os
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from dataclasses import dataclass
 
 from impacket.dcerpc.v5 import rrp
@@ -76,13 +76,15 @@ class CertificatesTriage:
     ]
     share = 'C$'
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey]) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey], per_certificate_callback:Any = None) -> None:
         self.target = target
         self.conn = conn
         
         self._users = None
         self.looted_files = dict()
         self.masterkeys = masterkeys
+
+        self.per_certificate_callback = per_certificate_callback
 
     def triage_system_certificates(self) -> List[Certificate]:
         logging.getLogger("impacket").disabled = True
@@ -255,8 +257,10 @@ class CertificatesTriage:
                     ]:
                         clientauth = True
                         break
-
-                certificates.append(Certificate(winuser=winuser, cert=cert, pkey=key, pfx=pfx, username=username, filename=name, clientauth=clientauth))
+                cert_object = Certificate(winuser=winuser, cert=cert, pkey=key, pfx=pfx, username=username, filename=name, clientauth=clientauth)
+                certificates.append(cert_object)
+                if self.per_certificate_callback is not None:
+                    self.per_certificate_callback(cert_object)
         return certificates
 
     def der_to_cert(self,certificate: bytes) -> x509.Certificate:

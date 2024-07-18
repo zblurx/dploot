@@ -56,13 +56,10 @@ class CertificatesAction:
                     for masterkey in self.masterkeys:
                         masterkey.dump()
                     print()
-                
-            triage = CertificatesTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            logging.info('Triage Certificates for ALL USERS\n')
-            certificates = triage.triage_certificates()
-            for certificate in certificates:
+
+            def certificate_callback(certificate):
                 if not self.options.dump_all and not certificate.clientauth:
-                    continue
+                    return
                 if not self.options.quiet:
                     certificate.dump()
                 filename = "%s_%s.pfx" % (certificate.username,certificate.filename[:16])
@@ -71,6 +68,10 @@ class CertificatesAction:
                     print() # better outputing
                 with open(filename, "wb") as f:
                     f.write(certificate.pfx)
+
+            triage = CertificatesTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_certificate_callback=certificate_callback)
+            logging.info('Triage Certificates for ALL USERS\n')
+            triage.triage_certificates()
             if self.outputdir is not None:
                 for filename, bytes in triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:

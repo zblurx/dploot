@@ -52,19 +52,20 @@ class MachineCertificatesAction:
                     for masterkey in self.masterkeys:
                         masterkey.dump()
                     print()
-                
-            certificate_triage = CertificatesTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            logging.info('Triage SYSTEM Certificates\n')
-            certificates = certificate_triage.triage_system_certificates()
-            for certificate in certificates:
+
+            def certificate_callback(certificate):
                 if not self.options.dump_all and not certificate.clientauth:
-                    continue
+                    return
                 if not self.options.quiet:
                     certificate.dump()
                 filename = "%s_%s.pfx" % (certificate.username,certificate.filename[:16])
                 logging.critical("Writting certificate to %s" % filename)
                 with open(filename, "wb") as f:
                     f.write(certificate.pfx)
+
+            certificate_triage = CertificatesTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_certificate_callback=certificate_callback)
+            logging.info('Triage SYSTEM Certificates\n')
+            certificate_triage.triage_system_certificates()
             if self.outputdir is not None:
                 for filename, bytes in certificate_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
