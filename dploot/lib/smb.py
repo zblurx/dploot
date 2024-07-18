@@ -13,6 +13,7 @@ from impacket.smb import ATTR_DIRECTORY
 from impacket.smb import SMB_DIALECT
 from impacket.smb import SharedFile
 from impacket.nmb import NetBIOSTimeout
+from impacket.dcerpc.v5 import tsts
 from impacket.examples.secretsdump import RemoteOperations,LocalOperations
 from impacket.smb3structs import FILE_READ_DATA, FILE_OPEN, FILE_NON_DIRECTORY_FILE, FILE_SHARE_READ
 
@@ -251,6 +252,29 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
                 self.smb_session._SMBConnection.close(treeId, fileId)
             self.smb_session.disconnectTree(treeId)
             return data
+        
+    def perform_taskkill(self, process_name):
+        with tsts.LegacyAPI(self.smb_session, self.target.address) as legacy:
+            handle = legacy.hRpcWinStationOpenServer()
+            r = legacy.hRpcWinStationGetAllProcesses(handle)
+            if not len(r):
+                logging.debug("Could not get process list")
+                return
+            pid_list = [i["UniqueProcessId"] for i in r if i["ImageName"].lower() == process_name.lower()]
+            if not len(pid_list):
+                logging.debug(f"No process {process_name} found")
+            logging.debug(f"Found {pid_list} pid(s) for process {process_name}")
+            for pid in pid_list:
+                logging.debug(f"Killing PID {pid}")
+                try:
+                    if legacy.hRpcWinStationTerminateProcess(handle, pid)["ErrorCode"]:
+                        logging(f"Successfully killed process {pid}")
+                    else: 
+                        logging(f"Could not kill process {pid}")
+                except Exception as e:
+                    logging.error(f"Error while terminating pid {pid}: {e}")
+            
+
 
 class DPLootLocalSMBConnection(DPLootSMBConnection):
     systemroot = 'C:\\Windows'

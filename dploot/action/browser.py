@@ -56,7 +56,12 @@ class BrowserAction:
                     for masterkey in self.masterkeys:
                         masterkey.dump()
                     print()
-        
+
+            if self.options.kill_browser:
+                logging.info("Killing browsers")
+                for browser_process_name in ["chrome.exe","msedge.exe","brave.exe"]:
+                    self.conn.perform_taskkill(process_name=browser_process_name)
+
             triage = BrowserTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
             logging.info('Triage Browser Credentials%sfor ALL USERS\n' % (' and Cookies ' if self.options.show_cookies else ' '))
             credentials, cookies = triage.triage_browsers(gather_cookies=self.options.show_cookies, bypass_shared_violation=self.options.bypass_shared_violation)
@@ -127,6 +132,14 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         action="store_true",
         help=(
             "Will try to bypass Shared Violation Error with a silly esentutl trick"
+        )
+    )
+
+    group.add_argument(
+        "-kill-browser",
+        action="store_true",
+        help=(
+            "Will try to kill browser's process. Usefull when Shared Violation Error"
         )
     )
 
