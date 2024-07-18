@@ -158,7 +158,7 @@ class WifiTriage:
                                     eap_password = None
                                     eap_domain   = None
                                     if creds is not None:
-                                        eap_username, eap_domain, eap_password = (_.decode('utf-8', errors='backslahreplace') for _ in creds)
+                                        eap_username, eap_domain, eap_password = (_.decode('latin-1', errors='backslashreplace') for _ in creds)
                                     wifi_creds.append(WifiCred(
                                         ssid=ssid,
                                         auth=auth_type,
@@ -166,13 +166,13 @@ class WifiTriage:
                                         xml_data=main,
                                         eap_username=eap_username,
                                         eap_domain=eap_domain,
-                                        eap_password=eap_password))    
+                                        eap_password=eap_password))
                                 else:
                                     wifi_creds.append(WifiCred(
                                         ssid=ssid,
                                         auth=auth_type,
                                         encryption=encryption,
-                                        xml_data=main))               
+                                        xml_data=main))
         except Exception as e:
             if logging.getLogger().level == logging.DEBUG:
                 import traceback
@@ -180,7 +180,7 @@ class WifiTriage:
                 logging.debug(f'{__name__}: {str(e)}')
             pass
         return wifi_creds
-    
+
     def triage_eap_creds(self, eap_profile) -> list[bytes]:
         try:
             if self.conn.local_session:
