@@ -3,20 +3,23 @@ import logging
 import sys
 from typing import Callable, Tuple
 
-from dploot.action.masterkeys import add_masterkeys_argument_group, parse_masterkeys_options
+from dploot.action.masterkeys import (
+    add_masterkeys_argument_group,
+    parse_masterkeys_options,
+)
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.mobaxterm import MobaXtermTriage
 
-NAME = 'mobaxterm'
+NAME = "mobaxterm"
+
 
 class MobaXtermAction:
-
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
         self.target = Target.from_options(options)
-        
+
         self.conn = None
         self._is_admin = None
         self._users = None
@@ -31,7 +34,9 @@ class MobaXtermAction:
                 logging.error(str(e))
                 sys.exit(1)
 
-        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(self.options, self.target)
+        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(
+            self.options, self.target
+        )
 
     def connect(self) -> None:
         self.conn = DPLootSMBConnection(self.target)
@@ -41,13 +46,30 @@ class MobaXtermAction:
 
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info(
+            "Connected to {} as {}\\{} {}\n".format(
+                self.target.address,
+                self.target.domain,
+                self.target.username,
+                ("(admin)" if self.is_admin else ""),
+            )
+        )
         if self.is_admin:
             if self.masterkeys is None:
+
                 def masterkey_triage(masterkey):
                     masterkey.dump()
 
-                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords, per_masterkey_callback=masterkey_triage if not self.options.quiet else None)
+                masterkeytriage = MasterkeysTriage(
+                    target=self.target,
+                    conn=self.conn,
+                    pvkbytes=self.pvkbytes,
+                    nthashes=self.nthashes,
+                    passwords=self.passwords,
+                    per_masterkey_callback=masterkey_triage
+                    if not self.options.quiet
+                    else None,
+                )
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
                 print()
@@ -57,8 +79,13 @@ class MobaXtermAction:
                     secret.dump_quiet()
                 else:
                     secret.dump()
-            
-            triage = MobaXtermTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_secret_callback=secret_callback)
+
+            triage = MobaXtermTriage(
+                target=self.target,
+                conn=self.conn,
+                masterkeys=self.masterkeys,
+                per_secret_callback=secret_callback,
+            )
             logging.info("Triage MobaXterm Secrets\n")
             triage.triage_mobaxterm(offline_users=self.options.dump_offline_users)
 
@@ -73,22 +100,23 @@ class MobaXtermAction:
         self._is_admin = self.conn.is_admin()
         return self._is_admin
 
+
 def entry(options: argparse.Namespace) -> None:
     a = MobaXtermAction(options)
     a.run()
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
 
-    subparser = subparsers.add_parser(NAME, help="Dump Passwords and Credentials from MobaXterm")
+def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+    subparser = subparsers.add_parser(
+        NAME, help="Dump Passwords and Credentials from MobaXterm"
+    )
 
     group = subparser.add_argument_group("mobaxterm options")
 
     group.add_argument(
         "-mkfile",
         action="store",
-        help=(
-            "File containing {GUID}:SHA1 masterkeys mappings"
-        ),
+        help=("File containing {GUID}:SHA1 masterkeys mappings"),
     )
 
     add_masterkeys_argument_group(group)
@@ -96,9 +124,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     group.add_argument(
         "-dump-offline-users",
         action="store_true",
-        help=(
-            "Will try to offline users by dumping them NTUSER.DAT file. Noisy"
-        )
+        help=("Will try to offline users by dumping them NTUSER.DAT file. Noisy"),
     )
 
     add_target_argument_group(subparser)

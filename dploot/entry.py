@@ -23,7 +23,7 @@ from dploot.action import (
     browser,
     wifi,
     mobaxterm,
-    )
+)
 
 
 ENTRY_PARSERS = [
@@ -45,18 +45,24 @@ ENTRY_PARSERS = [
     mobaxterm,
 ]
 
+
 def main() -> None:
     logger.init()
     version = importlib.metadata.version("dploot")
-    parser = argparse.ArgumentParser(description=f"DPAPI looting remotely in Python.\nVersion {version}", add_help=True)
+    parser = argparse.ArgumentParser(
+        description=f"DPAPI looting remotely in Python.\nVersion {version}",
+        add_help=True,
+    )
 
     parser.add_argument("-debug", action="store_true", help="Turn DEBUG output ON")
 
-    parser.add_argument("-quiet", action="store_true", help="Only output dumped credentials")
+    parser.add_argument(
+        "-quiet", action="store_true", help="Only output dumped credentials"
+    )
 
     subparsers = parser.add_subparsers(help="Action", dest="action", required=True)
 
-    actions = dict()
+    actions = {}
 
     for entry_parser in ENTRY_PARSERS:
         action, entry = entry_parser.add_subparser(subparsers)

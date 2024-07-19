@@ -3,7 +3,10 @@ import logging
 import os
 import sys
 from typing import Callable, Tuple
-from dploot.action.masterkeys import add_masterkeys_argument_group, parse_masterkeys_options
+from dploot.action.masterkeys import (
+    add_masterkeys_argument_group,
+    parse_masterkeys_options,
+)
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
@@ -11,14 +14,14 @@ from dploot.lib.utils import handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.rdg import RDGTriage
 
-NAME = 'rdg'
+NAME = "rdg"
+
 
 class RDGAction:
-
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
         self.target = Target.from_options(options)
-        
+
         self.conn = None
         self._is_admin = None
         self._users = None
@@ -26,7 +29,7 @@ class RDGAction:
         self.masterkeys = None
         self.pvkbytes = None
 
-        self.outputdir = handle_outputdir_option(dir= self.options.export_rdg)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_rdg)
 
         if self.options.mkfile is not None:
             try:
@@ -35,7 +38,9 @@ class RDGAction:
                 logging.error(str(e))
                 sys.exit(1)
 
-        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(self.options, self.target)
+        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(
+            self.options, self.target
+        )
 
     def connect(self) -> None:
         self.conn = DPLootSMBConnection(self.target)
@@ -45,13 +50,30 @@ class RDGAction:
 
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info(
+            "Connected to {} as {}\\{} {}\n".format(
+                self.target.address,
+                self.target.domain,
+                self.target.username,
+                ("(admin)" if self.is_admin else ""),
+            )
+        )
         if self.is_admin:
             if self.masterkeys is None:
+
                 def masterkey_triage(masterkey):
                     masterkey.dump()
 
-                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords, per_masterkey_callback=masterkey_triage if not self.options.quiet else None)
+                masterkeytriage = MasterkeysTriage(
+                    target=self.target,
+                    conn=self.conn,
+                    pvkbytes=self.pvkbytes,
+                    nthashes=self.nthashes,
+                    passwords=self.passwords,
+                    per_masterkey_callback=masterkey_triage
+                    if not self.options.quiet
+                    else None,
+                )
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
                 print()
@@ -62,13 +84,20 @@ class RDGAction:
                 else:
                     credential.dump()
 
-            triage = RDGTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_credential_callback=credential_callback)
-            logging.info('Triage RDCMAN Settings and RDG files for ALL USERS\n')
+            triage = RDGTriage(
+                target=self.target,
+                conn=self.conn,
+                masterkeys=self.masterkeys,
+                per_credential_callback=credential_callback,
+            )
+            logging.info("Triage RDCMAN Settings and RDG files for ALL USERS\n")
             triage.triage_rdcman()
             if self.outputdir is not None:
-                for filename, bytes in triage.looted_files.items():
-                    with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
-                        outputfile.write(bytes)
+                for filename, bytes_data in triage.looted_files.items():
+                    with open(
+                        os.path.join(self.outputdir, filename), "wb"
+                    ) as outputfile:
+                        outputfile.write(bytes_data)
         else:
             logging.info("Not an admin, exiting...")
 
@@ -80,22 +109,24 @@ class RDGAction:
         self._is_admin = self.conn.is_admin()
         return self._is_admin
 
+
 def entry(options: argparse.Namespace) -> None:
     a = RDGAction(options)
     a.run()
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
 
-    subparser = subparsers.add_parser(NAME, help="Dump users saved password information for RDCMan.settings from remote target")
+def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+    subparser = subparsers.add_parser(
+        NAME,
+        help="Dump users saved password information for RDCMan.settings from remote target",
+    )
 
     group = subparser.add_argument_group("rdg options")
 
     group.add_argument(
         "-mkfile",
         action="store",
-        help=(
-            "File containing {GUID}:SHA1 masterkeys mappings"
-        ),
+        help=("File containing {GUID}:SHA1 masterkeys mappings"),
     )
 
     add_masterkeys_argument_group(group)
@@ -106,7 +137,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         metavar="DIR_RDG",
         help=(
             "Dump looted RDGMan.settings blob to specified directory, regardless they were decrypted"
-        )
+        ),
     )
 
     add_target_argument_group(subparser)

@@ -3,7 +3,10 @@ import logging
 import os
 import sys
 from typing import Callable, Tuple
-from dploot.action.masterkeys import add_masterkeys_argument_group, parse_masterkeys_options
+from dploot.action.masterkeys import (
+    add_masterkeys_argument_group,
+    parse_masterkeys_options,
+)
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
@@ -11,14 +14,14 @@ from dploot.lib.utils import handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.vaults import VaultsTriage
 
-NAME = 'vaults'
+NAME = "vaults"
+
 
 class VaultsAction:
-
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
         self.target = Target.from_options(options)
-        
+
         self.conn = None
         self._is_admin = None
         self.outputdir = None
@@ -27,7 +30,7 @@ class VaultsAction:
         self.passwords = None
         self.nthashes = None
 
-        self.outputdir = handle_outputdir_option(dir= self.options.export_vpol)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_vpol)
 
         if self.options.mkfile is not None:
             try:
@@ -36,7 +39,9 @@ class VaultsAction:
                 logging.error(str(e))
                 sys.exit(1)
 
-        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(self.options, self.target)
+        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(
+            self.options, self.target
+        )
 
     def connect(self) -> None:
         self.conn = DPLootSMBConnection(self.target)
@@ -46,30 +51,54 @@ class VaultsAction:
 
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info(
+            "Connected to {} as {}\\{} {}\n".format(
+                self.target.address,
+                self.target.domain,
+                self.target.username,
+                ("(admin)" if self.is_admin else ""),
+            )
+        )
         if self.is_admin:
             if self.masterkeys is None:
+
                 def masterkey_triage(masterkey):
                     masterkey.dump()
 
-                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords, per_masterkey_callback=masterkey_triage if not self.options.quiet else None)
+                masterkeytriage = MasterkeysTriage(
+                    target=self.target,
+                    conn=self.conn,
+                    pvkbytes=self.pvkbytes,
+                    nthashes=self.nthashes,
+                    passwords=self.passwords,
+                    per_masterkey_callback=masterkey_triage
+                    if not self.options.quiet
+                    else None,
+                )
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
                 print()
-        
+
             def secret_callback(vault):
                 if self.options.quiet:
                     vault.dump_quiet()
-                else: 
+                else:
                     vault.dump()
 
-            triage = VaultsTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_vault_callback=secret_callback)
-            logging.info('Triage Vaults for ALL USERS\n')
+            triage = VaultsTriage(
+                target=self.target,
+                conn=self.conn,
+                masterkeys=self.masterkeys,
+                per_vault_callback=secret_callback,
+            )
+            logging.info("Triage Vaults for ALL USERS\n")
             triage.triage_vaults()
             if self.outputdir is not None:
-                for filename, bytes in triage.looted_files.items():
-                    with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
-                        outputfile.write(bytes)
+                for filename, bytes_data in triage.looted_files.items():
+                    with open(
+                        os.path.join(self.outputdir, filename), "wb"
+                    ) as outputfile:
+                        outputfile.write(bytes_data)
         else:
             logging.info("Not an admin, exiting...")
 
@@ -81,22 +110,23 @@ class VaultsAction:
         self._is_admin = self.conn.is_admin()
         return self._is_admin
 
+
 def entry(options: argparse.Namespace) -> None:
     a = VaultsAction(options)
     a.run()
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
 
-    subparser = subparsers.add_parser(NAME, help="Dump users Vaults blob from remote target")
+def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+    subparser = subparsers.add_parser(
+        NAME, help="Dump users Vaults blob from remote target"
+    )
 
     group = subparser.add_argument_group("vaults options")
 
     group.add_argument(
         "-mkfile",
         action="store",
-        help=(
-            "File containing {GUID}:SHA1 masterkeys mappings"
-        ),
+        help=("File containing {GUID}:SHA1 masterkeys mappings"),
     )
 
     add_masterkeys_argument_group(group)
@@ -107,7 +137,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         metavar="DIR_VPOL",
         help=(
             "Dump looted Vaults blob to specified directory, regardless they were decrypted"
-        )
+        ),
     )
 
     add_target_argument_group(subparser)

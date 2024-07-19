@@ -10,10 +10,10 @@ from dploot.lib.utils import handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage
 
 
-NAME = 'machinemasterkeys'
+NAME = "machinemasterkeys"
+
 
 class MachineMasterkeysAction:
-
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
 
@@ -25,9 +25,9 @@ class MachineMasterkeysAction:
         self.append = self.options.append
         self.outputdir = None
 
-        self.outputdir = handle_outputdir_option(dir= self.options.export_mk)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_mk)
 
-        if self.options.outputfile is not None and self.options.outputfile != '':
+        if self.options.outputfile is not None and self.options.outputfile != "":
             self.outputfile = self.options.outputfile
 
     def connect(self) -> None:
@@ -35,29 +35,45 @@ class MachineMasterkeysAction:
         if self.conn.connect() is None:
             logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)
-    
+
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info(
+            "Connected to {} as {}\\{} {}\n".format(
+                self.target.address,
+                self.target.domain,
+                self.target.username,
+                ("(admin)" if self.is_admin else ""),
+            )
+        )
         if self.is_admin:
+            fd = (
+                open(self.outputfile + ".mkf", ("a+" if self.append else "w"))
+                if self.outputfile is not None
+                else None
+            )
 
-            fd = open(self.outputfile + '.mkf', ('a+' if self.append else 'w')) if self.outputfile is not None else None
-            
             def masterkey_callback(masterkey):
                 masterkey.dump()
                 if fd is not None:
-                    fd.write(str(masterkey)+'\n')
+                    fd.write(str(masterkey) + "\n")
 
-            triage = MasterkeysTriage(target=self.target, conn=self.conn, per_masterkey_callback=masterkey_callback)
+            triage = MasterkeysTriage(
+                target=self.target,
+                conn=self.conn,
+                per_masterkey_callback=masterkey_callback,
+            )
             logging.info("Triage SYSTEM masterkeys\n")
             triage.triage_system_masterkeys()
             if self.outputfile is not None:
                 logging.critical("Writting masterkeys to %s.mkf" % self.outputfile)
                 fd.close()
             if self.outputdir is not None:
-                for filename, bytes in triage.looted_files.items():
-                    with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
-                        outputfile.write(bytes)                
+                for filename, bytes_data in triage.looted_files.items():
+                    with open(
+                        os.path.join(self.outputdir, filename), "wb"
+                    ) as outputfile:
+                        outputfile.write(bytes_data)
         else:
             logging.info("Not an admin, exiting...")
 
@@ -69,30 +85,29 @@ class MachineMasterkeysAction:
         self._is_admin = self.conn.is_admin()
         return self._is_admin
 
+
 def entry(options: argparse.Namespace) -> None:
     a = MachineMasterkeysAction(options)
     a.run()
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
 
-    subparser = subparsers.add_parser(NAME, help="Dump system masterkey from remote target")
+def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+    subparser = subparsers.add_parser(
+        NAME, help="Dump system masterkey from remote target"
+    )
 
     group = subparser.add_argument_group("machinemasterkeys options")
 
     group.add_argument(
         "-outputfile",
         action="store",
-        help=(
-            "Export keys to file"
-        ),
+        help=("Export keys to file"),
     )
 
     group.add_argument(
         "-append",
         action="store_true",
-        help=(
-            "Appends keys to file specified with -outputfile"
-        ),
+        help=("Appends keys to file specified with -outputfile"),
     )
 
     group.add_argument(
@@ -101,7 +116,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         metavar="DIR_MASTERKEYS",
         help=(
             "Dump looted masterkey files to specified directory, regardless they were decrypted"
-        )
+        ),
     )
 
     add_target_argument_group(subparser)

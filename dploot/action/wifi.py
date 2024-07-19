@@ -12,10 +12,10 @@ from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.wifi import WifiTriage
 
 
-NAME = 'wifi'
+NAME = "wifi"
+
 
 class WifiAction:
-
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
 
@@ -26,9 +26,11 @@ class WifiAction:
         self.masterkeys = None
         self.outputdir = None
 
-        self.outputdir = handle_outputdir_option(dir= self.options.export_wifi)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_wifi)
 
-        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(self.options, self.target)
+        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(
+            self.options, self.target
+        )
 
         if self.options.mkfile is not None:
             try:
@@ -42,16 +44,33 @@ class WifiAction:
         if self.conn.connect() is None:
             logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)
-    
+
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info(
+            "Connected to {} as {}\\{} {}\n".format(
+                self.target.address,
+                self.target.domain,
+                self.target.username,
+                ("(admin)" if self.is_admin else ""),
+            )
+        )
         if self.is_admin:
             if self.masterkeys is None:
+
                 def masterkey_triage(masterkey):
                     masterkey.dump()
 
-                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords, per_masterkey_callback=masterkey_triage if not self.options.quiet else None)
+                masterkeytriage = MasterkeysTriage(
+                    target=self.target,
+                    conn=self.conn,
+                    pvkbytes=self.pvkbytes,
+                    nthashes=self.nthashes,
+                    passwords=self.passwords,
+                    per_masterkey_callback=masterkey_triage
+                    if not self.options.quiet
+                    else None,
+                )
                 logging.info("Triage SYSTEM masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_system_masterkeys()
                 # we need user masterkeys, too.
@@ -65,14 +84,21 @@ class WifiAction:
                 else:
                     profile.dump()
 
-            wifi_triage = WifiTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_profile_callback=profile_callback)
-            logging.info('Triage ALL WIFI profiles\n')
-            wifi_triage.triage_wifi()        
+            wifi_triage = WifiTriage(
+                target=self.target,
+                conn=self.conn,
+                masterkeys=self.masterkeys,
+                per_profile_callback=profile_callback,
+            )
+            logging.info("Triage ALL WIFI profiles\n")
+            wifi_triage.triage_wifi()
             if self.outputdir is not None:
-                for filename, bytes in wifi_triage.looted_files.items():
-                    with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
-                        outputfile.write(bytes)
-            
+                for filename, bytesdata in wifi_triage.looted_files.items():
+                    with open(
+                        os.path.join(self.outputdir, filename), "wb"
+                    ) as outputfile:
+                        outputfile.write(bytesdata)
+
         else:
             logging.info("Not an admin, exiting...")
 
@@ -84,30 +110,29 @@ class WifiAction:
         self._is_admin = self.conn.is_admin()
         return self._is_admin
 
+
 def entry(options: argparse.Namespace) -> None:
     a = WifiAction(options)
     a.run()
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
 
-    subparser = subparsers.add_parser(NAME, help="Dump wifi profiles from remote target")
+def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+    subparser = subparsers.add_parser(
+        NAME, help="Dump wifi profiles from remote target"
+    )
 
     group = subparser.add_argument_group("wifi options")
 
     group.add_argument(
         "-mkfile",
         action="store",
-        help=(
-            "File containing {GUID}:SHA1 masterkeys mappings"
-        ),
+        help=("File containing {GUID}:SHA1 masterkeys mappings"),
     )
 
     group.add_argument(
         "-outputfile",
         action="store",
-        help=(
-            "Export keys to file"
-        ),
+        help=("Export keys to file"),
     )
 
     group.add_argument(
@@ -116,7 +141,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         metavar="DIR_CREDMAN",
         help=(
             "Dump looted Wifi Profile xml files to specified directory, regardless they were decrypted"
-        )
+        ),
     )
 
     add_target_argument_group(subparser)

@@ -11,10 +11,10 @@ from dploot.triage.certificates import CertificatesTriage
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 
 
-NAME = 'machinecertificates'
+NAME = "machinecertificates"
+
 
 class MachineCertificatesAction:
-
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
 
@@ -25,7 +25,7 @@ class MachineCertificatesAction:
         self.masterkeys = None
         self.outputdir = None
 
-        self.outputdir = handle_outputdir_option(dir= self.options.export_certificates)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_certificates)
 
         if self.options.mkfile is not None:
             try:
@@ -39,18 +39,32 @@ class MachineCertificatesAction:
         if self.conn.connect() is None:
             logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)
-    
+
     def run(self) -> None:
         self.connect()
-        logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
+        logging.info(
+            "Connected to {} as {}\\{} {}\n".format(
+                self.target.address,
+                self.target.domain,
+                self.target.username,
+                ("(admin)" if self.is_admin else ""),
+            )
+        )
         if self.is_admin:
             if self.masterkeys is None:
+
                 def masterkey_triage(masterkey):
                     masterkey.dump()
 
-                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, per_masterkey_callback=masterkey_triage if not self.options.quiet else None)
+                masterkeytriage = MasterkeysTriage(
+                    target=self.target,
+                    conn=self.conn,
+                    per_masterkey_callback=masterkey_triage
+                    if not self.options.quiet
+                    else None,
+                )
                 logging.info("Triage SYSTEM masterkeys\n")
-                self.masterkeys = masterkeytriage.triage_masterkeys()
+                self.masterkeys = masterkeytriage.triage_system_masterkeys()
                 print()
 
             def certificate_callback(certificate):
@@ -58,19 +72,26 @@ class MachineCertificatesAction:
                     return
                 if not self.options.quiet:
                     certificate.dump()
-                filename = "%s_%s.pfx" % (certificate.username,certificate.filename[:16])
+                filename = f"{certificate.username}_{certificate.filename[:16]}.pfx"
                 logging.critical("Writting certificate to %s" % filename)
                 with open(filename, "wb") as f:
                     f.write(certificate.pfx)
 
-            certificate_triage = CertificatesTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_certificate_callback=certificate_callback)
-            logging.info('Triage SYSTEM Certificates\n')
+            certificate_triage = CertificatesTriage(
+                target=self.target,
+                conn=self.conn,
+                masterkeys=self.masterkeys,
+                per_certificate_callback=certificate_callback,
+            )
+            logging.info("Triage SYSTEM Certificates\n")
             certificate_triage.triage_system_certificates()
             if self.outputdir is not None:
-                for filename, bytes in certificate_triage.looted_files.items():
-                    with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
-                        outputfile.write(bytes)
-            
+                for filename, bytes_data in certificate_triage.looted_files.items():
+                    with open(
+                        os.path.join(self.outputdir, filename), "wb"
+                    ) as outputfile:
+                        outputfile.write(bytes_data)
+
         else:
             logging.info("Not an admin, exiting...")
 
@@ -82,38 +103,35 @@ class MachineCertificatesAction:
         self._is_admin = self.conn.is_admin()
         return self._is_admin
 
+
 def entry(options: argparse.Namespace) -> None:
     a = MachineCertificatesAction(options)
     a.run()
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
 
-    subparser = subparsers.add_parser(NAME, help="Dump system certificates from remote target")
+def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+    subparser = subparsers.add_parser(
+        NAME, help="Dump system certificates from remote target"
+    )
 
     group = subparser.add_argument_group("machinecertificates options")
 
     group.add_argument(
         "-mkfile",
         action="store",
-        help=(
-            "File containing {GUID}:SHA1 masterkeys mappings"
-        ),
+        help=("File containing {GUID}:SHA1 masterkeys mappings"),
     )
 
     group.add_argument(
         "-outputfile",
         action="store",
-        help=(
-            "Export keys to file"
-        ),
+        help=("Export keys to file"),
     )
 
     group.add_argument(
         "-dump-all",
         action="store_true",
-        help=(
-            "Dump also certificates not used for client authentication"
-        )
+        help=("Dump also certificates not used for client authentication"),
     )
 
     group.add_argument(
@@ -122,7 +140,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         metavar="DIR_CERTIFICATES",
         help=(
             "Dump looted Certificates and PKI blob to specified directory, regardless they were decrypted"
-        )
+        ),
     )
 
     add_target_argument_group(subparser)
