@@ -2,6 +2,8 @@ import argparse
 import sys
 from typing import Optional
 
+from dploot.lib.utils import add_general_args
+
 
 class Target:
     def __init__(self) -> None:
@@ -164,11 +166,7 @@ def add_target_argument_group(
         help="Password",
     )
 
-    parser.add_argument("-debug", action="store_true", help="Turn DEBUG output ON")
-
-    parser.add_argument(
-        "-quiet", action="store_true", help="Only output dumped credentials"
-    )
+    add_general_args(parser)
 
     group = parser.add_argument_group("authentication")
 

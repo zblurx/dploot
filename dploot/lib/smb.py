@@ -246,6 +246,7 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
         password=None,
         shareAccessMode=FILE_SHARE_READ,
         bypass_shared_violation=False,
+        looted_files=None
     ) -> bytes:
         # ToDo: Handle situations where share is password protected
         path = path.replace("/", "\\")
@@ -300,7 +301,7 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
                 time.sleep(1)
                 while True:
                     try:
-                        filepath = "Windows\\Temp\\" + wmiexec.output
+                        filepath = ntpath.join("Windows\\Temp\\",wmiexec.output)
                         data = self.readFile(shareName=shareName, path=filepath)
                         break
                     except Exception as e:
@@ -311,7 +312,7 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
             elif str(e).find("Broken") >= 0:
                 logging.debug("Connection broken, trying to recreate it")
                 self.reconnect()
-                return self.readFile(
+                data = self.readFile(
                     shareName=shareName,
                     path=path,
                     mode=mode,
@@ -319,6 +320,7 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
                     password=password,
                     shareAccessMode=shareAccessMode,
                     bypass_shared_violation=bypass_shared_violation,
+                    looted_files=looted_files
                 )
             else:
                 logging.debug(str(e))
@@ -326,6 +328,9 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
             if fileId is not None:
                 self.smb_session._SMBConnection.close(treeId, fileId)
             self.smb_session.disconnectTree(treeId)
+
+        if looted_files is not None and data is not None and data != b"":
+            looted_files[os.path.join(*(path.split("\\")))]=data
         return data
 
     def perform_taskkill(self, process_name):
@@ -430,6 +435,7 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
         password=None,
         shareAccessMode=FILE_SHARE_READ,
         bypass_shared_violation=False,
+        looted_files=None
     ) -> bytes:
         data = None
         try:

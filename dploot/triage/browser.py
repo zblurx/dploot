@@ -192,6 +192,7 @@ class BrowserTriage:
                 shareName=self.share,
                 path=paths["aesStateKeyPath"] % user,
                 bypass_shared_violation=bypass_shared_violation,
+                looted_files=self.looted_files
             )
             if aesStateKey_bytes is not None and len(aesStateKey_bytes) > 0:
                 logging.debug(
@@ -213,6 +214,7 @@ class BrowserTriage:
                 shareName=self.share,
                 path=paths["loginDataPath"] % user,
                 bypass_shared_violation=bypass_shared_violation,
+                looted_files=self.looted_files
             )
             if (
                 aeskey is not None
@@ -248,6 +250,7 @@ class BrowserTriage:
                         shareName=self.share,
                         path=cookiepath % user,
                         bypass_shared_violation=bypass_shared_violation,
+                        looted_files=self.looted_files
                     )
                     if (
                         aeskey is not None
@@ -295,6 +298,7 @@ class BrowserTriage:
                 shareName=self.share,
                 path=paths["webDataPath"] % user,
                 bypass_shared_violation=bypass_shared_violation,
+                looted_files=self.looted_files
             )
             if (
                 aeskey is not None

@@ -123,9 +123,8 @@ class CredentialsTriage:
                     f"Found Credential Manager blob: \\\\{self.target.address}\\{self.share}\\{cred_filename_path}"
                 )
                 # read credman blob
-                credmanblob_bytes = self.conn.readFile(self.share, cred_filename_path)
+                credmanblob_bytes = self.conn.readFile(self.share, cred_filename_path, looted_files=self.looted_files)
                 if credmanblob_bytes is not None and self.masterkeys is not None:
-                    self.looted_files[cred_filename] = credmanblob_bytes
                     masterkey = find_masterkey_for_credential_blob(
                         credmanblob_bytes, self.masterkeys
                     )

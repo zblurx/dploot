@@ -10,7 +10,7 @@ from dploot.action.masterkeys import (
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option
+from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.rdg import RDGTriage
 
@@ -29,7 +29,7 @@ class RDGAction:
         self.masterkeys = None
         self.pvkbytes = None
 
-        self.outputdir = handle_outputdir_option(directory=self.options.export_rdg)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
 
         if self.options.mkfile is not None:
             try:
@@ -77,6 +77,8 @@ class RDGAction:
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
                 print()
+                if self.outputdir is not None:
+                    dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
 
             def credential_callback(credential):
                 if self.options.quiet:
@@ -93,11 +95,7 @@ class RDGAction:
             logging.info("Triage RDCMAN Settings and RDG files for ALL USERS\n")
             triage.triage_rdcman()
             if self.outputdir is not None:
-                for filename, bytes_data in triage.looted_files.items():
-                    with open(
-                        os.path.join(self.outputdir, filename), "wb"
-                    ) as outputfile:
-                        outputfile.write(bytes_data)
+                dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:
             logging.info("Not an admin, exiting...")
 
@@ -130,16 +128,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     )
 
     add_masterkeys_argument_group(group)
-
-    group.add_argument(
-        "-export-rdg",
-        action="store",
-        metavar="DIR_RDG",
-        help=(
-            "Dump looted RDGMan.settings blob to specified directory, regardless they were decrypted"
-        ),
-    )
-
     add_target_argument_group(subparser)
 
     return NAME, entry

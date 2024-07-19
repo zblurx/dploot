@@ -5,7 +5,7 @@ from typing import Callable, Tuple
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option
+from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.sccm import SCCMTriage
 
@@ -23,7 +23,7 @@ class SCCMAction:
         self.outputdir = None
         self.masterkeys = None
 
-        self.outputdir = handle_outputdir_option(directory=self.options.export_sccm)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
 
         if self.options.mkfile is not None:
             try:
@@ -64,6 +64,8 @@ class SCCMAction:
                 logging.info("Triage SYSTEM masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
                 print()
+                if self.outputdir is not None:
+                    dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
 
             def secret_callback(secret):
                 if self.options.quiet:
@@ -79,6 +81,7 @@ class SCCMAction:
             )
             logging.info("Triage SCCM Secrets\n")
             triage.triage_sccm(use_wmi=self.options.wmi)
+            dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:
             logging.info("Not an admin, exiting...")
 
@@ -108,13 +111,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         "-mkfile",
         action="store",
         help=("File containing {GUID}:SHA1 masterkeys mappings"),
-    )
-
-    group.add_argument(
-        "-export-sccm",
-        action="store",
-        metavar="DIR_SCCM",
-        help=("Dump looted SCCM secrets to specified directory"),
     )
 
     group.add_argument(

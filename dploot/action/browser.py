@@ -10,7 +10,7 @@ from dploot.action.masterkeys import (
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option
+from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
 from dploot.triage.browser import BrowserTriage, Cookie
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 
@@ -30,7 +30,7 @@ class BrowserAction:
         self.passwords = None
         self.nthashes = None
 
-        self.outputdir = handle_outputdir_option(directory=self.options.export_browser)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
 
         if self.options.mkfile is not None:
             try:
@@ -78,6 +78,8 @@ class BrowserAction:
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
                 print()
+                if self.outputdir is not None:
+                    dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
 
             if self.options.kill_browser:
                 logging.info("Killing browsers")
@@ -107,11 +109,7 @@ class BrowserAction:
                 bypass_shared_violation=self.options.bypass_shared_violation,
             )
             if self.outputdir is not None:
-                for filename, bytes_data in triage.looted_files.items():
-                    with open(
-                        os.path.join(self.outputdir, filename), "wb"
-                    ) as outputfile:
-                        outputfile.write(bytes_data)
+                dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:
             logging.info("Not an admin, exiting...")
 
@@ -149,15 +147,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         "-show-cookies",
         action="store_true",
         help=("Output dumped cookies from browsers"),
-    )
-
-    group.add_argument(
-        "-export-browser",
-        action="store",
-        metavar="DIR_BROWSER",
-        help=(
-            "Dump looted Browser data blobs to specified directory, regardless they were decrypted"
-        ),
     )
 
     group.add_argument(

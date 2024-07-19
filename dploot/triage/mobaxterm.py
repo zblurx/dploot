@@ -150,6 +150,7 @@ class MobaXtermTriage:
     ) -> None:
         self.target = target
         self.conn = conn
+        self.looted_files = {}
 
         self._users = None
         self.masterkeys = masterkeys
@@ -197,7 +198,7 @@ class MobaXtermTriage:
             try:
                 ntuser_dat_bytes = (
                     self.conn.readFile(
-                        self.share, self.ntuser_dat_path.format(username=user)
+                        self.share, self.ntuser_dat_path.format(username=user), looted_files=self.looted_files
                     )
                     if offline_users
                     else None

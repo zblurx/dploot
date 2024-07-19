@@ -10,7 +10,7 @@ from dploot.action.masterkeys import (
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option
+from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
 from dploot.triage.certificates import CertificatesTriage
 from dploot.triage.credentials import CredentialsTriage
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
@@ -33,17 +33,7 @@ class TriageAction:
         self.passwords = None
         self.nthashes = None
 
-        self.outputdir = handle_outputdir_option(directory=self.options.export_triage)
-        if self.outputdir is not None:
-            for tmp in [
-                "certificates",
-                "credentials",
-                "rdg",
-                "vaults",
-                "masterkeys",
-                "browser",
-            ]:
-                os.makedirs(os.path.join(self.outputdir, tmp), 0o744, exist_ok=True)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
 
         if self.options.mkfile is not None:
             try:
@@ -93,11 +83,7 @@ class TriageAction:
                 self.masterkeys = masterkeys_triage.triage_masterkeys()
                 print()
                 if self.outputdir is not None:
-                    for filename, bytes_data in masterkeys_triage.looted_files.items():
-                        with open(
-                            os.path.join(self.outputdir, "masterkeys", filename), "wb"
-                        ) as outputfile:
-                            outputfile.write(bytes_data)
+                    dump_looted_files_to_disk(self.outputdir, masterkeys_triage.looted_files)
 
             def credential_callback(credential):
                 if self.options.quiet:
@@ -114,11 +100,7 @@ class TriageAction:
             logging.info("Triage Credentials for ALL USERS\n")
             credentials_triage.triage_credentials()
             if self.outputdir is not None:
-                for filename, bytes_data in credentials_triage.looted_files.items():
-                    with open(
-                        os.path.join(self.outputdir, filename), "wb"
-                    ) as outputfile:
-                        outputfile.write(bytes_data)
+                dump_looted_files_to_disk(self.outputdir, credentials_triage.looted_files)
 
             vaults_triage = VaultsTriage(
                 target=self.target,
@@ -129,11 +111,7 @@ class TriageAction:
             logging.info("Triage Vaults for ALL USERS\n")
             vaults_triage.triage_vaults()
             if self.outputdir is not None:
-                for filename, bytes_data in vaults_triage.looted_files.items():
-                    with open(
-                        os.path.join(self.outputdir, filename), "wb"
-                    ) as outputfile:
-                        outputfile.write(bytes_data)
+                dump_looted_files_to_disk(self.outputdir, vaults_triage.looted_files)
 
             rdg_triage = RDGTriage(
                 target=self.target,
@@ -144,11 +122,7 @@ class TriageAction:
             logging.info("Triage RDCMAN Settings and RDG files for ALL USERS\n")
             rdg_triage.triage_rdcman()
             if self.outputdir is not None:
-                for filename, bytes_data in rdg_triage.looted_files.items():
-                    with open(
-                        os.path.join(self.outputdir, filename), "wb"
-                    ) as outputfile:
-                        outputfile.write(bytes_data)
+                dump_looted_files_to_disk(self.outputdir, rdg_triage.looted_files)
 
             def certificate_callback(certificate):
                 if not self.options.dump_all and not certificate.clientauth:
@@ -169,11 +143,7 @@ class TriageAction:
             logging.info("Triage Certificates for ALL USERS\n")
             certificates_triage.triage_certificates()
             if self.outputdir is not None:
-                for filename, bytes_data in certificates_triage.looted_files.items():
-                    with open(
-                        os.path.join(self.outputdir, filename), "wb"
-                    ) as outputfile:
-                        outputfile.write(bytes_data)
+                dump_looted_files_to_disk(self.outputdir, certificates_triage.looted_files)
         else:
             logging.info("Not an admin, exiting...")
 
@@ -211,15 +181,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         "-dump-all",
         action="store_true",
         help=("Dump also certificates not used for client authentication"),
-    )
-
-    group.add_argument(
-        "-export-triage",
-        action="store",
-        metavar="DIR_TRIAGE",
-        help=(
-            "Dump looted blob to specified directory, regardless they were decrypted"
-        ),
     )
 
     add_target_argument_group(subparser)

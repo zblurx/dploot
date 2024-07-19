@@ -184,10 +184,8 @@ class WifiTriage:
                                     f"Found Wifi connection file: \\\\{self.target.address}\\{self.share}\\{wifi_interface_filepath}"
                                 )
                                 wifi_interface_data = self.conn.readFile(
-                                    self.share, wifi_interface_filepath
+                                    self.share, wifi_interface_filepath, looted_files=self.looted_files
                                 )
-                                self.looted_files[filename] = wifi_interface_data
-
                                 main = objectify.fromstring(wifi_interface_data)
 
                                 ssid = main.SSIDConfig.SSID.name.text

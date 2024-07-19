@@ -6,7 +6,7 @@ from typing import Callable, Dict, Tuple
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option, parse_file_as_dict
+from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option, parse_file_as_dict
 from dploot.triage.masterkeys import MasterkeysTriage
 
 
@@ -27,7 +27,7 @@ class MasterkeysAction:
         self.nthashes = None
         self.outputdir = None
 
-        self.outputdir = handle_outputdir_option(directory=self.options.export_mk)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
 
         if self.options.outputfile is not None and self.options.outputfile != "":
             self.outputfile = self.options.outputfile
@@ -78,11 +78,7 @@ class MasterkeysAction:
                 logging.critical("Writting masterkeys to %s" % self.outputfile)
                 fd.close()
             if self.outputdir is not None:
-                for filename, bytes_data in triage.looted_files.items():
-                    with open(
-                        os.path.join(self.outputdir, filename), "wb"
-                    ) as outputfile:
-                        outputfile.write(bytes_data)
+                dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:
             logging.info("Not an admin, exiting...")
 
@@ -183,15 +179,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         "-outputfile",
         action="store",
         help=("Export keys to file"),
-    )
-
-    group.add_argument(
-        "-export-mk",
-        action="store",
-        metavar="DIR_MASTERKEYS",
-        help=(
-            "Dump looted masterkey files to specified directory, regardless they were decrypted"
-        ),
     )
 
     add_target_argument_group(subparser)

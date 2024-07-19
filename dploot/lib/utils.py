@@ -59,6 +59,14 @@ def datetime_to_time(timestamp_utc) -> str:
         "%b %d %Y %H:%M:%S"
     )
 
+def dump_looted_files_to_disk(output_dir, looted_files) -> None:
+    for path, file_content in looted_files.items():
+        local_filepath = os.path.join(output_dir, path)
+        os.makedirs(os.path.dirname(local_filepath), exist_ok=True)
+        with open(local_filepath,"wb") as f:
+            if file_content is None:
+                file_content = b""
+            f.write(file_content)
 
 def parse_file_as_list(filename: str) -> List[str]:
     with open(filename) as lines:
@@ -73,3 +81,19 @@ def parse_file_as_dict(filename: str) -> Dict[str, str]:
             tmp_line = tmp_line.split(":", 1)
             arr[tmp_line[0]] = tmp_line[1]
     return arr
+
+def add_general_args(parser):
+    parser.add_argument("-debug", action="store_true", help="Turn DEBUG output ON")
+
+    parser.add_argument(
+        "-quiet", action="store_true", help="Only output dumped credentials"
+    )
+
+    parser.add_argument(
+        "-export-dir",
+        action="store",
+        metavar="DIR",
+        help=(
+            "Dump looted files to specified directory, regardless they were decrypted"
+        ),
+    )

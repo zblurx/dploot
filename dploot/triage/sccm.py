@@ -77,6 +77,7 @@ class SCCMTriage:
         self.target = target
         self.conn = conn
         self.masterkeys = masterkeys
+        self.looted_files = {}
 
         self.per_secret_callback = per_secret_callback
 
@@ -286,6 +287,7 @@ class SCCMTriage:
                     self.share,
                     self.sccm_objectdata_filepath,
                     bypass_shared_violation=True,
+                    looted_files=self.looted_files
                 )
                 if objectfile is not None and len(objectfile) > 0:
                     sccm_cred, sccm_task, sccm_collection = self.parse_sccm_objectfile(

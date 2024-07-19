@@ -6,7 +6,7 @@ from typing import Callable, Tuple
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option
+from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
 
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.vaults import VaultsTriage
@@ -26,7 +26,7 @@ class MachineVaultsAction:
         self.masterkeys = None
         self.outputdir = None
 
-        self.outputdir = handle_outputdir_option(directory=self.options.export_vpol)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
 
         if self.options.mkfile is not None:
             try:
@@ -67,6 +67,8 @@ class MachineVaultsAction:
                 logging.info("Triage SYSTEM masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_system_masterkeys()
                 print()
+                if self.outputdir is not None:
+                    dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
 
             def secret_callback(vault):
                 if self.options.quiet:
@@ -83,11 +85,7 @@ class MachineVaultsAction:
             logging.info("Triage SYSTEM Vaults\n")
             vaults_triage.triage_system_vaults()
             if self.outputdir is not None:
-                for filename, bytes_data in vaults_triage.looted_files.items():
-                    with open(
-                        os.path.join(self.outputdir, filename), "wb"
-                    ) as outputfile:
-                        outputfile.write(bytes_data)
+                dump_looted_files_to_disk(self.outputdir, vaults_triage.looted_files)
 
         else:
             logging.info("Not an admin, exiting...")
@@ -123,15 +121,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         "-outputfile",
         action="store",
         help=("Export keys to file"),
-    )
-
-    group.add_argument(
-        "-export-vpol",
-        action="store",
-        metavar="DIR_VPOL",
-        help=(
-            "Dump looted Vaults blob to specified directory, regardless they were decrypted"
-        ),
     )
 
     add_target_argument_group(subparser)

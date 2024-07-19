@@ -278,12 +278,11 @@ class CertificatesTriage:
                                 logging.debug(
                                     f"Found PrivateKey Blob: \\\\{self.target.address}\\{self.share}\\{filepath}"
                                 )
-                                pkey_bytes = self.conn.readFile(self.share, filepath)
+                                pkey_bytes = self.conn.readFile(self.share, filepath, looted_files=self.looted_files)
                                 if (
                                     pkey_bytes is not None
                                     and self.masterkeys is not None
                                 ):
-                                    self.looted_files[pkey_guid] = pkey_bytes
                                     try:
                                         masterkey = find_masterkey_for_privatekey_blob(
                                             pkey_bytes, masterkeys=self.masterkeys
@@ -319,8 +318,7 @@ class CertificatesTriage:
                             logging.debug(
                                 f"Found Certificates Blob: \\\\{self.target.address}\\{self.share}\\{certpath}"
                             )
-                            certbytes = self.conn.readFile(self.share, certpath)
-                            self.looted_files[certname] = certbytes
+                            certbytes = self.conn.readFile(self.share, certpath, looted_files=self.looted_files)
                             certblob = CERTBLOB(certbytes)
                             if certblob.der is not None:
                                 cert = self.der_to_cert(certblob.der)

@@ -139,9 +139,8 @@ class MasterkeysTriage:
                             f"Found SYSTEM system MasterKey: \\\\{self.target.address}\\{self.share}\\{filepath}"
                         )
                         # read masterkey
-                        masterkey_bytes = self.conn.readFile(self.share, filepath)
+                        masterkey_bytes = self.conn.readFile(self.share, filepath, looted_files=self.looted_files)
                         if masterkey_bytes is not None:
-                            self.looted_files[guid] = masterkey_bytes
                             key = decrypt_masterkey(
                                 masterkey=masterkey_bytes,
                                 dpapi_systemkey=self.dpapiSystem,
@@ -175,10 +174,9 @@ class MasterkeysTriage:
                                 )
                                 # read masterkey
                                 masterkey_bytes = self.conn.readFile(
-                                    self.share, filepath
+                                    self.share, filepath, looted_files=self.looted_files
                                 )
                                 if masterkey_bytes is not None:
-                                    self.looted_files[guid] = masterkey_bytes
                                     key = decrypt_masterkey(
                                         masterkey=masterkey_bytes,
                                         dpapi_systemkey=self.dpapiSystem,
@@ -246,9 +244,8 @@ class MasterkeysTriage:
                             f"Found MasterKey: \\\\{self.target.address}\\{self.share}\\{filepath}"
                         )
                         # read masterkey
-                        masterkey_bytes = self.conn.readFile(self.share, filepath)
+                        masterkey_bytes = self.conn.readFile(self.share, filepath, looted_files=self.looted_files)
                         if masterkey_bytes is not None:
-                            self.looted_files[guid] = masterkey_bytes
                             password = None
                             nthash = None
                             if (

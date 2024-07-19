@@ -6,7 +6,7 @@ from typing import Callable, Tuple
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option
+from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
 from dploot.triage.credentials import CredentialsTriage
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 
@@ -25,7 +25,7 @@ class MachineCredentialsAction:
         self.masterkeys = None
         self.outputdir = None
 
-        self.outputdir = handle_outputdir_option(directory=self.options.export_cm)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
 
         if self.options.mkfile is not None:
             try:
@@ -66,6 +66,8 @@ class MachineCredentialsAction:
                 logging.info("Triage SYSTEM masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_system_masterkeys()
                 print()
+                if self.outputdir is not None:
+                    dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
 
             def credential_callback(credential):
                 if self.options.quiet:
@@ -82,11 +84,7 @@ class MachineCredentialsAction:
             logging.info("Triage SYSTEM Credentials\n")
             cred_triage.triage_system_credentials()
             if self.outputdir is not None:
-                for filename, bytes_data in cred_triage.looted_files.items():
-                    with open(
-                        os.path.join(self.outputdir, filename), "wb"
-                    ) as outputfile:
-                        outputfile.write(bytes_data)
+                dump_looted_files_to_disk(self.outputdir, cred_triage.looted_files)
 
         else:
             logging.info("Not an admin, exiting...")
@@ -116,21 +114,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         "-mkfile",
         action="store",
         help=("File containing {GUID}:SHA1 masterkeys mappings"),
-    )
-
-    group.add_argument(
-        "-outputfile",
-        action="store",
-        help=("Export keys to file"),
-    )
-
-    group.add_argument(
-        "-export-cm",
-        action="store",
-        metavar="DIR_CREDMAN",
-        help=(
-            "Dump looted Credential Manager blob to specified directory, regardless they were decrypted"
-        ),
     )
 
     add_target_argument_group(subparser)

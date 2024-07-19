@@ -6,7 +6,7 @@ from typing import Callable, Tuple
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import handle_outputdir_option
+from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
 from dploot.action.masterkeys import parse_masterkeys_options
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.wifi import WifiTriage
@@ -26,7 +26,7 @@ class WifiAction:
         self.masterkeys = None
         self.outputdir = None
 
-        self.outputdir = handle_outputdir_option(directory=self.options.export_wifi)
+        self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
 
         self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(
             self.options, self.target
@@ -77,6 +77,8 @@ class WifiAction:
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys.extend(masterkeytriage.triage_masterkeys())
                 print()
+                if self.outputdir is not None:
+                    dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
 
             def profile_callback(profile):
                 if self.options.quiet:
@@ -93,11 +95,7 @@ class WifiAction:
             logging.info("Triage ALL WIFI profiles\n")
             wifi_triage.triage_wifi()
             if self.outputdir is not None:
-                for filename, bytesdata in wifi_triage.looted_files.items():
-                    with open(
-                        os.path.join(self.outputdir, filename), "wb"
-                    ) as outputfile:
-                        outputfile.write(bytesdata)
+                dump_looted_files_to_disk(self.outputdir, wifi_triage.looted_files)
 
         else:
             logging.info("Not an admin, exiting...")
@@ -133,15 +131,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         "-outputfile",
         action="store",
         help=("Export keys to file"),
-    )
-
-    group.add_argument(
-        "-export-wifi",
-        action="store",
-        metavar="DIR_CREDMAN",
-        help=(
-            "Dump looted Wifi Profile xml files to specified directory, regardless they were decrypted"
-        ),
     )
 
     add_target_argument_group(subparser)

@@ -138,12 +138,11 @@ class RDGTriage:
                 self.user_rdcman_settings_generic_filepath % user
             )
             rdcmanblob_bytes = self.conn.readFile(
-                self.share, user_rcdman_settings_filepath
+                self.share, user_rcdman_settings_filepath, looted_files=self.looted_files
             )
             if rdcmanblob_bytes:
                 logging.debug("Found RDCMan Settings for %s user" % (user))
                 if rdcmanblob_bytes is not None and self.masterkeys is not None:
-                    self.looted_files["%s_RDCMan.settings" % user] = rdcmanblob_bytes
                     xml_data = rdcmanblob_bytes
                     root = ET.fromstring(xml_data)
                     rdcman_file = RDCMANFile(
@@ -156,7 +155,7 @@ class RDGTriage:
                         filename = item.text
                         if "\\\\" not in filename and "C:\\" in filename:
                             filepath = filename.replace("C:\\", "")
-                            rdg_bytes = self.conn.readFile(self.share, filepath)
+                            rdg_bytes = self.conn.readFile(self.share, filepath, looted_files=self.looted_files)
                             rdg_xml = ET.fromstring(rdg_bytes)
                             rdgfiles.append(
                                 RDCMANFile(

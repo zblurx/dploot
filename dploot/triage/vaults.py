@@ -162,12 +162,9 @@ class VaultsTriage:
 
                 # read vpol blob
                 vpol_filepath = ntpath.join(vault_directory_path, self.vpol_filename)
-                vpolblob_bytes = self.conn.readFile(self.share, vpol_filepath)
+                vpolblob_bytes = self.conn.readFile(self.share, vpol_filepath, looted_files=self.looted_files)
                 vpol_keys = []
                 if vpolblob_bytes is not None and self.masterkeys is not None:
-                    self.looted_files[vault_dirname + "_" + self.vpol_filename] = (
-                        vpolblob_bytes
-                    )
                     masterkey = find_masterkey_for_vpol_blob(
                         vpolblob_bytes, self.masterkeys
                     )
@@ -205,10 +202,7 @@ class VaultsTriage:
                         and filename[-4:] == "vcrd"
                     ):
                         vrcd_filepath = ntpath.join(vault_directory_path, filename)
-                        vrcd_bytes = self.conn.readFile(self.share, vrcd_filepath)
-                        self.looted_files[vault_dirname + "_" + vrcd_filepath] = (
-                            vpolblob_bytes
-                        )
+                        vrcd_bytes = self.conn.readFile(self.share, vrcd_filepath, looted_files=self.looted_files)
                         if (
                             vrcd_bytes is not None
                             and filename[-4:] in ["vsch", "vcrd"]

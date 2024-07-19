@@ -24,6 +24,7 @@ from dploot.action import (
     wifi,
     mobaxterm,
 )
+from dploot.lib.utils import add_general_args
 
 
 ENTRY_PARSERS = [
@@ -54,12 +55,7 @@ def main() -> None:
         add_help=True,
     )
 
-    parser.add_argument("-debug", action="store_true", help="Turn DEBUG output ON")
-
-    parser.add_argument(
-        "-quiet", action="store_true", help="Only output dumped credentials"
-    )
-
+    add_general_args(parser)
     subparsers = parser.add_subparsers(help="Action", dest="action", required=True)
 
     actions = {}

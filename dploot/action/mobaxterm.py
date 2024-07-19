@@ -9,6 +9,7 @@ from dploot.action.masterkeys import (
 )
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
+from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 from dploot.triage.mobaxterm import MobaXtermTriage
 
@@ -26,6 +27,8 @@ class MobaXtermAction:
         self.outputdir = None
         self.masterkeys = None
         self.pvkbytes = None
+
+        self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
 
         if self.options.mkfile is not None:
             try:
@@ -73,6 +76,8 @@ class MobaXtermAction:
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
                 print()
+                if self.outputdir is not None:
+                    dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
 
             def secret_callback(secret):
                 if self.options.quiet:
@@ -88,7 +93,8 @@ class MobaXtermAction:
             )
             logging.info("Triage MobaXterm Secrets\n")
             triage.triage_mobaxterm(offline_users=self.options.dump_offline_users)
-
+            if self.outputdir is not None:
+                dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:
             logging.info("Not an admin, exiting...")
 
