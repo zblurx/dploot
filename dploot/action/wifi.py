@@ -48,25 +48,26 @@ class WifiAction:
         logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
-                triage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
+                def masterkey_triage(masterkey):
+                    masterkey.dump()
+
+                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords, per_masterkey_callback=masterkey_triage if not self.options.quiet else None)
                 logging.info("Triage SYSTEM masterkeys\n")
-                self.masterkeys = triage.triage_system_masterkeys()
+                self.masterkeys = masterkeytriage.triage_system_masterkeys()
                 # we need user masterkeys, too.
                 logging.info("Triage ALL USERS masterkeys\n")
-                self.masterkeys.extend(triage.triage_masterkeys())
-                if not self.options.quiet:
-                    for masterkey in self.masterkeys:
-                        masterkey.dump()
-                    print()
+                self.masterkeys.extend(masterkeytriage.triage_masterkeys())
+                print()
 
-            wifi_triage = WifiTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            logging.info('Triage ALL WIFI profiles\n')
-            wifi_creds = wifi_triage.triage_wifi()
-            for wifi_cred in wifi_creds:
+            def profile_callback(profile):
                 if self.options.quiet:
-                    wifi_cred.dump_quiet()
+                    profile.dump_quiet()
                 else:
-                    wifi_cred.dump()
+                    profile.dump()
+
+            wifi_triage = WifiTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_profile_callback=profile_callback)
+            logging.info('Triage ALL WIFI profiles\n')
+            wifi_triage.triage_wifi()        
             if self.outputdir is not None:
                 for filename, bytes in wifi_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:

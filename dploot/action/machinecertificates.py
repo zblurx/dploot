@@ -45,13 +45,13 @@ class MachineCertificatesAction:
         logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
-                triage = MasterkeysTriage(target=self.target, conn=self.conn)
+                def masterkey_triage(masterkey):
+                    masterkey.dump()
+
+                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, per_masterkey_callback=masterkey_triage if not self.options.quiet else None)
                 logging.info("Triage SYSTEM masterkeys\n")
-                self.masterkeys = triage.triage_system_masterkeys()
-                if not self.options.quiet: 
-                    for masterkey in self.masterkeys:
-                        masterkey.dump()
-                    print()
+                self.masterkeys = masterkeytriage.triage_masterkeys()
+                print()
 
             def certificate_callback(certificate):
                 if not self.options.dump_all and not certificate.clientauth:

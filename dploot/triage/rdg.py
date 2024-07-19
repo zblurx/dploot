@@ -11,51 +11,64 @@ from dploot.lib.target import Target
 from dploot.triage.masterkeys import Masterkey
 
 @dataclass
-class RDGCred:
+class RDGProfile:
     type: str
     profile_name: str
     username: str
     password: str
+
+@dataclass
+class RDGCredProfile(RDGProfile):
+    def dump(self) -> None:
+        print('[CREDENTIAL PROFILES]')
+        print('\tProfile Name:\t%s' % self.profile_name)
+        print('\tUsername:\t%s' % self.username)
+        print('\tPassword:\t%s' % self.password.decode('latin-1'))
+        print()
+
+    def dump_quiet(self) -> None:
+        print("[RDG] %s - %s:%s" % (self.profile_name, self.username, self.password.decode('latin-1')))
+
+@dataclass
+class RGDLogonProfile(RDGProfile):
+    def dump(self) -> None:
+        print('[LOGON PROFILES]')
+        print('\tProfile Name:\t%s' % self.profile_name)
+        print('\tUsername:\t%s' % self.username)
+        print('\tPassword:\t%s' % self.password.decode('latin-1'))
+        print()
+
+    def dump_quiet(self) -> None:
+        print("[RDG] %s - %s:%s" % (self.profile_name, self.username, self.password.decode('latin-1')))
+
+
+@dataclass
+class RDGServerProfile(RDGProfile):
     server_name: str = None
 
     def dump(self) -> None:
-        if self.type == 'cred':
-            print('[CREDENTIAL PROFILES]')
-            print('\tProfile Name:\t%s' % self.profile_name)
-            print('\tUsername:\t%s' % self.username)
-            print('\tPassword:\t%s' % self.password.decode('latin-1'))
-        elif self.type == 'logon':
-            print('[LOGON PROFILES]')
-            print('\tProfile Name:\t%s' % self.profile_name)
-            print('\tUsername:\t%s' % self.username)
-            print('\tPassword:\t%s' % self.password.decode('latin-1'))
-        elif self.type == 'server':
-            print('[SERVER PROFILES]')
-            print('\tName:\t\t%s' % self.server_name)
-            print('\tProfile Name:\t%s' % self.profile_name)
-            print('\tUsername:\t%s' % self.username)
-            print('\tPassword:\t%s' % self.password.decode('latin-1'))
+        print('[SERVER PROFILES]')
+        print('\tName:\t\t%s' % self.server_name)
+        print('\tProfile Name:\t%s' % self.profile_name)
+        print('\tUsername:\t%s' % self.username)
+        print('\tPassword:\t%s' % self.password.decode('latin-1'))
         print()
-    
+
     def dump_quiet(self) -> None:
-        if self.type == 'cred':
-            print("[RDG] %s - %s:%s" % (self.profile_name, self.username, self.password.decode('latin-1')))
-        elif self.type == 'logon':
-            print("[RDG] %s - %s:%s" % (self.profile_name, self.username, self.password.decode('latin-1')))
-        elif self.type == 'server':
-            print("[RDG] %s - %s - %s:%s" % (self.profile_name, self.server_name, self.username, self.password.decode('latin-1')))
+        print("[RDG] %s - %s - %s:%s" % (self.profile_name, self.server_name, self.username, self.password.decode('latin-1')))
+
 
 @dataclass
 class RDCMANFile:
     winuser: str
     filepath: str
-    rdg_creds: List[RDGCred]
+    rdg_creds: List[RDGProfile]
 
 @dataclass
 class RDGFile:
     winuser: str
     filepath: str
-    rdg_creds: List[RDGCred]
+    rdg_creds: List[RDGProfile]
 
 class RDGTriage:
 
@@ -64,13 +77,15 @@ class RDGTriage:
     user_rdg_generic_filepath = ['Users\\%s\\Documents','Users\\%s\\Desktop']
     share = 'C$'
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey]) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey], per_credential_callback: Any = None) -> None:
         self.target = target
         self.conn = conn
         
         self._users = None
         self.looted_files = dict()
         self.masterkeys = masterkeys
+
+        self.per_credential_callback = per_credential_callback
 
     def triage_rdcman(self) -> Tuple[List[RDCMANFile], List[RDGFile]]:
         rdcman_files = list()
@@ -118,62 +133,72 @@ class RDGTriage:
             pass
         return rdcman_file, rdgfiles
 
-    def triage_rdgprofile(self, rdgxml: ET.Element) -> List[RDGCred]:
+    def triage_rdgprofile(self, rdgxml: ET.Element) -> List[RDGProfile]:
         rdg_creds = list()
         for cred_profile in rdgxml.findall('.//credentialsProfile'):
             if cred_profile is not None:
                 profile_name, username, password = self.triage_credprofile(cred_profile)
-                rdg_creds.append(RDGCred(
+                rdg_cred = RDGCredProfile(
                     type='cred',
                     profile_name=profile_name,
                     username=username,
                     password=password,
-                ))
+                )
+                rdg_creds.append(rdg_cred)
+                if self.per_credential_callback is not None:
+                    self.per_credential_callback(rdg_cred)
 
         for server_profile in rdgxml.findall('.//server'):
             server_name = server_profile.find('.//properties//name').text
             for item in server_profile.findall('.//logonCredentials'):
                 profile_name, username, password = self.triage_credprofile(item)
-                rdg_creds.append(RDGCred(
+                rdg_cred = RDGServerProfile(
                     type='server',
                     profile_name=profile_name,
                     server_name=server_name,
                     username=username,
                     password=password,
-                ))
+                )
+                rdg_creds.append(rdg_cred)
+                if self.per_credential_callback is not None:
+                    self.per_credential_callback(rdg_cred)
         return rdg_creds
 
 
-    def triage_rdcman_settings(self, rdcman_settings : ET.Element) -> List[RDGCred]:
+    def triage_rdcman_settings(self, rdcman_settings : ET.Element) -> List[RDGProfile]:
         rdcman_creds = list()
         for cred_profile in rdcman_settings.findall('.//credentialsProfile'):
             if cred_profile is not None:
                 profile_name, username, password = self.triage_credprofile(cred_profile)
-                rdcman_creds.append(RDGCred(
+                rdcman_cred = RDGCredProfile(
                     type='cred',
                     profile_name=profile_name,
                     username=username,
                     password=password,
-                ))
+                )
+                rdcman_creds.append(rdcman_cred)
+                if self.per_credential_callback is not None:
+                    self.per_credential_callback(rdcman_cred)
 
         for cred_profile in rdcman_settings.findall('.//logonCredentials'):
             if cred_profile is not None:
                 profile_name, username, password = self.triage_credprofile(cred_profile)
-                rdcman_creds.append(RDGCred(
+                rdcman_cred = RGDLogonProfile(
                     type='logon',
                     profile_name=profile_name,
                     username=username,
                     password=password,
-                ))
+                )
+                rdcman_creds.append(rdcman_cred)
+                if self.per_credential_callback is not None:
+                    self.per_credential_callback(rdcman_cred)
         return rdcman_creds
 
     def triage_credprofile(self, cred_node: ET.Element) -> Tuple[str, str, Any]:
         profile_name = cred_node.find('.//profileName').text
-        full_username = ''
-        password = None
-        if cred_node.find(".//userName") is None:
-            return
-        else:
+        full_username = ""
+        password = b""
+        if cred_node.find(".//userName") is not None:
             username = cred_node.find('.//userName').text
             domain = cred_node.find('.//domain').text
             b64password = cred_node.find('.//password').text
@@ -182,11 +207,11 @@ class RDGTriage:
                 full_username = username
             else:
                 full_username = '%s\\%s' % (domain, username)
-
-            pass_dpapi_blob = base64.b64decode(b64password)
-            masterkey = find_masterkey_for_blob(pass_dpapi_blob, self.masterkeys)
-            if masterkey is not None:
-                password = decrypt_blob(pass_dpapi_blob, masterkey)
+            if b64password is not None:
+                pass_dpapi_blob = base64.b64decode(b64password)
+                masterkey = find_masterkey_for_blob(pass_dpapi_blob, self.masterkeys)
+                if masterkey is not None:
+                    password = decrypt_blob(pass_dpapi_blob, masterkey)
 
         return profile_name, full_username, password
 

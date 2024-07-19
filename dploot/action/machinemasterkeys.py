@@ -40,23 +40,24 @@ class MachineMasterkeysAction:
         self.connect()
         logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
-            triage = MasterkeysTriage(target=self.target, conn=self.conn)
+
+            fd = open(self.outputfile + '.mkf', ('a+' if self.append else 'w')) if self.outputfile is not None else None
+            
+            def masterkey_callback(masterkey):
+                masterkey.dump()
+                if fd is not None:
+                    fd.write(str(masterkey)+'\n')
+
+            triage = MasterkeysTriage(target=self.target, conn=self.conn, per_masterkey_callback=masterkey_callback)
             logging.info("Triage SYSTEM masterkeys\n")
-            masterkeys = triage.triage_system_masterkeys()
+            triage.triage_system_masterkeys()
             if self.outputfile is not None:
-                with open(self.outputfile + '.mkf', ('a+' if self.append else 'w')) as file:
-                    logging.critical("Writting masterkeys to %s" % self.outputfile)
-                    for masterkey in masterkeys:
-                        masterkey.dump()
-                        file.write(str(masterkey)+'\n')
-            else:
-                for masterkey in masterkeys:
-                    masterkey.dump()
+                logging.critical("Writting masterkeys to %s.mkf" % self.outputfile)
+                fd.close()
             if self.outputdir is not None:
                 for filename, bytes in triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:
-                        outputfile.write(bytes)
-            
+                        outputfile.write(bytes)                
         else:
             logging.info("Not an admin, exiting...")
 

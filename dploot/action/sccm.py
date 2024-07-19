@@ -43,32 +43,23 @@ class SCCMAction:
         logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
-                triage = MasterkeysTriage(target=self.target, conn=self.conn)
-                logging.info("Triage SYSTEM masterkeys\n")
-                self.masterkeys = triage.triage_system_masterkeys()
-                if not self.options.quiet:
-                    for masterkey in self.masterkeys:
-                        masterkey.dump()
-                    print()
+                def masterkey_triage(masterkey):
+                    masterkey.dump()
 
-            triage = SCCMTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, use_wmi=self.options.wmi)
+                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, per_masterkey_callback=masterkey_triage if not self.options.quiet else None)
+                logging.info("Triage SYSTEM masterkeys\n")
+                self.masterkeys = masterkeytriage.triage_masterkeys()
+                print()
+
+            def secret_callback(secret):
+                if self.options.quiet:
+                    secret.dump_quiet()
+                else:
+                    secret.dump()
+
+            triage = SCCMTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_secret_callback=secret_callback)
             logging.info('Triage SCCM Secrets\n')
-            sccmcreds, sccmtasks, sccmcollections = triage.triage_sccm()
-            for sccm_cred in sccmcreds:
-                if self.options.quiet:
-                    sccm_cred.dump_quiet()
-                else:
-                    sccm_cred.dump()
-            for sccm_task in sccmtasks:
-                if self.options.quiet:
-                    sccm_task.dump_quiet()
-                else:
-                    sccm_task.dump()
-            for sccm_collection in sccmcollections:
-                if self.options.quiet:
-                    sccm_collection.dump_quiet()
-                else:
-                    sccm_collection.dump()
+            triage.triage_sccm(use_wmi=self.options.wmi)
         else:
             logging.info("Not an admin, exiting...")
 

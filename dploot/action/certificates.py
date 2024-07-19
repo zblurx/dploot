@@ -49,13 +49,13 @@ class CertificatesAction:
         logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
-                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords)
+                def masterkey_triage(masterkey):
+                    masterkey.dump()
+
+                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, pvkbytes=self.pvkbytes, nthashes=self.nthashes, passwords=self.passwords, per_masterkey_callback=masterkey_triage if not self.options.quiet else None)
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
-                if not self.options.quiet: 
-                    for masterkey in self.masterkeys:
-                        masterkey.dump()
-                    print()
+                print()
 
             def certificate_callback(certificate):
                 if not self.options.dump_all and not certificate.clientauth:

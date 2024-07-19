@@ -107,12 +107,13 @@ class WifiTriage:
     eap_profiles_keys = (   "SOFTWARE\\Microsoft\\Wlansvc\\Profiles",
                             "SOFTWARE\\Microsoft\\Wlansvc\\UserData\\Profiles" )
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey]) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey], per_profile_callback: Any = None) -> None:
         self.target = target
         self.conn = conn
         
         self.looted_files = dict()
         self.masterkeys = masterkeys
+        self.per_profile_callback = per_profile_callback
 
     def triage_wifi(self) -> List[WifiCred]:
         wifi_creds = list()
@@ -137,6 +138,8 @@ class WifiTriage:
                                 auth_type = main.MSM.security.authEncryption.authentication.text
                                 encryption = main.MSM.security.authEncryption.encryption.text
 
+                                wifi_profile = None
+
                                 if auth_type in ['WPA2PSK','WPAPSK','WPA3SAE']:
                                     
                                     dpapi_blob = main.MSM.security.sharedKey.keyMaterial
@@ -146,12 +149,12 @@ class WifiTriage:
                                         cleartext = decrypt_blob(unhexlify(dpapi_blob.text), masterkey=masterkey)
                                         if cleartext is not None:
                                             password = cleartext.removesuffix(b'\x00')
-                                    wifi_creds.append(WifiCred(
+                                    wifi_profile = WifiCred(
                                         ssid=ssid,
                                         auth=auth_type,
                                         encryption=encryption,
                                         password=password.decode('latin-1', errors='backslashreplace'),
-                                        xml_data=main))
+                                        xml_data=main)
                                 elif auth_type in ['WPA', 'WPA2']:
                                     creds = self.triage_eap_creds(filename[:-4])
                                     eap_username = None
@@ -159,20 +162,24 @@ class WifiTriage:
                                     eap_domain   = None
                                     if creds is not None:
                                         eap_username, eap_domain, eap_password = (_.decode('latin-1', errors='backslashreplace') for _ in creds)
-                                    wifi_creds.append(WifiCred(
+                                    wifi_profile = WifiCred(
                                         ssid=ssid,
                                         auth=auth_type,
                                         encryption=encryption,
                                         xml_data=main,
                                         eap_username=eap_username,
                                         eap_domain=eap_domain,
-                                        eap_password=eap_password))
+                                        eap_password=eap_password)
                                 else:
-                                    wifi_creds.append(WifiCred(
+                                    wifi_profile = WifiCred(
                                         ssid=ssid,
                                         auth=auth_type,
                                         encryption=encryption,
-                                        xml_data=main))
+                                        xml_data=main)
+                                    
+                                wifi_creds.append(wifi_profile)
+                                if self.per_profile_callback is not None:
+                                    self.per_profile_callback(wifi_creds)
         except Exception as e:
             if logging.getLogger().level == logging.DEBUG:
                 import traceback

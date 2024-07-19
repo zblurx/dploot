@@ -46,22 +46,23 @@ class MachineVaultsAction:
         logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
-                triage = MasterkeysTriage(target=self.target, conn=self.conn)
-                logging.info("Triage SYSTEM masterkeys\n")
-                self.masterkeys = triage.triage_system_masterkeys()
-                if not self.options.quiet: 
-                    for masterkey in self.masterkeys:
-                        masterkey.dump()
-                    print()
+                def masterkey_triage(masterkey):
+                    masterkey.dump()
 
-            vaults_triage = VaultsTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            logging.info('Triage SYSTEM Vaults\n')
-            vaults = vaults_triage.triage_system_vaults()
-            for vault in vaults:
+                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, per_masterkey_callback=masterkey_triage if not self.options.quiet else None)
+                logging.info("Triage SYSTEM masterkeys\n")
+                self.masterkeys = masterkeytriage.triage_masterkeys()
+                print()
+
+            def secret_callback(vault):
                 if self.options.quiet:
                     vault.dump_quiet() 
                 else:
                     vault.dump()
+
+            vaults_triage = VaultsTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_vault_callback=secret_callback)
+            logging.info('Triage SYSTEM Vaults\n')
+            vaults_triage.triage_system_vaults()
             if self.outputdir is not None:
                 for filename, bytes in vaults_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:

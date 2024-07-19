@@ -45,22 +45,23 @@ class MachineCredentialsAction:
         logging.info("Connected to %s as %s\\%s %s\n" % (self.target.address, self.target.domain, self.target.username, ( "(admin)"if self.is_admin  else "")))
         if self.is_admin:
             if self.masterkeys is None:
-                triage = MasterkeysTriage(target=self.target, conn=self.conn)
-                logging.info("Triage SYSTEM masterkeys\n")
-                self.masterkeys = triage.triage_system_masterkeys()
-                if not self.options.quiet: 
-                    for masterkey in self.masterkeys:
-                        masterkey.dump()
-                    print()
+                def masterkey_triage(masterkey):
+                    masterkey.dump()
 
-            cred_triage = CredentialsTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys)
-            logging.info('Triage SYSTEM Credentials\n')
-            credentials = cred_triage.triage_system_credentials()
-            for credential in credentials:
+                masterkeytriage = MasterkeysTriage(target=self.target, conn=self.conn, per_masterkey_callback=masterkey_triage if not self.options.quiet else None)
+                logging.info("Triage SYSTEM masterkeys\n")
+                self.masterkeys = masterkeytriage.triage_masterkeys()
+                print()
+
+            def credential_callback(credential):
                 if self.options.quiet:
                     credential.dump_quiet()
                 else:
                     credential.dump()
+
+            cred_triage = CredentialsTriage(target=self.target, conn=self.conn, masterkeys=self.masterkeys, per_credential_callback=credential_callback)
+            logging.info('Triage SYSTEM Credentials\n')
+            cred_triage.triage_system_credentials()
             if self.outputdir is not None:
                 for filename, bytes in cred_triage.looted_files.items():
                     with open(os.path.join(self.outputdir, filename),'wb') as outputfile:

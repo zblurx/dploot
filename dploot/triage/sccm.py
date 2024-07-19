@@ -1,5 +1,5 @@
 import logging
-from typing import List, Tuple
+from typing import Any, List, Tuple
 import re
 
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
@@ -64,17 +64,22 @@ class SCCMTriage:
     sccm_objectdata_filepath = 'Windows\\System32\\wbem\\Repository\\OBJECTS.DATA'
     share = 'C$'
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey], use_wmi: bool) -> None:
+    regex_naa = br"CCM_NetworkAccessAccount\x00\x00<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>\x00\x00<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
+    regex_task = br"</SWDReserved>.*?<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
+    regex_collection = br"CCM_CollectionVariable\x00\x00(.*?)\x00\x00.*?<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
+
+    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey], per_secret_callback: Any = None) -> None:
         self.target = target
         self.conn = conn
-        self.use_wmi = use_wmi
         self.masterkeys = masterkeys
+
+        self.per_secret_callback = per_secret_callback
 
         self.dcom_conn = None
 
 
-    def sccmdecrypt(self, dpapi_blob):
-        if self.use_wmi:
+    def decrypt_sccm_secret(self, dpapi_blob, from_wmi: bool = False):
+        if from_wmi:
             list_blob = [int(dpapi_blob[i:i+2],16) for i in range(0, len(dpapi_blob), 2)][4:]
         else:
             list_blob = list(bytes.fromhex(dpapi_blob.decode('utf-8')))[4:]
@@ -88,40 +93,49 @@ class SCCMTriage:
             logging.debug("Master keys not found for SCCM blob")
         return result
 
-    def parseFile(self, objectfile) -> Tuple[List[SCCMCred], List[SCCMSecret], List[SCCMCollection]]:
-        sccmcred = set()
-        sccmsecret = set()
-        sccmcollection = set()
-        regex_naa = br"CCM_NetworkAccessAccount\x00\x00<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>\x00\x00<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
-        regex_task = br"</SWDReserved>.*?<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
-        regex_collection = br"CCM_CollectionVariable\x00\x00(.*?)\x00\x00.*?<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
+    def parse_sccm_objectfile(self, objectfile) -> Tuple[List[SCCMCred], List[SCCMSecret], List[SCCMCollection]]:
+        sccm_creds = []
+        sccm_task_sequences = []
+        sccm_collections = []
+        
         logging.debug("Looking for NAA Credentials from OBJECTS.DATA file")
-        pattern = re.compile(regex_naa)
+        pattern = re.compile(self.regex_naa)
         for match in pattern.finditer(objectfile):
             logging.debug(f"Found NAA Credentials from OBJECTS.DATA file: {match.start()} - {match.end()}")
-            password = self.sccmdecrypt(match.group(1))
-            username = self.sccmdecrypt(match.group(2))
-            sccmcred.add(SCCMCred(username, password))
-        pattern = re.compile(regex_task)
+            password = self.decrypt_sccm_secret(match.group(1))
+            username = self.decrypt_sccm_secret(match.group(2))
+            sccm_cred = SCCMCred(username, password)
+            sccm_creds.append(sccm_cred)
+            if self.per_secret_callback is not None:
+                self.per_secret_callback(sccm_cred)
+
+        pattern = re.compile(self.regex_task)
         logging.debug("Looking for task sequences secret from OBJECTS.DATA file")
         for match in pattern.finditer(objectfile):
             logging.debug(f"Found task sequences secret from OBJECTS.DATA file: {match.start()} - {match.end()}")
-            sccmsecret.add(SCCMSecret(self.sccmdecrypt(match.group(1))))
-        pattern = re.compile(regex_collection)
+            task_seq = SCCMSecret(self.decrypt_sccm_secret(match.group(1)))
+            sccm_task_sequences.append(task_seq)
+            if self.per_secret_callback is not None:
+                self.per_secret_callback(task_seq)
+
+        pattern = re.compile(self.regex_collection)
         logging.debug("Looking for collection variables from OBJECTS.DATA file")
         for match in pattern.finditer(objectfile):
             try:
                 logging.debug(f"Found collection variable from OBJECTS.DATA file: {match.start()} - {match.end()}")
                 name = match.group(1).decode('utf-8').encode('utf-16le')
-                value = self.sccmdecrypt(match.group(2))
-                sccmcollection.add(SCCMCollection(name, value))
+                value = self.decrypt_sccm_secret(match.group(2))
+                sccm_collection = SCCMCollection(name, value)
+                sccm_collections.append(sccm_collection)
+                if self.per_secret_callback is not None:
+                    self.per_secret_callback(sccm_collection)
             except Exception as e:
                 logging.debug(f'Exception encountered in {__name__}: {e}.')
                 
-        return sccmcred, sccmsecret, sccmcollection
+        return sccm_creds, sccm_task_sequences, sccm_collections
     
-    def parseReply(self, iEnum):
-            finding = list()
+    def parse_wmi_reply(self, iEnum):
+            finding = []
             regex = r"<PolicySecret Version=\"1\"><!\[CDATA\[(.*?)\]\]><\/PolicySecret>"
             while True:
                 try:
@@ -130,18 +144,30 @@ class SCCMTriage:
 
                     if 'NetworkAccessUsername' in record and 'NetworkAccessPassword' in record and len(record['NetworkAccessUsername']['value']) > 0 and len(record['NetworkAccessPassword']['value']) > 0:
                         logging.debug("Found NAA Credentials using WMI")
-                        username = self.sccmdecrypt(re.match(regex, record['NetworkAccessUsername']['value']).group(1))
-                        password = self.sccmdecrypt(re.match(regex, record['NetworkAccessPassword']['value']).group(1))
-                        finding.append(SCCMCred(username, password))
+                        username = self.decrypt_sccm_secret(re.match(regex, record['NetworkAccessUsername']['value']).group(1), from_wmi=True)
+                        password = self.decrypt_sccm_secret(re.match(regex, record['NetworkAccessPassword']['value']).group(1), from_wmi=True)
+                        sccm_naa = SCCMCred(username, password)
+                        finding.append(sccm_naa)
+                        if self.per_secret_callback is not None:
+                            self.per_secret_callback(sccm_naa)
+
                     if 'Name' in record and 'Value' in record and len(record['Name']['value']) > 0 and len(record['value']['value']) > 0:
                         logging.debug("Found collection variables using WMI")
-                        name = self.sccmdecrypt(re.match(regex, record['name']['value']).group(1))
-                        value = self.sccmdecrypt(re.match(regex, record['value']['value']).group(1))
-                        finding.append(SCCMCollection(name, value))
+                        name = self.decrypt_sccm_secret(re.match(regex, record['name']['value']).group(1), from_wmi=True)
+                        value = self.decrypt_sccm_secret(re.match(regex, record['value']['value']).group(1), from_wmi=True)
+                        sccm_collection = SCCMCollection(name, value)
+                        finding.append(sccm_collection)
+                        if self.per_secret_callback is not None:
+                            self.per_secret_callback(sccm_collection)
+
                     if 'TS_Sequence' in record and len(record['TS_Sequence']['value']) > 0:
                         logging.debug("Found task sequences secret using WMI")
-                        secret = self.sccmdecrypt(re.match(regex, record['TS_Sequence']['value']).group(1))
-                        finding.append(SCCMSecret, secret)
+                        secret = self.decrypt_sccm_secret(re.match(regex, record['TS_Sequence']['value']).group(1), from_wmi=True)
+                        sccm_ts = SCCMSecret(secret)
+                        finding.append(sccm_ts)
+                        if self.per_secret_callback is not None:
+                            self.per_secret_callback(sccm_ts)
+
                 except Exception as e:
                     if str(e).find('S_FALSE') > 0:
                         break
@@ -155,10 +181,10 @@ class SCCMTriage:
             return finding
 
 
-    def LocalSecretsWmi(self) -> Tuple[List[SCCMCred], List[SCCMSecret], List[SCCMCollection]]:
-        sccmcred=list()
-        sccmtask=list()
-        sccmcollection=list()
+    def wmi_collect_sccm_secrets(self) -> Tuple[List[SCCMCred], List[SCCMSecret], List[SCCMCollection]]:
+        sccm_cred = []
+        sccm_task = []
+        sccm_collection = []
         namespace = 'root\\ccm\\Policy\\Machine\\RequestedConfig'
         query_naa = 'SELECT NetworkAccessUsername, NetworkAccessPassword FROM CCM_NetworkAccessAccount'
         query_task = 'SELECT TS_Sequence FROM CCM_TaskSequence'
@@ -169,15 +195,19 @@ class SCCMTriage:
             iWbemLevel1Login = wmi.IWbemLevel1Login(iInterface)
             iWbemServices = iWbemLevel1Login.NTLMLogin(namespace, NULL, NULL)
             iWbemLevel1Login.RemRelease()
+
             logging.debug("Query WMI for Network access accounts")
             iEnumWbemClassObject = iWbemServices.ExecQuery(query_naa)
-            sccmcred = self.parseReply(iEnumWbemClassObject)
+            sccm_cred = self.parse_wmi_reply(iEnumWbemClassObject)
+
             logging.debug("Query WMI for Task sequences")
             iEnumWbemClassObject = iWbemServices.ExecQuery(query_task)
-            sccmtask = self.parseReply(iEnumWbemClassObject)
+            sccm_task = self.parse_wmi_reply(iEnumWbemClassObject)
+
             logging.debug("Query WMI for collection variables")
             iEnumWbemClassObject = iWbemServices.ExecQuery(query_collection)
-            sccmcollection = self.parseReply(iEnumWbemClassObject)
+            sccm_collection = self.parse_wmi_reply(iEnumWbemClassObject)
+
             iEnumWbemClassObject.RemRelease()
         except  (Exception, KeyboardInterrupt) as e:
             if logging.getLogger().level == logging.DEBUG:
@@ -187,26 +217,26 @@ class SCCMTriage:
         finally:
             if self.dcom_conn is not None:
                 self.dcom_conn.disconnect()
-        return sccmcred, sccmtask, sccmcollection
+        return sccm_cred, sccm_task, sccm_collection
     
-    def triage_sccm(self) -> Tuple[List[SCCMCred], List[SCCMSecret], List[SCCMCollection]]:
-        sccmcred=list()
-        sccmtask=list()
-        sccmcollection=list()
+    def triage_sccm(self, use_wmi: bool) -> Tuple[List[SCCMCred], List[SCCMSecret], List[SCCMCollection]]:
+        sccm_cred=[]
+        sccm_task=[]
+        sccm_collection=[]
         try:
-            if self.use_wmi:
-                sccmcred, sccmtask, sccmcollection = self.LocalSecretsWmi()
+            if use_wmi:
+                sccm_cred, sccm_task, sccm_collection = self.wmi_collect_sccm_secrets()
             else:
                 objectfile = self.conn.readFile(self.share,self.sccm_objectdata_filepath, bypass_shared_violation = True)
                 if (objectfile is not None and len(objectfile) > 0):
-                    sccmcred, sccmtask, sccmcollection = self.parseFile(objectfile)
+                    sccm_cred, sccm_task, sccm_collection = self.parse_sccm_objectfile(objectfile)
         except Exception as e:
             if logging.getLogger().level == logging.DEBUG:
                 import traceback
                 traceback.print_exc()
                 logging.debug(str(e))
             pass
-        return sccmcred, sccmtask, sccmcollection
+        return sccm_cred, sccm_task, sccm_collection
     
 
 

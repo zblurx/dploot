@@ -46,13 +46,15 @@ class CredentialsTriage:
     ]
     share = 'C$'
 
-    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey]) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection, masterkeys: List[Masterkey], per_credential_callback: Any = None) -> None:
         self.target = target
         self.conn = conn
         
         self._users = None
         self.looted_files = dict()
         self.masterkeys = masterkeys
+
+        self.per_credential_callback = per_credential_callback
 
     def triage_system_credentials(self) -> List[Credential]:
         credentials = list()
@@ -97,9 +99,10 @@ class CredentialsTriage:
                     masterkey = find_masterkey_for_credential_blob(credmanblob_bytes, self.masterkeys)
                     if masterkey is not None:
                         cred = decrypt_credential(credmanblob_bytes,masterkey)
-                        try:
-                            if cred['Unknown3'].decode('utf-16le') != '':
-                                credentials.append(Credential(
+                        credential = None
+                        if cred['Unknown3'] != '':
+                            try:
+                                credential = Credential(
                                     winuser=winuser,
                                     credblob=cred,
                                     target=cred['Target'].decode('utf-16le'),
@@ -107,10 +110,9 @@ class CredentialsTriage:
                                     unknown=cred['Unknown'].decode('utf-16le'),
                                     username=cred['Username'].decode('utf-16le'),
                                     password=cred['Unknown3'].decode('utf-16le')
-                                    ))
-                        except UnicodeDecodeError:
-                            if cred['Unknown3'] != '':
-                                credentials.append(Credential(
+                                )
+                            except UnicodeDecodeError:
+                                credential = Credential(
                                     winuser=winuser,
                                     credblob=cred,
                                     target=f"HEX[{cred['Target'].hex()}]",
@@ -118,7 +120,10 @@ class CredentialsTriage:
                                     unknown=f"HEX[{cred['Unknown'].hex()}]",
                                     username=f"HEX[{cred['Username'].hex()}]",
                                     password=f"HEX[{cred['Unknown3'].hex()}]",
-                                    ))
+                                )
+                            credentials.append(credential)
+                            if self.per_credential_callback is not None:
+                                self.per_credential_callback(credential)
                     else:
                         logging.debug("Could not decrypt...")
         return credentials
