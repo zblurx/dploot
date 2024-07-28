@@ -252,7 +252,7 @@ class WifiTriage:
 
                                 wifi_creds.append(wifi_profile)
                                 if self.per_profile_callback is not None:
-                                    self.per_profile_callback(wifi_creds)
+                                    self.per_profile_callback(wifi_profile)
         except Exception as e:
             if logging.getLogger().level == logging.DEBUG:
                 import traceback
