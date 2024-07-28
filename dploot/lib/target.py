@@ -132,7 +132,8 @@ def add_target_argument_group(
     parser: argparse.ArgumentParser,
 ) -> None:
     parser.add_argument(
-        "-t-target",
+        "-t",
+        "-target",
         action="store",
         dest="target",
         metavar="<target name or address>",
