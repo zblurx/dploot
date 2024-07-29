@@ -23,6 +23,7 @@ from dploot.action import (
     browser,
     wifi,
     mobaxterm,
+    wam,
 )
 from dploot.lib.utils import add_general_args
 
@@ -44,6 +45,7 @@ ENTRY_PARSERS = [
     browser,
     wifi,
     mobaxterm,
+    wam,
 ]
 
 
