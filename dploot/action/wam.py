@@ -2,34 +2,34 @@ import argparse
 import logging
 import sys
 from typing import Callable, Tuple
+from dploot.action.masterkeys import (
+    add_masterkeys_argument_group,
+    parse_masterkeys_options,
+)
 
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
-from dploot.action.masterkeys import parse_masterkeys_options
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
-from dploot.triage.wifi import WifiTriage
+from dploot.triage.wam import WamTriage
+
+NAME = "wam"
 
 
-NAME = "wifi"
-
-
-class WifiAction:
+class WamAction:
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
-
         self.target = Target.from_options(options)
 
         self.conn = None
         self._is_admin = None
-        self.masterkeys = None
         self.outputdir = None
+        self.masterkeys = None
+        self.pvkbytes = None
+        self.passwords = None
+        self.nthashes = None
 
         self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
-
-        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(
-            self.options, self.target
-        )
 
         if self.options.mkfile is not None:
             try:
@@ -37,6 +37,10 @@ class WifiAction:
             except Exception as e:
                 logging.error(str(e))
                 sys.exit(1)
+
+        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(
+            self.options, self.target
+        )
 
     def connect(self) -> None:
         self.conn = DPLootSMBConnection(self.target)
@@ -70,32 +74,28 @@ class WifiAction:
                     if not self.options.quiet
                     else None,
                 )
-                logging.info("Triage SYSTEM masterkeys\n")
-                self.masterkeys = masterkeytriage.triage_system_masterkeys()
-                # we need user masterkeys, too.
                 logging.info("Triage ALL USERS masterkeys\n")
-                self.masterkeys.extend(masterkeytriage.triage_masterkeys())
+                self.masterkeys = masterkeytriage.triage_masterkeys()
                 print()
                 if self.outputdir is not None:
                     dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
 
-            def profile_callback(profile):
+            def token_callback(token):
                 if self.options.quiet:
-                    profile.dump_quiet()
+                    token.dump_quiet()
                 else:
-                    profile.dump()
+                    token.dump()
 
-            wifi_triage = WifiTriage(
+            triage = WamTriage(
                 target=self.target,
                 conn=self.conn,
                 masterkeys=self.masterkeys,
-                per_profile_callback=profile_callback,
+                per_token_callback=token_callback,
             )
-            logging.info("Triage ALL WIFI profiles\n")
-            wifi_triage.triage_wifi()
+            logging.info("Triage Token Credentials for ALL USERS\n")
+            triage.triage_wam()
             if self.outputdir is not None:
-                dump_looted_files_to_disk(self.outputdir, wifi_triage.looted_files)
-
+                dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:
             logging.info("Not an admin, exiting...")
 
@@ -109,16 +109,17 @@ class WifiAction:
 
 
 def entry(options: argparse.Namespace) -> None:
-    a = WifiAction(options)
+    a = WamAction(options)
     a.run()
 
 
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
-        NAME, help="Dump wifi profiles from remote target"
+        NAME,
+        help="Dump users cached azure tokens from remote target",
     )
 
-    group = subparser.add_argument_group("wifi options")
+    group = subparser.add_argument_group("credentials options")
 
     group.add_argument(
         "-mkfile",
@@ -126,12 +127,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         help=("File containing {GUID}:SHA1 masterkeys mappings"),
     )
 
-    group.add_argument(
-        "-outputfile",
-        action="store",
-        help=("Export keys to file"),
-    )
-
+    add_masterkeys_argument_group(group)
     add_target_argument_group(subparser)
 
     return NAME, entry
