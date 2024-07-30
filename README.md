@@ -66,7 +66,7 @@ usage: dploot [-h] [-debug] [-quiet] [-export-dir DIR]
               {certificates,credentials,masterkeys,vaults,backupkey,rdg,sccm,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi,mobaxterm,wam}
               ...
 
-DPAPI looting remotely in Python. Version 2.7.3
+DPAPI looting remotely in Python. Version 3.0.0
 
 positional arguments:
   {certificates,credentials,masterkeys,vaults,backupkey,rdg,sccm,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi,mobaxterm,wam}
