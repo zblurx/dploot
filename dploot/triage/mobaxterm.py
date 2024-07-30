@@ -132,6 +132,7 @@ class MobaXtermTriage:
         "Default User",
         "All Users",
     ]
+    
     mobaxterm_conf_file_path = "Users\\{username}\\AppData\\Roaming\\MobaXterm\\MobaXterm.ini"
     mobaxterm_registry_key_path = "SOFTWARE\\Mobatek\\MobaXterm"
     mobaxterm_sessionp_key_path = ntpath.join(mobaxterm_registry_key_path, "SessionP")
@@ -191,7 +192,7 @@ class MobaXtermTriage:
         mobaxterm_credentials = []
 
         mobaxterm_masterpassword, mobaxterm_credentials = self.extract_mobaxtermkeys_for_user_from_files(user, sid)
-        if mobaxterm_masterpassword is None or len(mobaxterm_credentials) == 0:
+        if not self.conn.local_session and (mobaxterm_masterpassword is None or len(mobaxterm_credentials) == 0):
 
             logging.debug(f"Triaging MobaXterm for user {user}")
             mobaxterm_masterpassword, mobaxterm_credentials = (
