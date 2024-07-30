@@ -60,7 +60,10 @@ class TBRESKeyValue(Structure):
                 _length = unpack("I", remaining[0:4])
                 version = TBRESVersion(remaining[4:])
                 next_key_value = TBRESKeyValue(remaining[4+len(version):])
-                self["Data"] = "{}: {}".format(next_key_value["Key"].decode(), next_key_value["Data"])
+                try:
+                    self["Data"] = "{}: {}".format(next_key_value["Key"].decode(), next_key_value["Data"].decode())
+                except Exception:
+                    self["Data"] = "{}: {}".format(next_key_value["Key"].decode(), next_key_value["Data"])
                 self.additionnal_size=len(next_key_value)+len(version)+4
             else:
                 self["Data"] = "None"    
@@ -85,7 +88,10 @@ class TBRESKeyValue(Structure):
         
     def __str__(self):
         try:
-            return f"{self['Key'].decode()}: {self['Data'].decode()}"
+            if isinstance(self["Data"], int):
+                return f"{self['Key'].decode()}: {self['Data']}"
+            else:
+                return f"{self['Key'].decode()}: {self['Data'].decode()}"
         except Exception:
             return f"{self['Key'].decode()}: {self['Data']}"
 
