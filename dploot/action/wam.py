@@ -92,7 +92,7 @@ class WamAction:
                 masterkeys=self.masterkeys,
                 per_token_callback=token_callback,
             )
-            logging.info("Triage Office Token Cache for ALL USERS\n")
+            logging.info("Triage Office Token Broker Cache for ALL USERS\n")
             triage.triage_wam()
             if self.outputdir is not None:
                 dump_looted_files_to_disk(self.outputdir, triage.looted_files)
