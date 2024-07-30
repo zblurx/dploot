@@ -188,7 +188,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     group.add_argument(
         "-hashes-outputfile",
         action="store",
-        help=("Export hashes of masterkeys to file"),
+        help=("Export hashes of masterkeys to file in Hashcat/JtR format"),
     )
 
     add_target_argument_group(subparser)
