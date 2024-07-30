@@ -6,6 +6,11 @@ from typing import Any, Dict, List, Optional
 from Cryptodome.Hash import SHA1
 
 from impacket.examples.secretsdump import LSASecrets
+from impacket.dpapi import (
+    MasterKeyFile,
+    MasterKey,
+    ALGORITHMS_DATA
+)
 
 from dploot.lib.dpapi import decrypt_masterkey
 from dploot.lib.target import Target
@@ -14,17 +19,69 @@ from dploot.lib.smb import DPLootSMBConnection
 
 
 class Masterkey:
-    def __init__(self, guid, sha1, user: str = "None") -> None:
+    def __init__(self, guid, blob, sid, key = None, sha1 = None, user: str = "None") -> None:
         self.guid = guid
-        self.sha1 = sha1
+        self.blob = blob
+        self.sid = sid
         self.user = user
 
+        self.key = key
+        self._sha1 = sha1
+
+        self.generate_hash()
+
     def __str__(self) -> str:
-        return f"{{{self.guid}}}:{self.sha1}"
+        return f"{{{self.guid}}}:{self.sha1}" if self.key is not None else ""
+
+    def decrypt(self, domain_backupkey = None, password = None, nthash = None, dpapi_systemkey = None) -> bool:
+        key = decrypt_masterkey(
+            masterkey=self.blob,
+            domain_backupkey=domain_backupkey,
+            sid=self.sid,
+            password=password,
+            nthash=nthash,
+            dpapi_systemkey=dpapi_systemkey
+        )
+        if key is not None:
+            self.key = key
+            return True
+        return False
+    
+    def generate_hash(self):
+        hashes = []
+        mkf = MasterKeyFile(self.blob)
+        data = self.blob[len(mkf) :]
+        if mkf["MasterKeyLen"] > 0:
+            mk = MasterKey(data[:mkf["MasterKeyLen"]])
+            try:
+                version = mk["Version"]
+                hash_algo = ALGORITHMS_DATA[mk["HashAlgo"]][1].__name__.split(".")[-1].lower()
+                crypt_algo = ALGORITHMS_DATA[mk["CryptAlgo"]][1].__name__.split(".")[-1].lower()
+                if crypt_algo == "aes":
+                    crypt_algo = "aes256"
+                iteration_count = mk["MasterKeyIterationCount"]
+                iv = hexlify(mk["Salt"]).decode("ascii")
+                encryted_data = hexlify(mk["data"]).decode("ascii")
+                hashes = [f"{self.user}:$DPAPImk${version}*{context}*{self.sid}*{crypt_algo}*{hash_algo}*{iteration_count}*{iv}*{len(encryted_data)}*{encryted_data}"for context in [1,2,3]]    
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(e)
+        return hashes
 
     def dump(self) -> None:
         print(self)
 
+    @property
+    def sha1(self):
+        if self._sha1 is not None:
+            return self._sha1
+        if self.key is not None:
+            try:
+                self._sha1 = hexlify(SHA1.new(self.key).digest()).decode("latin-1")
+            except Exception as e:
+                logging.debug(f"Could not generate sha1 for masterkey {self.guid}: {e}")
+        return self._sha1
 
 def parse_masterkey_file(filename) -> List[Masterkey]:
     masterkeys = []
@@ -72,6 +129,7 @@ class MasterkeysTriage:
 
         self._users = None
         self.looted_files = {}
+        self.all_looted_masterkeys = []
         self.dpapiSystem = dpapiSystem
         if self.dpapiSystem is None:
             self.dpapiSystem = {}
@@ -141,18 +199,14 @@ class MasterkeysTriage:
                         # read masterkey
                         masterkey_bytes = self.conn.readFile(self.share, filepath, looted_files=self.looted_files)
                         if masterkey_bytes is not None:
-                            key = decrypt_masterkey(
-                                masterkey=masterkey_bytes,
-                                dpapi_systemkey=self.dpapiSystem,
+                            masterkey = Masterkey(
+                                guid=guid,
+                                blob=masterkey_bytes,
+                                sid=sid,
+                                user="SYSTEM"
                             )
-                            if key is not None:
-                                masterkey = Masterkey(
-                                    guid=guid,
-                                    sha1=hexlify(SHA1.new(key).digest()).decode(
-                                        "latin-1"
-                                    ),
-                                    user="SYSTEM",
-                                )
+                            self.all_looted_masterkeys.append(masterkey)
+                            if masterkey.decrypt(dpapi_systemkey=self.dpapiSystem):
                                 masterkeys.append(masterkey)
                                 if self.per_masterkey_callback is not None:
                                     self.per_masterkey_callback(masterkey)
@@ -177,19 +231,14 @@ class MasterkeysTriage:
                                     self.share, filepath, looted_files=self.looted_files
                                 )
                                 if masterkey_bytes is not None:
-                                    key = decrypt_masterkey(
-                                        masterkey=masterkey_bytes,
-                                        dpapi_systemkey=self.dpapiSystem,
+                                    masterkey = Masterkey(
+                                        guid=guid,
+                                        blob=masterkey_bytes,
                                         sid=sid,
+                                        user="SYSTEM_User"
                                     )
-                                    if key is not None:
-                                        masterkey = Masterkey(
-                                            guid=guid,
-                                            sha1=hexlify(SHA1.new(key).digest()).decode(
-                                                "latin-1"
-                                            ),
-                                            user="SYSTEM_User",
-                                        )
+                                    self.all_looted_masterkeys.append(masterkey)
+                                    if masterkey.decrypt(dpapi_systemkey=self.dpapiSystem):
                                         masterkeys.append(masterkey)
                                         if self.per_masterkey_callback is not None:
                                             self.per_masterkey_callback(masterkey)
@@ -270,21 +319,18 @@ class MasterkeysTriage:
                                 and user.rpartition(".")[0].lower() in self.nthashes
                             ):
                                 nthash = self.nthashes[user.rpartition(".")[0].lower()]
-                            key = decrypt_masterkey(
-                                masterkey=masterkey_bytes,
-                                domain_backupkey=self.pvkbytes,
+                            masterkey = Masterkey(
+                                guid=guid,
+                                blob=masterkey_bytes,
                                 sid=sid,
+                                user=user,
+                            )
+                            self.all_looted_masterkeys.append(masterkey)
+                            if masterkey.decrypt(
+                                domain_backupkey=self.pvkbytes,
                                 password=password,
                                 nthash=nthash,
-                            )
-                            if key is not None:
-                                masterkey = Masterkey(
-                                    guid=guid,
-                                    sha1=hexlify(SHA1.new(key).digest()).decode(
-                                        "latin-1"
-                                    ),
-                                    user=user,
-                                )
+                            ):
                                 masterkeys.append(masterkey)
                                 if self.per_masterkey_callback is not None:
                                     self.per_masterkey_callback(masterkey)

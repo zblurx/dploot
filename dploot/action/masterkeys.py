@@ -1,6 +1,5 @@
 import argparse
 import logging
-import os
 import sys
 from typing import Callable, Dict, Tuple
 
@@ -60,9 +59,10 @@ class MasterkeysAction:
             )
 
             def masterkey_callback(masterkey):
-                masterkey.dump()
-                if fd is not None:
-                    fd.write(str(masterkey) + "\n")
+                if masterkey.key is not None:
+                    masterkey.dump()
+                    if fd is not None:
+                        fd.write(str(masterkey) + "\n")
 
             triage = MasterkeysTriage(
                 target=self.target,
@@ -77,6 +77,10 @@ class MasterkeysAction:
             if self.outputfile is not None:
                 logging.critical("Writting masterkeys to %s" % self.outputfile)
                 fd.close()
+            if self.options.hashes_outputfile:
+                with open(self.options.hashes_outputfile, "a+") as hashes_fd:
+                    for mkhash in [mkhash for masterkey in triage.all_looted_masterkeys for mkhash in masterkey.generate_hash() ]:
+                        hashes_fd.write(mkhash + "\n")
             if self.outputdir is not None:
                 dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:
@@ -179,6 +183,12 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         "-outputfile",
         action="store",
         help=("Export keys to file"),
+    )
+
+    group.add_argument(
+        "-hashes-outputfile",
+        action="store",
+        help=("Export hashes of masterkeys to file"),
     )
 
     add_target_argument_group(subparser)
