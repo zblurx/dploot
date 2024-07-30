@@ -13,6 +13,7 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
     - [Kerberos](#kerberos)
   - [How to use](#how-to-use)
     - [As a local administrator on the machine](#as-a-local-administrator-on-the-machine)
+    - [With offline access to the Windows' filesystem](#with-offline-access-to-the-windows-filesystem)
     - [As a domain administrator (or equivalent)](#as-a-domain-administrator-or-equivalent)
     - [Not as a domain administrator](#not-as-a-domain-administrator)
   - [Commands](#commands)
@@ -174,6 +175,8 @@ URL:
 Username:	zblurx@gmail.com
 Password:	Waza1234
 ```
+
+You can also dump masterkey hashes with `-hashes-outputfile` option of [dploot masterkeys](#masterkeys)
 
 ## Commands
 
