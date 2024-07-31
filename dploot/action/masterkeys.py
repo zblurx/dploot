@@ -173,7 +173,7 @@ def add_masterkeys_argument_group(group: argparse._ArgumentGroup) -> None:
 
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
-        NAME, help="Dump users masterkey from remote target"
+        NAME, help="Dump users masterkey from local or remote target"
     )
 
     group = subparser.add_argument_group("masterkeys options")

@@ -132,7 +132,7 @@ def entry(options: argparse.Namespace) -> None:
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
         NAME,
-        help="Loot SYSTEM Masterkeys (if not set), SYSTEM credentials, SYSTEM certificates and SYSTEM vaults from remote target",
+        help="Loot SYSTEM Masterkeys (if not set), SYSTEM credentials, SYSTEM certificates and SYSTEM vaults from local or remote target",
     )
 
     group = subparser.add_argument_group("machinetriage options")

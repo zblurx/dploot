@@ -129,7 +129,7 @@ def entry(options: argparse.Namespace) -> None:
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
         NAME,
-        help="Dump users credentials and cookies saved in browser from remote target",
+        help="Dump users credentials and cookies saved in browser from local or remote target",
     )
 
     group = subparser.add_argument_group("credentials options")

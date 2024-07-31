@@ -163,7 +163,7 @@ def entry(options: argparse.Namespace) -> None:
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
         NAME,
-        help="Loot Masterkeys (if not set), credentials, rdg, certificates, browser and vaults from remote target",
+        help="Loot Masterkeys (if not set), credentials, rdg, certificates, browser and vaults from local or remote target",
     )
 
     group = subparser.add_argument_group("triage options")

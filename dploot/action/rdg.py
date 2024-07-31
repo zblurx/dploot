@@ -115,7 +115,7 @@ def entry(options: argparse.Namespace) -> None:
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
         NAME,
-        help="Dump users saved password information for RDCMan.settings from remote target",
+        help="Dump users saved password information for RDCMan.settings from local or remote target",
     )
 
     group = subparser.add_argument_group("rdg options")

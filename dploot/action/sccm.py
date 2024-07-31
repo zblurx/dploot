@@ -102,7 +102,7 @@ def entry(options: argparse.Namespace) -> None:
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
         NAME,
-        help="Dump SCCM secrets (NAA, Collection variables, tasks sequences credentials)  from remote target",
+        help="Dump SCCM secrets (NAA, Collection variables, tasks sequences credentials)  from local or remote target",
     )
 
     group = subparser.add_argument_group("sccm options")

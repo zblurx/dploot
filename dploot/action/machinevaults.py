@@ -105,7 +105,7 @@ def entry(options: argparse.Namespace) -> None:
 
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
-        NAME, help="Dump system vaults from remote target"
+        NAME, help="Dump system vaults from local or remote target"
     )
 
     group = subparser.add_argument_group("machinevaults options")

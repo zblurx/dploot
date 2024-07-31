@@ -7,59 +7,57 @@ import traceback
 from impacket.examples import logger
 
 from dploot.action import (
-    certificates,
-    credentials,
-    masterkeys,
-    vaults,
     backupkey,
     blob,
+    browser,
+    certificates,
+    credentials,
+    machinecertificates,
+    machinecredentials,
+    machinemasterkeys,
+    machinetriage,
+    machinevaults,
+    masterkeys,
+    mobaxterm,
     rdg,
     sccm,
     triage,
-    machinemasterkeys,
-    machinecredentials,
-    machinevaults,
-    machinecertificates,
-    machinetriage,
-    browser,
-    wifi,
-    mobaxterm,
+    vaults,
     wam,
+    wifi,
 )
-from dploot.lib.utils import add_general_args
-
 
 ENTRY_PARSERS = [
-    certificates,
-    credentials,
-    masterkeys,
-    vaults,
     backupkey,
     blob,
+    browser,
+    certificates,
+    credentials,
+    machinecertificates,
+    machinecredentials,
+    machinemasterkeys,
+    machinetriage,
+    machinevaults,
+    masterkeys,
+    mobaxterm,
     rdg,
     sccm,
     triage,
-    machinemasterkeys,
-    machinecredentials,
-    machinevaults,
-    machinecertificates,
-    machinetriage,
-    browser,
-    wifi,
-    mobaxterm,
+    vaults,
     wam,
+    wifi,
 ]
 
 
 def main() -> None:
     logger.init()
     version = importlib.metadata.version("dploot")
+    print(f"dploot (https://github.com/zblurx/dploot) v{version} by @_zblurx")
     parser = argparse.ArgumentParser(
-        description=f"DPAPI looting remotely in Python.\nVersion {version}",
+        description="DPAPI looting locally remotely in Python",
         add_help=True,
     )
 
-    add_general_args(parser)
     subparsers = parser.add_subparsers(help="Action", dest="action", required=True)
 
     actions = {}

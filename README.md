@@ -64,39 +64,39 @@ sudo apt install python3-dploot
 ## Usage
 
 ```text
-usage: dploot [-h] [-debug] [-quiet] [-export-dir DIR]
-              {certificates,credentials,masterkeys,vaults,backupkey,rdg,sccm,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi,mobaxterm,wam}
+dploot (https://github.com/zblurx/dploot) v3.0.0 by @_zblurx
+usage: dploot [-h]
+              {certificates,credentials,masterkeys,vaults,backupkey,blob,rdg,sccm,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi,mobaxterm,wam}
               ...
 
-DPAPI looting remotely in Python. Version 3.0.0
+DPAPI looting locally remotely in Python
 
 positional arguments:
-  {certificates,credentials,masterkeys,vaults,backupkey,rdg,sccm,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi,mobaxterm,wam}
+  {backupkey,blob,browser,certificates,credentials,machinecertificates,machinecredentials,machinemasterkeys,machinetriage,machinevaults,masterkeys,mobaxterm,rdg,sccm,triage,vaults,wam,wifi}
                         Action
-    certificates        Dump users certificates from remote target
-    credentials         Dump users Credential Manager blob from remote target
-    masterkeys          Dump users masterkey from remote target
-    vaults              Dump users Vaults blob from remote target
     backupkey           Backup Keys from domain controller
-    rdg                 Dump users saved password information for RDCMan.settings from remote target
-    sccm                Dump SCCM secrets (NAA, Collection variables, tasks sequences credentials) from remote target
-    triage              Loot Masterkeys (if not set), credentials, rdg, certificates, browser and vaults from remote target
-    machinemasterkeys   Dump system masterkey from remote target
-    machinecredentials  Dump system credentials from remote target
-    machinevaults       Dump system vaults from remote target
+    blob                Decrypt DPAPI blob. Can fetch masterkeys on target
+    browser             Dump users credentials and cookies saved in browser from local or remote target
+    certificates        Dump users certificates from local or remote target
+    credentials         Dump users Credential Manager blob from local or remote target
     machinecertificates
-                        Dump system certificates from remote target
-    machinetriage       Loot SYSTEM Masterkeys (if not set), SYSTEM credentials, SYSTEM certificates and SYSTEM vaults from remote target
-    browser             Dump users credentials and cookies saved in browser from remote target
-    wifi                Dump wifi profiles from remote target
+                        Dump system certificates from local or remote target
+    machinecredentials  Dump system credentials from local or remote target
+    machinemasterkeys   Dump system masterkey from local or remote target
+    machinetriage       Loot SYSTEM Masterkeys (if not set), SYSTEM credentials, SYSTEM certificates and SYSTEM vaults from local or remote
+                        target
+    machinevaults       Dump system vaults from local or remote target
+    masterkeys          Dump users masterkey from local or remote target
     mobaxterm           Dump Passwords and Credentials from MobaXterm
-    wam                 Dump users cached azure tokens from remote target
+    rdg                 Dump users saved password information for RDCMan.settings from local or remote target
+    sccm                Dump SCCM secrets (NAA, Collection variables, tasks sequences credentials) from local or remote target
+    triage              Loot Masterkeys (if not set), credentials, rdg, certificates, browser and vaults from local or remote target
+    vaults              Dump users Vaults blob from local or remote target
+    wam                 Dump users cached azure tokens from local or remote target
+    wifi                Dump wifi profiles from local or remote target
 
 options:
   -h, --help            show this help message and exit
-  -debug                Turn DEBUG output ON
-  -quiet                Only output dumped credentials
-  -export-dir DIR       Dump looted files to specified directory, regardless they were decrypted
 ```
 
 ### Kerberos
