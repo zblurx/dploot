@@ -7,56 +7,60 @@ import traceback
 from impacket.examples import logger
 
 from dploot.action import (
+    backupkey,
+    blob,
+    browser,
     certificates,
     credentials,
+    machinecertificates,
+    machinecredentials,
+    machinemasterkeys,
+    machinetriage,
+    machinevaults,
     masterkeys,
-    vaults,
-    backupkey,
+    mobaxterm,
     rdg,
     sccm,
     triage,
-    machinemasterkeys,
-    machinecredentials,
-    machinevaults,
-    machinecertificates,
-    machinetriage,
-    browser,
+    vaults,
+    wam,
     wifi,
-    mobaxterm,
-    )
-
+)
 
 ENTRY_PARSERS = [
+    backupkey,
+    blob,
+    browser,
     certificates,
     credentials,
+    machinecertificates,
+    machinecredentials,
+    machinemasterkeys,
+    machinetriage,
+    machinevaults,
     masterkeys,
-    vaults,
-    backupkey,
+    mobaxterm,
     rdg,
     sccm,
     triage,
-    machinemasterkeys,
-    machinecredentials,
-    machinevaults,
-    machinecertificates,
-    machinetriage,
-    browser,
+    vaults,
+    wam,
     wifi,
-    mobaxterm,
 ]
+
 
 def main() -> None:
     logger.init()
     version = importlib.metadata.version("dploot")
-    parser = argparse.ArgumentParser(description=f"DPAPI looting remotely in Python.\nVersion {version}", add_help=True)
-
-    parser.add_argument("-debug", action="store_true", help="Turn DEBUG output ON")
-
-    parser.add_argument("-quiet", action="store_true", help="Only output dumped credentials")
+    print(f"dploot (https://github.com/zblurx/dploot) v{version} by @_zblurx")
+    parser = argparse.ArgumentParser(
+        description="DPAPI looting locally remotely in Python",
+        add_help=True,
+    )
 
     subparsers = parser.add_subparsers(help="Action", dest="action", required=True)
 
-    actions = dict()
+    actions = {}
 
     for entry_parser in ENTRY_PARSERS:
         action, entry = entry_parser.add_subparser(subparsers)
@@ -75,6 +79,7 @@ def main() -> None:
     else:
         logging.getLogger().setLevel(logging.INFO)
 
+    logging.debug(f"{options=}")
     try:
         actions[options.action](options)
     except Exception as e:

