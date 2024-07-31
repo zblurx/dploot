@@ -37,6 +37,7 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
       - [backupkey](#backupkey)
       - [mobaxterm](#mobaxterm)
       - [wam](#wam)
+      - [blob](#blob)
   - [Credits](#credits)
   - [TODO](#TODO)
 
@@ -794,6 +795,42 @@ Version: 1
 expiration: 133668881920000000
 responses: b'\x8aC\xed\x9f\xf4\xe6D!\x0c\x82\x86)\xab\x1d\xf9\xac'
 WTRes_Token: access_token=eyJhb[...]
+```
+
+***Tips***: *You can find Microsoft access token for Entra users in TBRES files.*
+
+### blob
+
+The **blob** command will decrypt DPAPI blob with `-mkfile FILE` of one or more {GUID}:SHA1, `-masterkey {GUID}:SHA1` or with `-passwords FILE` combo of user:password, `-nthashes` combo of user:nthash or a `-pvk PVKFILE` to first decrypt masterkeys. 
+
+With `pvk`:
+
+```text
+dploot blob -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14 -pvk key.pvk -blob 'AQAAANCMnd8BF[...]'
+[*] Connected to 192.168.56.14 as waza.local\jsmith (admin)
+
+[*] Triage ALL USERS masterkeys
+
+{d5efdaf1-9fd9-44e7-8bd1-7e017d458c14}:a7eac2a750069aa576e1e9f03f1dc37b2057adb3
+{13405569-1685-49c7-90e2-0e7ce55e5b8b}:ab1b23d3380c53ac1dae1cdf62bc44b4db391bb9
+
+[*] Triage Office Token Broken Cache for ALL USERS
+
+[BLOB]
+Version          :        1 (1)
+Guid Credential  : DF9D8CD0-1501-11D1-8C7A-00C04FC297EB
+MasterKeyVersion :        1 (1)
+Guid MasterKey   : 13405569-1685-49C7-90E2-0E7CE55E5B8B
+Flags            :        0 ()
+Description      :
+CryptAlgo        : 00006603 (26115) (CALG_3DES)
+Salt             : b'a5a15df8f0fb606897f28966dd5fcd9e'
+HMacKey          : b''
+HashAlgo         : 00008004 (32772) (CALG_SHA)
+HMac             : b'80b2dc6cee8d206d5dc5a9ef844f000a'
+Data             : b'5ece8ce1dd8[...]
+
+Data decrypted : b'0\x00\x00\x00\x01\x00\x00[...]' 
 ```
 
 ***Tips***: *You can find Microsoft access token for Entra users in TBRES files.*

@@ -131,7 +131,7 @@ def entry(options: argparse.Namespace) -> None:
 
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
-        NAME, help="Dump users Vaults blob from remote target"
+        NAME, help="Decrypt DPAPI blob. Can fetch masterkeys on target"
     )
 
     group = subparser.add_argument_group("vaults options")
