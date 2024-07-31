@@ -172,7 +172,9 @@ class MasterkeysTriage:
                     LSA.finish()
                 except Exception as e:
                     logging.error("LSA hashes extraction failed: %s" % str(e))
-
+        if self.dpapiSystem is None or len(self.dpapiSystem) != 2:
+            logging.debug("Could not get DPAPI SYSTEM keys")
+            return masterkeys
         system_protect_dir = self.conn.remote_list_dir(
             self.share, path=self.system_masterkeys_generic_path
         )

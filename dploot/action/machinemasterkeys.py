@@ -1,4 +1,5 @@
 import argparse
+from binascii import unhexlify
 import logging
 import sys
 from typing import Callable, Tuple
@@ -21,8 +22,12 @@ class MachineMasterkeysAction:
         self.conn = None
         self._is_admin = None
         self.outputfile = None
-        self.append = self.options.append
         self.outputdir = None
+        
+        self.dpapi_system_key = {}
+        if self.options.dpapi_system_key is not None and self.options.dpapi_system_key != "":
+            correl_table = {"dpapi_machinekey":"MachineKey","dpapi_userkey":"UserKey"}
+            self.dpapi_system_key = {correl_table[k] :unhexlify(v[2:]) for k, v in (elem.split(":") for elem in options.dpapi_system_key.split(","))}
 
         self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
 
@@ -47,7 +52,7 @@ class MachineMasterkeysAction:
         )
         if self.is_admin:
             fd = (
-                open(self.outputfile + ".mkf", ("a+" if self.append else "w"))
+                open(self.outputfile + ".mkf", "a+")
                 if self.outputfile is not None
                 else None
             )
@@ -61,6 +66,7 @@ class MachineMasterkeysAction:
                 target=self.target,
                 conn=self.conn,
                 per_masterkey_callback=masterkey_callback,
+                dpapiSystem=self.dpapi_system_key
             )
             logging.info("Triage SYSTEM masterkeys\n")
             triage.triage_system_masterkeys()
@@ -100,9 +106,10 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     )
 
     group.add_argument(
-        "-append",
-        action="store_true",
-        help=("Appends keys to file specified with -outputfile"),
+        "-dpapi-system-key",
+        action="store",
+        metavar="dpapi_machinekey:0x0123456789abcdef0123456789abcdef01234567,dpapi_userkey:0x0123456789abcdef0123456789abcdef01234567",
+        help=("Use custom DPAPI SYSTEM keys"),
     )
 
     add_target_argument_group(subparser)
