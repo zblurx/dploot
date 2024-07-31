@@ -39,7 +39,6 @@ If you don't know what is DPAPI, [check out this post](https://posts.specterops.
       - [wam](#wam)
       - [blob](#blob)
   - [Credits](#credits)
-  - [TODO](#TODO)
 
 ## Installation
 
@@ -814,7 +813,7 @@ dploot blob -d waza.local -u jsmith -p 'Password#123' -t 192.168.56.14 -pvk key.
 {d5efdaf1-9fd9-44e7-8bd1-7e017d458c14}:a7eac2a750069aa576e1e9f03f1dc37b2057adb3
 {13405569-1685-49c7-90e2-0e7ce55e5b8b}:ab1b23d3380c53ac1dae1cdf62bc44b4db391bb9
 
-[*] Triage Office Token Broken Cache for ALL USERS
+[*] Trying to decrypt DPAPI blob
 
 [BLOB]
 Version          :        1 (1)
@@ -843,5 +842,4 @@ Those projects helped a lot in writting this tool:
 - [SharpDPAPI](https://github.com/GhostPack/SharpDPAPI) by [Harmj0y](https://twitter.com/harmj0y)
 - [Mimikatz](https://github.com/gentilkiwi/mimikatz/) by [gentilkiwi](https://twitter.com/gentilkiwi)
 - [DonPAPI](https://github.com/login-securite/DonPAPI) by [LoginSecurite](https://twitter.com/LoginSecurite)
-- [wifi-squid](https://github.com/K-Mistele/wifi-squid) by [0xBlacklight](https://twitter.com/0xBlacklight)
-
+- [WAMBam](https://github.com/xpn/WAMBam) by [_xpn_](https://twitter.com/_xpn_)

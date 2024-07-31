@@ -94,7 +94,7 @@ class BlobAction:
                 if self.outputdir is not None:
                     dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
 
-            logging.info("Trying to uncrypt DPAPI blob\n")
+            logging.info("Trying to decrypt DPAPI blob\n")
             DPAPI_BLOB(self.blob).dump()
             masterkey = find_masterkey_for_blob(self.blob, masterkeys=self.masterkeys)
             if masterkey is not None:
