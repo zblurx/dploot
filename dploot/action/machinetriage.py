@@ -65,7 +65,8 @@ class MachineTriageAction:
                 logging.info("Triage SYSTEM masterkeys\n")
                 self.masterkeys = masterkeys_triage.triage_system_masterkeys()
                 print()
-                dump_looted_files_to_disk(self.outputdir, masterkeys_triage.looted_files)
+                if self.outputdir is not None:
+                    dump_looted_files_to_disk(self.outputdir, masterkeys_triage.looted_files)
 
             def credential_callback(credential):
                 if self.options.quiet:
@@ -81,7 +82,8 @@ class MachineTriageAction:
             )
             logging.info("Triage SYSTEM Credentials\n")
             credentials_triage.triage_system_credentials()
-            dump_looted_files_to_disk(self.outputdir, credentials_triage.looted_files)
+            if self.outputdir is not None:
+                dump_looted_files_to_disk(self.outputdir, credentials_triage.looted_files)
 
             vaults_triage = VaultsTriage(
                 target=self.target,
@@ -91,7 +93,8 @@ class MachineTriageAction:
             )
             logging.info("Triage SYSTEM Vaults\n")
             vaults_triage.triage_system_vaults()
-            dump_looted_files_to_disk(self.outputdir, vaults_triage.looted_files)
+            if self.outputdir is not None:
+                dump_looted_files_to_disk(self.outputdir, vaults_triage.looted_files)
 
             def certificate_callback(certificate):
                 if not self.options.dump_all and not certificate.clientauth:
@@ -111,7 +114,8 @@ class MachineTriageAction:
             )
             logging.info("Triage SYSTEM Certificates\n")
             certificate_triage.triage_system_certificates()
-            dump_looted_files_to_disk(self.outputdir, certificate_triage.looted_files)
+            if self.outputdir is not None:
+                dump_looted_files_to_disk(self.outputdir, certificate_triage.looted_files)
         else:
             logging.info("Not an admin, exiting...")
 

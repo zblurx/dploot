@@ -131,7 +131,7 @@ class CredentialsTriage:
                     if masterkey is not None:
                         cred = decrypt_credential(credmanblob_bytes, masterkey)
                         credential = None
-                        if cred["Unknown3"] != "":
+                        if cred["Unknown3"] != b"":
                             try:
                                 credential = Credential(
                                     winuser=winuser,
@@ -146,11 +146,11 @@ class CredentialsTriage:
                                 credential = Credential(
                                     winuser=winuser,
                                     credblob=cred,
-                                    target=f"HEX[{cred['Target'].hex()}]",
-                                    description=f"HEX[{cred['Description'].hex()}]",
-                                    unknown=f"HEX[{cred['Unknown'].hex()}]",
-                                    username=f"HEX[{cred['Username'].hex()}]",
-                                    password=f"HEX[{cred['Unknown3'].hex()}]",
+                                    target=cred["Target"].decode("utf-16le"),
+                                    description=cred["Description"].decode("utf-16le"),
+                                    unknown=cred["Unknown"].decode("utf-16le"),
+                                    username=cred["Username"].decode("utf-16le"),
+                                    password=cred["Unknown3"].decode("latin-1"),
                                 )
                             credentials.append(credential)
                             if self.per_credential_callback is not None:
