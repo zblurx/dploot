@@ -334,7 +334,7 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
         return data
 
     def perform_taskkill(self, process_name):
-        with tsts.LegacyAPI(self.smb_session, self.target.address) as legacy:
+        with tsts.LegacyAPI(self.smb_session, self.target.address, self.target.do_kerberos) as legacy:
             handle = legacy.hRpcWinStationOpenServer()
             r = legacy.hRpcWinStationGetAllProcesses(handle)
             if not len(r):
