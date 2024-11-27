@@ -19,7 +19,7 @@ from dploot.lib.smb import DPLootSMBConnection
 
 
 class Masterkey:
-    def __init__(self, guid, blob, sid, key = None, sha1 = None, user: str = "None") -> None:
+    def __init__(self, guid, blob = None, sid = None, key = None, sha1 = None, user: str = "None") -> None:
         self.guid = guid
         self.blob = blob
         self.sid = sid
@@ -28,7 +28,8 @@ class Masterkey:
         self.key = key
         self._sha1 = sha1
 
-        self.generate_hash()
+        if self.blob is not None:
+            self.generate_hash()
 
     def __str__(self) -> str:
         return f"{{{self.guid}}}:{self.sha1}" if self.key is not None else ""
