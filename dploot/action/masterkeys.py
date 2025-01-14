@@ -78,10 +78,13 @@ class MasterkeysAction:
                 logging.critical("Writting masterkeys to %s" % self.outputfile)
                 fd.close()
             if self.options.hashes_outputfile:
+                print()
                 with open(self.options.hashes_outputfile, "a+") as hashes_fd:
-                    logging.critical("Writting masterkey hashes to %s" % self.options.hashes_outputfile)
                     for mkhash in [mkhash for masterkey in triage.all_looted_masterkeys for mkhash in masterkey.generate_hash() ]:
+                        print(mkhash)
                         hashes_fd.write(mkhash + "\n")
+                    print()
+                    logging.critical("Writting masterkey hashes to %s" % self.options.hashes_outputfile)
             if self.outputdir is not None:
                 dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:

@@ -9,7 +9,6 @@ from impacket.examples.secretsdump import LSASecrets
 from impacket.dpapi import (
     MasterKeyFile,
     MasterKey,
-    ALGORITHMS_DATA
 )
 
 from dploot.lib.dpapi import decrypt_masterkey
@@ -55,14 +54,12 @@ class Masterkey:
         if mkf["MasterKeyLen"] > 0:
             mk = MasterKey(data[:mkf["MasterKeyLen"]])
             try:
-                version = mk["Version"]
-                hash_algo = ALGORITHMS_DATA[mk["HashAlgo"]][1].__name__.split(".")[-1].lower()
-                crypt_algo = ALGORITHMS_DATA[mk["CryptAlgo"]][1].__name__.split(".")[-1].lower()
-                if crypt_algo == "aes":
-                    crypt_algo = "aes256"
                 iteration_count = mk["MasterKeyIterationCount"]
                 iv = hexlify(mk["Salt"]).decode("ascii")
                 encryted_data = hexlify(mk["data"]).decode("ascii")
+                version = 1 if len(encryted_data) == 208 else 2
+                hash_algo = "sha1" if len(encryted_data) == 208 else "sha512"
+                crypt_algo = "des3" if len(encryted_data) == 208 else "aes256"
                 hashes = [f"{self.user}:$DPAPImk${version}*{context}*{self.sid}*{crypt_algo}*{hash_algo}*{iteration_count}*{iv}*{len(encryted_data)}*{encryted_data}"for context in [1,2,3]]    
             except Exception as e:
                 import traceback
