@@ -134,7 +134,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         NAME, help="Decrypt DPAPI blob. Can fetch masterkeys on target"
     )
 
-    group = subparser.add_argument_group("vaults options")
+    group = subparser.add_argument_group("blob options")
 
     group.add_argument(
         "-blob",
