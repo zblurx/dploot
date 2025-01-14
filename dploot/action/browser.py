@@ -76,6 +76,8 @@ class BrowserAction:
                 )
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
+                if self.options.v20support:
+                    self.masterkeys += masterkeytriage.triage_system_masterkeys()
                 print()
                 if self.outputdir is not None:
                     dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
@@ -132,7 +134,7 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         help="Dump users credentials and cookies saved in browser from local or remote target",
     )
 
-    group = subparser.add_argument_group("credentials options")
+    group = subparser.add_argument_group("browser options")
 
     group.add_argument(
         "-mkfile",
@@ -152,6 +154,12 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         "-bypass-shared-violation",
         action="store_true",
         help=("Will try to bypass Shared Violation Error with a silly esentutl trick"),
+    )
+
+    group.add_argument(
+        "-v20support",
+        action="store_true",
+        help=("Will dump v20 chromium credentials (will perform a LSA dump in form of reg save)"),
     )
 
     group.add_argument(

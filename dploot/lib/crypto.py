@@ -277,13 +277,16 @@ def pvkblob_to_pkcs1(key):
 
 def decrypt_chrome_password(encrypted_password: str, aeskey: bytes):
     version, rest = encrypted_password[:3], encrypted_password[3:]
-    if version in (b"v10", b"v11"):
-        iv, payload = rest[:12], rest[12:]
-        cipher = AES.new(aeskey, AES.MODE_GCM, iv)
-        decrypted = cipher.decrypt(payload)[:-16]
-        decrypted = decrypted.decode("utf-8")
-        return decrypted or None
-
+    iv, payload = rest[:12], rest[12:]
+    cipher = AES.new(aeskey, AES.MODE_GCM, iv)
+    decrypted = cipher.decrypt(payload)
+    if version in (b"v10",b"v11"):
+        decrypted = decrypted[:-16]
+    elif version in (b"v20"):
+        decrypted = decrypted[32:]
+        decrypted = decrypted[:-16]
+    decrypted = decrypted.decode("utf-8")
+    return decrypted or None
 
 def deriveKeysFromUser(sid, password):
     password = password.encode("utf-16le")
