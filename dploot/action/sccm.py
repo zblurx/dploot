@@ -62,7 +62,7 @@ class SCCMAction:
                     else None,
                 )
                 logging.info("Triage SYSTEM masterkeys\n")
-                self.masterkeys = masterkeytriage.triage_masterkeys()
+                self.masterkeys = masterkeytriage.triage_system_masterkeys()
                 print()
                 if self.outputdir is not None:
                     dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)

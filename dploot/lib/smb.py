@@ -308,7 +308,7 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
                         if str(e).find("STATUS_SHARING_VIOLATION") >= 0:
                             # Output not finished, let's wait
                             time.sleep(1)
-                self.smb_session.deleteFile(shareName, wmiexec.output)
+                self.smb_session.deleteFile(shareName, filepath)
             elif str(e).find("Broken") >= 0:
                 logging.debug("Connection broken, trying to recreate it")
                 self.reconnect()
