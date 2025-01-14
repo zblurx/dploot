@@ -45,7 +45,7 @@ class AppBoundKey(Structure):
             return self._key
         if len(self["Key"]) == 32:
             self._key = self["Key"]
-        else:
+        else: # from https://gist.github.com/thewh1teagle/d0bbc6bc678812e39cba74e1d407e5c7
             key = base64.b64decode("sxxuJBrIRnKNqcH6xJNmUc/7lE0UOrgWJ2vMbaAoR4c=")
             iv = self["Key"][1:13]
             encrypted_text = self["Key"][13:45]

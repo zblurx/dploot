@@ -513,7 +513,9 @@ Username:	admin
 Password:	Password!123
 ```
 
-To display stored cookies, use `-show-cookies` option
+To display stored cookies, use `-show-cookies` option. 
+
+Since July 2024, [Chromium based browsers support App Bound Key encryption](https://security.googleblog.com/2024/07/improving-security-of-chrome-cookies-on.html). TLDR : To dump chromium cookies (and soon passwords) you need to decrypt user's AND SYSTEM masterkeys. This option is supported with `-v20-support` flag. 
 
 #### triage
 
