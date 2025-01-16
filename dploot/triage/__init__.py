@@ -12,6 +12,7 @@ class Triage(ABC):
     """
     Abstract Class Definition for the DPLoot Triage Class.
     """
+    @abstractmethod
     def __init__(
         self,
         target: Target,
@@ -30,6 +31,5 @@ class Triage(ABC):
 
 
     @abstractmethod
-    @classmethod
     def triage(*args: List[Any], **kwargs: Dict[Any, Any]) -> Any:
         pass
