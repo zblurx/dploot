@@ -41,7 +41,6 @@ class MasterkeysTriage(Triage):
         self.nthashes = nthashes
 
         self._users = None
-        self.looted_files = {}
         self.all_looted_masterkeys = []
         self.dpapiSystem = dpapiSystem
         if self.dpapiSystem is None:
