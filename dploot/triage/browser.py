@@ -5,16 +5,18 @@ import json
 import logging
 import tempfile
 import sqlite3
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Callable
 from impacket.structure import Structure
 
 
+from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
+from dploot.lib.masterkey import Masterkey
 from dploot.lib.crypto import decrypt_chrome_password
 from dploot.lib.utils import datetime_to_time
-from dploot.triage.masterkeys import Masterkey
+from dploot.triage import Triage
 from dataclasses import dataclass
 
 
@@ -121,16 +123,7 @@ class GoogleRefreshToken:
         print(f"[{self.browser.upper()}] GRT {self.service}:{self.token}")
 
 
-class BrowserTriage:
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
+class BrowserTriage(Triage):
     user_google_chrome_generic_login_path = {
         "aesStateKeyPath": "Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Local State",
         "loginDataPath": "Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\%s\\Login Data",
@@ -165,24 +158,28 @@ class BrowserTriage:
     }
 
     share = "C$"
-
+    
     def __init__(
         self,
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_secret_callback: Any = None,
+        per_profile_callback: Callable = None,
+        false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        self.target = target
-        self.conn = conn
+        super().__init__(target, conn, masterkeys, per_profile_callback, false_positive)
+        
+        self._users: List[str] = None
 
-        self._users = None
-        self.looted_files = {}
-        self.masterkeys = masterkeys
 
-        self.per_secret_callback = per_secret_callback
-
-    def triage_browsers(
+    def triage(self, gather_cookies: bool = False, bypass_shared_violation: bool = False) -> Tuple[List[LoginData], List[Cookie]]:
+        return self._triage_browsers(
+            gather_cookies=gather_cookies,
+            bypass_shared_violation=bypass_shared_violation
+        )
+    
+    
+    def _triage_browsers(
         self, gather_cookies: bool = False, bypass_shared_violation: bool = False
     ) -> Tuple[List[LoginData], List[Cookie]]:
         credentials = []
