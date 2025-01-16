@@ -7,6 +7,7 @@ from impacket.dcerpc.v5 import lsad
 from impacket.dcerpc.v5.rpcrt import RPC_C_AUTHN_GSS_NEGOTIATE
 from impacket.dpapi import P_BACKUP_KEY, PREFERRED_BACKUP_KEY, PVK_FILE_HDR
 
+from dploot.triage import Triage
 from dploot.lib.target import Target
 from dploot.lib.smb import DPLootSMBConnection
 
@@ -19,13 +20,13 @@ class Backupkey:
         self.backupkey_v2 = self.pvk_header.getData() + self.pvk_data
 
 
-class BackupkeyTriage:
+class BackupkeyTriage(Triage):
     def __init__(self, target: Target, conn: DPLootSMBConnection) -> None:
-        self.target = target
-        self.conn = conn
-
+        super().__init__(target=target, conn=conn)
+        
         self.dce = None
         self._users = None
+
 
     def connect(self) -> None:
         rpctransport = transport.DCERPCTransportFactory(r"ncacn_np:445[\pipe\lsarpc]")
@@ -39,7 +40,12 @@ class BackupkeyTriage:
         except transport.DCERPCException as e:
             raise e
 
-    def triage_backupkey(self) -> None:
+
+    def triage(self) -> Backupkey:
+        return self._triage_backupkey()
+
+
+    def _triage_backupkey(self) -> Backupkey:
         if self.dce is None:
             self.connect()
 
