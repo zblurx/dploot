@@ -1,10 +1,13 @@
 import logging
 import ntpath
-from typing import Any, List
+from typing import Any, List, Callable
 from dataclasses import dataclass
 
 from impacket.dpapi import CREDENTIAL_BLOB
 
+
+from dploot.triage import Triage
+from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_credential, find_masterkey_for_credential_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -29,16 +32,7 @@ class Credential:
         print(f"[CREDENTIAL] {self.target} - {self.username}:{self.password}")
 
 
-class CredentialsTriage:
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
+class CredentialsTriage(Triage):
     user_credentials_generic_path = [
         "Users\\%s\\AppData\\Local\\Microsoft\\Credentials",
         "Users\\%s\\AppData\\Roaming\\Microsoft\\Credentials",
@@ -59,16 +53,11 @@ class CredentialsTriage:
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_credential_callback: Any = None,
+        per_loot_callback: Callable = None,
+        false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        self.target = target
-        self.conn = conn
-
+        super().__init__(target, conn, masterkeys, per_loot_callback, false_positive)
         self._users = None
-        self.looted_files = {}
-        self.masterkeys = masterkeys
-
-        self.per_credential_callback = per_credential_callback
 
     def triage_system_credentials(self) -> List[Credential]:
         credentials = []
@@ -153,8 +142,8 @@ class CredentialsTriage:
                                     password=cred["Unknown3"].decode("latin-1"),
                                 )
                             credentials.append(credential)
-                            if self.per_credential_callback is not None:
-                                self.per_credential_callback(credential)
+                            if self.per_loot_callback is not None:
+                                self.per_loot_callback(credential)
                     else:
                         logging.debug("Could not decrypt...")
         return credentials
