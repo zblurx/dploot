@@ -1,6 +1,6 @@
 import logging
 import ntpath
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Callable
 from binascii import hexlify
 
 from impacket.dcerpc.v5.dtypes import RPC_SID
@@ -10,6 +10,8 @@ from impacket.dpapi import (
     VAULT_NGC_ACCOOUNT,
 )
 
+from dploot.triage import Triage
+from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_vcrd, decrypt_vpol, find_masterkey_for_vpol_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -68,16 +70,7 @@ class VaultCred:
             )
 
 
-class VaultsTriage:
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
+class VaultsTriage(Triage):
     user_vault_generic_path = [
         "Users\\%s\\AppData\\Local\\Microsoft\\Vault",
         "Users\\%s\\AppData\\Roaming\\Microsoft\\Vault",
@@ -98,16 +91,17 @@ class VaultsTriage:
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_vault_callback: Any = None,
+        per_vault_callback: Callable = None,
+        false_positive: List[str] = FALSE_POSITIVES
     ) -> None:
-        self.target = target
-        self.conn = conn
-
+        super().__init__(
+            target, 
+            conn, 
+            masterkeys=masterkeys, 
+            per_loot_callback=per_vault_callback, 
+            false_positive=false_positive
+        )
         self._users = None
-        self.looted_files = {}
-        self.masterkeys = masterkeys
-
-        self.per_vault_callback = per_vault_callback
 
     def triage_system_vaults(self) -> List[VaultCred]:
         vaults_creds = []
@@ -287,8 +281,8 @@ class VaultsTriage:
                                         )
                                     if vault_cred is not None:
                                         vaults_creds.append(vault_cred)
-                                        if self.per_vault_callback is not None:
-                                            self.per_vault_callback(vault_cred)
+                                        if self.per_loot_callback is not None:
+                                            self.per_loot_callback(vault_cred)
                                 else:
                                     logging.debug(
                                         "Vault decrypted but unknown data structure:"
