@@ -164,10 +164,10 @@ class BrowserTriage(Triage):
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_profile_callback: Callable = None,
+        per_loot_callback: Callable = None,
         false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        super().__init__(target, conn, masterkeys, per_profile_callback, false_positive)
+        super().__init__(target, conn, masterkeys, per_loot_callback, false_positive)
         
         self._users: List[str] = None
 
@@ -309,8 +309,8 @@ class BrowserTriage(Triage):
                                 password=password,
                             )
                             credentials.append(login_data_decrypted)
-                            if self.per_secret_callback is not None:
-                                self.per_secret_callback(login_data_decrypted)
+                            if self.per_loot_callback is not None:
+                                self.per_loot_callback(login_data_decrypted)
                     fh.close()
                 if gather_cookies:
                     for cookiepath in paths["cookiesDataPath"]:
@@ -368,8 +368,8 @@ class BrowserTriage(Triage):
                                         last_access_utc=last_access_utc,
                                     )
                                     cookies.append(cookie)
-                                    if self.per_secret_callback is not None:
-                                        self.per_secret_callback(cookie)
+                                    if self.per_loot_callback is not None:
+                                        self.per_loot_callback(cookie)
                             fh.close()
                 webData_bytes = self.conn.readFile(
                     shareName=self.share,
@@ -398,8 +398,8 @@ class BrowserTriage(Triage):
                                 winuser=user, browser=browser, service=service, token=token
                             )
                             credentials.append(google_refresh_token)
-                            if self.per_secret_callback is not None:
-                                self.per_secret_callback(google_refresh_token)
+                            if self.per_loot_callback is not None:
+                                self.per_loot_callback(google_refresh_token)
         return credentials, cookies
 
     @property

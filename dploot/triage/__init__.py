@@ -18,14 +18,14 @@ class Triage(ABC):
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey] = None,
-        per_profile_callback: Callable = None,
+        per_loot_callback: Callable = None,
         false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
         
         self.target = target
         self.conn = conn
         self.masterkeys = masterkeys
-        self.per_profile_callback = per_profile_callback
+        self.per_loot_callback = per_loot_callback
         self.false_positive = false_positive
         
         self.looted_files = {}
