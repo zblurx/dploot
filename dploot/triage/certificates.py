@@ -24,6 +24,8 @@ from cryptography.hazmat.primitives.serialization import (
 from pyasn1.codec.der import decoder
 from pyasn1.type.char import UTF8String
 
+from dploot.triage import Triage
+from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.crypto import CERTBLOB
 from dploot.lib.dpapi import decrypt_privatekey, find_masterkey_for_privatekey_blob
 from dploot.lib.smb import DPLootSMBConnection
@@ -63,16 +65,7 @@ class Certificate:
         print()
 
 
-class CertificatesTriage:
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
+class CertificatesTriage(Triage):
     system_capi_keys_generic_path = [
         "ProgramData\\Microsoft\\Crypto\\RSA",
         "Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\RSA",
@@ -98,16 +91,11 @@ class CertificatesTriage:
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_certificate_callback: Any = None,
+        per_loot_callback: Any = None,
+        false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        self.target = target
-        self.conn = conn
-
+        super().__init__(target, conn, masterkeys, per_loot_callback, false_positive)
         self._users = None
-        self.looted_files = {}
-        self.masterkeys = masterkeys
-
-        self.per_certificate_callback = per_certificate_callback
 
     def triage_system_certificates(self) -> List[Certificate]:
         logging.getLogger("impacket").disabled = True
@@ -382,8 +370,8 @@ class CertificatesTriage:
                     clientauth=clientauth,
                 )
                 certificates.append(cert_object)
-                if self.per_certificate_callback is not None:
-                    self.per_certificate_callback(cert_object)
+                if self.per_loot_callback is not None:
+                    self.per_loot_callback(cert_object)
         return certificates
 
     def der_to_cert(self, certificate: bytes) -> x509.Certificate:
