@@ -1,7 +1,8 @@
 import logging
-from typing import Any, List, Tuple
+from typing import List, Tuple, Callable
 import re
 
+from dploot.triage import Triage
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -59,7 +60,7 @@ class SCCMCollection(SCCM):
         self.value = value
 
 
-class SCCMTriage:
+class SCCMTriage(Triage):
     sccm_objectdata_filepath = "Windows\\System32\\wbem\\Repository\\OBJECTS.DATA"
     share = "C$"
 
@@ -72,15 +73,14 @@ class SCCMTriage:
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_secret_callback: Any = None,
+        per_secret_callback: Callable = None,
     ) -> None:
-        self.target = target
-        self.conn = conn
-        self.masterkeys = masterkeys
-        self.looted_files = {}
-
-        self.per_secret_callback = per_secret_callback
-
+        super().__init__(
+            target, 
+            conn, 
+            masterkeys=masterkeys, 
+            per_loot_callback=per_secret_callback,
+        )
         self.dcom_conn = None
 
     def decrypt_sccm_secret(self, dpapi_blob, from_wmi: bool = False):
@@ -112,8 +112,8 @@ class SCCMTriage:
             username = self.decrypt_sccm_secret(match.group(2))
             sccm_cred = SCCMCred(username, password)
             sccm_creds.append(sccm_cred)
-            if self.per_secret_callback is not None:
-                self.per_secret_callback(sccm_cred)
+            if self.per_loot_callback is not None:
+                self.per_loot_callback(sccm_cred)
 
         pattern = re.compile(self.regex_task)
         logging.debug("Looking for task sequences secret from OBJECTS.DATA file")
@@ -123,8 +123,8 @@ class SCCMTriage:
             )
             task_seq = SCCMSecret(self.decrypt_sccm_secret(match.group(1)))
             sccm_task_sequences.append(task_seq)
-            if self.per_secret_callback is not None:
-                self.per_secret_callback(task_seq)
+            if self.per_loot_callback is not None:
+                self.per_loot_callback(task_seq)
 
         pattern = re.compile(self.regex_collection)
         logging.debug("Looking for collection variables from OBJECTS.DATA file")
@@ -137,8 +137,8 @@ class SCCMTriage:
                 value = self.decrypt_sccm_secret(match.group(2))
                 sccm_collection = SCCMCollection(name, value)
                 sccm_collections.append(sccm_collection)
-                if self.per_secret_callback is not None:
-                    self.per_secret_callback(sccm_collection)
+                if self.per_loot_callback is not None:
+                    self.per_loot_callback(sccm_collection)
             except Exception as e:
                 logging.debug(f"Exception encountered in {__name__}: {e}.")
 
@@ -173,8 +173,8 @@ class SCCMTriage:
                     )
                     sccm_naa = SCCMCred(username, password)
                     finding.append(sccm_naa)
-                    if self.per_secret_callback is not None:
-                        self.per_secret_callback(sccm_naa)
+                    if self.per_loot_callback is not None:
+                        self.per_loot_callback(sccm_naa)
 
                 if (
                     "Name" in record
@@ -192,8 +192,8 @@ class SCCMTriage:
                     )
                     sccm_collection = SCCMCollection(name, value)
                     finding.append(sccm_collection)
-                    if self.per_secret_callback is not None:
-                        self.per_secret_callback(sccm_collection)
+                    if self.per_loot_callback is not None:
+                        self.per_loot_callback(sccm_collection)
 
                 if "TS_Sequence" in record and len(record["TS_Sequence"]["value"]) > 0:
                     logging.debug("Found task sequences secret using WMI")
@@ -203,8 +203,8 @@ class SCCMTriage:
                     )
                     sccm_ts = SCCMSecret(secret)
                     finding.append(sccm_ts)
-                    if self.per_secret_callback is not None:
-                        self.per_secret_callback(sccm_ts)
+                    if self.per_loot_callback is not None:
+                        self.per_loot_callback(sccm_ts)
 
             except Exception as e:
                 if str(e).find("S_FALSE") > 0:
