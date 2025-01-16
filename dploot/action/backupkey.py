@@ -47,7 +47,7 @@ class BackupkeyAction:
             )
         )
         triage = BackupkeyTriage(target=self.target, conn=self.conn)
-        backupkey = triage.triage_backupkey()
+        backupkey = triage.triage()
         if backupkey.backupkey_v1 is not None and self.legacy:
             if not self.options.quiet:
                 print("Legacy key:")
