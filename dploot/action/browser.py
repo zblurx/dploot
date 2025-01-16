@@ -99,7 +99,7 @@ class BrowserAction:
                 target=self.target,
                 conn=self.conn,
                 masterkeys=self.masterkeys,
-                per_loot_callback=secret_callback,
+                per_secret_callback=secret_callback,
             )
             logging.info(
                 "Triage Browser Credentials%sfor ALL USERS\n"
