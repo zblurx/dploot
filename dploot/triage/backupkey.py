@@ -27,7 +27,6 @@ class BackupkeyTriage(Triage):
         self.dce = None
         self._users = None
 
-
     def connect(self) -> None:
         rpctransport = transport.DCERPCTransportFactory(r"ncacn_np:445[\pipe\lsarpc]")
         rpctransport.set_smb_connection(self.conn.smb_session)
@@ -39,13 +38,8 @@ class BackupkeyTriage(Triage):
             self.dce.bind(lsad.MSRPC_UUID_LSAD)
         except transport.DCERPCException as e:
             raise e
-
-
-    def triage(self) -> Backupkey:
-        return self._triage_backupkey()
-
-
-    def _triage_backupkey(self) -> Backupkey:
+    
+    def triage_backupkey(self) -> Backupkey:
         if self.dce is None:
             self.connect()
 

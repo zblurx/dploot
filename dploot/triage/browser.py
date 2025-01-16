@@ -170,16 +170,8 @@ class BrowserTriage(Triage):
         super().__init__(target, conn, masterkeys, per_loot_callback, false_positive)
         
         self._users: List[str] = None
-
-
-    def triage(self, gather_cookies: bool = False, bypass_shared_violation: bool = False) -> Tuple[List[LoginData], List[Cookie]]:
-        return self._triage_browsers(
-            gather_cookies=gather_cookies,
-            bypass_shared_violation=bypass_shared_violation
-        )
     
-    
-    def _triage_browsers(
+    def triage_browsers(
         self, gather_cookies: bool = False, bypass_shared_violation: bool = False
     ) -> Tuple[List[LoginData], List[Cookie]]:
         credentials = []

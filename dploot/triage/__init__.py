@@ -29,8 +29,3 @@ class Triage(ABC):
         self.false_positive = false_positive
         
         self.looted_files = {}
-
-
-    @abstractmethod
-    def triage(*args: List[Any], **kwargs: Dict[Any, Any]) -> Any:
-        pass
