@@ -6,26 +6,19 @@ from typing import Any, Dict, List, Optional
 
 from impacket.examples.secretsdump import LSASecrets
 
+from dploot.triage import Triage
+from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.masterkey import Masterkey
 from dploot.lib.target import Target
 from dploot.lib.utils import is_guid
 from dploot.lib.smb import DPLootSMBConnection
 
 
-class MasterkeysTriage:
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
+class MasterkeysTriage(Triage):
     user_masterkeys_generic_path = "AppData\\Roaming\\Microsoft\\Protect"
     system_masterkeys_generic_path = "Windows\\System32\\Microsoft\\Protect"
     share = "C$"
-
+        
     def __init__(
         self,
         target: Target,
@@ -35,9 +28,14 @@ class MasterkeysTriage:
         nthashes: Optional[Dict[str, str]] = None,
         dpapiSystem: Optional[Dict[str, str]] = None,
         per_masterkey_callback: Any = None,
+        false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        self.target = target
-        self.conn = conn
+        super().__init__(
+            target, 
+            conn,
+            per_loot_callback=per_masterkey_callback,
+            false_positive=false_positive,
+        )
         self.pvkbytes = pvkbytes
         self.passwords = passwords
         self.nthashes = nthashes
@@ -49,8 +47,6 @@ class MasterkeysTriage:
         if self.dpapiSystem is None:
             self.dpapiSystem = {}
         # should be {"MachineKey":"key","Userkey":"key"}
-
-        self.per_masterkey_callback = per_masterkey_callback
 
     def triage_system_masterkeys(self) -> List[Masterkey]:
         masterkeys = []
@@ -125,8 +121,8 @@ class MasterkeysTriage:
                             self.all_looted_masterkeys.append(masterkey)
                             if masterkey.decrypt(dpapi_systemkey=self.dpapiSystem):
                                 masterkeys.append(masterkey)
-                                if self.per_masterkey_callback is not None:
-                                    self.per_masterkey_callback(masterkey)
+                                if self.per_loot_callback is not None:
+                                    self.per_loot_callback(masterkey)
                     elif f.is_directory() > 0 and f.get_longname() == "User":
                         system_protect_dir_user_path = ntpath.join(
                             system_protect_dir_sid_path, "User"
@@ -157,8 +153,8 @@ class MasterkeysTriage:
                                     self.all_looted_masterkeys.append(masterkey)
                                     if masterkey.decrypt(dpapi_systemkey=self.dpapiSystem):
                                         masterkeys.append(masterkey)
-                                        if self.per_masterkey_callback is not None:
-                                            self.per_masterkey_callback(masterkey)
+                                        if self.per_loot_callback is not None:
+                                            self.per_loot_callback(masterkey)
         return masterkeys
 
     def triage_masterkeys(self) -> List[Masterkey]:
@@ -249,8 +245,8 @@ class MasterkeysTriage:
                                 nthash=nthash,
                             ):
                                 masterkeys.append(masterkey)
-                                if self.per_masterkey_callback is not None:
-                                    self.per_masterkey_callback(masterkey)
+                                if self.per_loot_callback is not None:
+                                    self.per_loot_callback(masterkey)
         return masterkeys
 
     def getDPAPI_SYSTEM(self, _, secret) -> None:
