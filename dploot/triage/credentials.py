@@ -52,11 +52,17 @@ class CredentialsTriage(Triage):
         self,
         target: Target,
         conn: DPLootSMBConnection,
-        masterkeys: List[Masterkey],
-        per_loot_callback: Callable = None,
+        masterkeys: List[Masterkey] = [],
+        per_credential_callback: Callable = None,
         false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        super().__init__(target, conn, masterkeys, per_loot_callback, false_positive)
+        super().__init__(
+            target, 
+            conn, 
+            masterkeys=masterkeys, 
+            per_loot_callback=per_credential_callback, 
+            false_positive=false_positive
+        )
         self._users = None
 
     def triage_system_credentials(self) -> List[Credential]:

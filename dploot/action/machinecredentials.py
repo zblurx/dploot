@@ -78,7 +78,7 @@ class MachineCredentialsAction:
                 target=self.target,
                 conn=self.conn,
                 masterkeys=self.masterkeys,
-                per_loot_callback=credential_callback,
+                per_credential_callback=credential_callback,
             )
             logging.info("Triage SYSTEM Credentials\n")
             cred_triage.triage_system_credentials()

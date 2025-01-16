@@ -94,7 +94,7 @@ class TriageAction:
                 target=self.target,
                 conn=self.conn,
                 masterkeys=self.masterkeys,
-                per_loot_callback=credential_callback,
+                per_credential_callback=credential_callback,
             )
             logging.info("Triage Credentials for ALL USERS\n")
             credentials_triage.triage_credentials()
