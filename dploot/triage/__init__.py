@@ -17,17 +17,18 @@ class Triage(ABC):
         self,
         target: Target,
         conn: DPLootSMBConnection,
-        masterkeys: List[Masterkey],
+        masterkeys: List[Masterkey] = None,
         per_profile_callback: Callable = None,
         false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
+        
         self.target = target
         self.conn = conn
-
-        self.looted_files = {}
         self.masterkeys = masterkeys
         self.per_profile_callback = per_profile_callback
         self.false_positive = false_positive
+        
+        self.looted_files = {}
 
 
     @abstractmethod
