@@ -91,10 +91,16 @@ class CertificatesTriage(Triage):
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_loot_callback: Callable = None,
+        per_certificate_callback: Callable = None,
         false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        super().__init__(target, conn, masterkeys, per_loot_callback, false_positive)
+        super().__init__(
+            target, 
+            conn, 
+            masterkeys=masterkeys, 
+            per_loot_callback=per_certificate_callback, 
+            false_positive=false_positive
+        )
         self._users = None
 
     def triage_system_certificates(self) -> List[Certificate]:

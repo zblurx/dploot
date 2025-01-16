@@ -110,7 +110,7 @@ class MachineTriageAction:
                 target=self.target,
                 conn=self.conn,
                 masterkeys=self.masterkeys,
-                per_loot_callback=certificate_callback,
+                per_certificate_callback=certificate_callback,
             )
             logging.info("Triage SYSTEM Certificates\n")
             certificate_triage.triage_system_certificates()

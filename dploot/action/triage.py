@@ -137,7 +137,7 @@ class TriageAction:
                 target=self.target,
                 conn=self.conn,
                 masterkeys=self.masterkeys,
-                per_loot_callback=certificate_callback,
+                per_certificate_callback=certificate_callback,
             )
             logging.info("Triage Certificates for ALL USERS\n")
             certificates_triage.triage_certificates()
