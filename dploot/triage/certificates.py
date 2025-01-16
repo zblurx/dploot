@@ -2,7 +2,7 @@ import hashlib
 import logging
 import ntpath
 import os
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple, Callable
 from dataclasses import dataclass
 
 from impacket.dcerpc.v5 import rrp
@@ -91,7 +91,7 @@ class CertificatesTriage(Triage):
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_loot_callback: Any = None,
+        per_loot_callback: Callable = None,
         false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
         super().__init__(target, conn, masterkeys, per_loot_callback, false_positive)
