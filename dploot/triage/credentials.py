@@ -52,7 +52,7 @@ class CredentialsTriage(Triage):
         self,
         target: Target,
         conn: DPLootSMBConnection,
-        masterkeys: List[Masterkey] = [],
+        masterkeys: List[Masterkey],
         per_credential_callback: Callable = None,
         false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
