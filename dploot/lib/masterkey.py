@@ -1,6 +1,4 @@
 import logging
-from typing import List
-
 from binascii import hexlify
 from Cryptodome.Hash import SHA1
 
@@ -9,9 +7,7 @@ from impacket.dpapi import (
     MasterKey,
 )
 
-
 from dploot.lib.dpapi import decrypt_masterkey
-from dploot.lib.utils import find_guid, find_sha1, parse_file_as_list
 
 
 class Masterkey:
@@ -77,17 +73,3 @@ class Masterkey:
             except Exception as e:
                 logging.debug(f"Could not generate sha1 for masterkey {self.guid}: {e}")
         return self._sha1
-
-
-def parse_masterkey_file(filename) -> List[Masterkey]:
-    masterkeys = []
-    masterkeys_lines = parse_file_as_list(filename)
-    for masterkey in masterkeys_lines:
-        guid, sha1 = masterkey.split(":", 1)
-        masterkeys.append(
-            Masterkey(
-                guid=find_guid(guid),
-                sha1=find_sha1(sha1),
-            )
-        )
-    return masterkeys

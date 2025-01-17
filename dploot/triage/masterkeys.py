@@ -10,8 +10,22 @@ from dploot.triage import Triage
 from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.masterkey import Masterkey
 from dploot.lib.target import Target
-from dploot.lib.utils import is_guid
+from dploot.lib.utils import is_guid, find_guid, find_sha1, parse_file_as_list
 from dploot.lib.smb import DPLootSMBConnection
+
+
+def parse_masterkey_file(filename) -> List[Masterkey]:
+    masterkeys = []
+    masterkeys_lines = parse_file_as_list(filename)
+    for masterkey in masterkeys_lines:
+        guid, sha1 = masterkey.split(":", 1)
+        masterkeys.append(
+            Masterkey(
+                guid=find_guid(guid),
+                sha1=find_sha1(sha1),
+            )
+        )
+    return masterkeys
 
 
 class MasterkeysTriage(Triage):
