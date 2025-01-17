@@ -22,20 +22,10 @@ from impacket.smb3structs import (
 )
 
 from dploot.lib.wmi import DPLootWmiExec
+from dploot.lib.consts import FALSE_POSITIVES
 
 
-class DPLootSMBConnection:
-
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
-    
+class DPLootSMBConnection:    
     # if called with target = LOCAL, return an instance of DPLootLocalSMConnection,
     # else return an instance of DPLootRemoteSMBConnection
     def __new__(
@@ -53,12 +43,14 @@ class DPLootSMBConnection:
             # we end up here when a child class is instantiated.
             return super().__new__(cls)
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target, false_positive: List[str] = FALSE_POSITIVES) -> None:
         self.target = target
         self.remote_ops = None
         self.local_session = None
 
         self._usersProfiles = None
+
+        self.false_positive = false_positive
 
     def listDirs(self, share: str, dirlist: List[str]) -> Dict[str, Any]:
         result = {}
