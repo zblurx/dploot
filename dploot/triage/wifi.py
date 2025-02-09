@@ -3,15 +3,17 @@ import itertools
 import logging
 import ntpath
 import os
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Callable
 from lxml import objectify
 
 from impacket.dcerpc.v5 import rrp
 from impacket.winregistry import Registry
 from impacket.system_errors import ERROR_NO_MORE_ITEMS, ERROR_FILE_NOT_FOUND
 
-from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 
+from dploot.triage import Triage
+from dploot.lib.consts import FALSE_POSITIVES
+from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
 from dploot.triage.masterkeys import Masterkey
@@ -119,17 +121,7 @@ class WifiCred:
             print(f"[WIFI] {self.auth.upper()} - {self.ssid}")
 
 
-class WifiTriage:
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
-
+class WifiTriage(Triage):
     system_wifi_generic_path = "ProgramData\\Microsoft\\Wlansvc\\Profiles\\Interfaces"
     share = "C$"
 
@@ -143,14 +135,16 @@ class WifiTriage:
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_profile_callback: Any = None,
+        per_profile_callback: Callable = None,
+        false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        self.target = target
-        self.conn = conn
-
-        self.looted_files = {}
-        self.masterkeys = masterkeys
-        self.per_profile_callback = per_profile_callback
+        super().__init__(
+            target, 
+            conn, 
+            masterkeys=masterkeys, 
+            per_loot_callback=per_profile_callback, 
+            false_positive=false_positive
+        )
 
     def triage_wifi(self) -> List[WifiCred]:
         wifi_creds = []
@@ -251,8 +245,8 @@ class WifiTriage:
                                     )
 
                                 wifi_creds.append(wifi_profile)
-                                if self.per_profile_callback is not None:
-                                    self.per_profile_callback(wifi_profile)
+                                if self.per_loot_callback is not None:
+                                    self.per_loot_callback(wifi_profile)
         except Exception as e:
             if logging.getLogger().level == logging.DEBUG:
                 import traceback
