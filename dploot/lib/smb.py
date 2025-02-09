@@ -12,13 +12,13 @@ from impacket.smb import ATTR_DIRECTORY
 from impacket.smb import SMB_DIALECT
 from impacket.smb import SharedFile
 from impacket.nmb import NetBIOSTimeout
+from impacket.smb import FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SHARE_DELETE
 from impacket.dcerpc.v5 import tsts
 from impacket.examples.secretsdump import RemoteOperations, LocalOperations
 from impacket.smb3structs import (
     FILE_READ_DATA,
     FILE_OPEN,
-    FILE_NON_DIRECTORY_FILE,
-    FILE_SHARE_READ,
+    FILE_NON_DIRECTORY_FILE
 )
 
 from dploot.lib.wmi import DPLootWmiExec
@@ -236,7 +236,7 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
         mode=FILE_OPEN,
         offset=0,
         password=None,
-        shareAccessMode=FILE_SHARE_READ,
+        shareAccessMode=FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         bypass_shared_violation=False,
         looted_files=None
     ) -> bytes:
