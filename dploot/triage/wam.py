@@ -205,6 +205,7 @@ class WamTriage:
         tbres_responses_cache = []
         for user in self.users:
             tbres_responses_cache += self.triage_wam_for_user(user)
+        return tbres_responses_cache
 
     def triage_wam_for_user(self, user):
         tbres_responses_cache = []
