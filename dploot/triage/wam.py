@@ -176,7 +176,7 @@ class TBRESResponseData:
             print(attrib)
         print()
 
-class WamTriage:
+class WamTriage(Triage):
     share = "C$"
     token_broker_cache_path = "Users\\{username}\\AppData\\Local\\Microsoft\\TokenBroker\\Cache"
 
@@ -195,6 +195,8 @@ class WamTriage:
             per_loot_callback=per_token_callback, 
             false_positive=false_positive
         )
+        
+        self._users = None
 
     def triage_wam(self):
         tbres_responses_cache = []
