@@ -12,30 +12,20 @@ from impacket.smb import ATTR_DIRECTORY
 from impacket.smb import SMB_DIALECT
 from impacket.smb import SharedFile
 from impacket.nmb import NetBIOSTimeout
+from impacket.smb import FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SHARE_DELETE
 from impacket.dcerpc.v5 import tsts
 from impacket.examples.secretsdump import RemoteOperations, LocalOperations
 from impacket.smb3structs import (
     FILE_READ_DATA,
     FILE_OPEN,
-    FILE_NON_DIRECTORY_FILE,
-    FILE_SHARE_READ,
+    FILE_NON_DIRECTORY_FILE
 )
 
 from dploot.lib.wmi import DPLootWmiExec
+from dploot.lib.consts import FALSE_POSITIVES
 
 
-class DPLootSMBConnection:
-
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
-    
+class DPLootSMBConnection:    
     # if called with target = LOCAL, return an instance of DPLootLocalSMConnection,
     # else return an instance of DPLootRemoteSMBConnection
     def __new__(
@@ -53,12 +43,14 @@ class DPLootSMBConnection:
             # we end up here when a child class is instantiated.
             return super().__new__(cls)
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target, false_positive: List[str] = FALSE_POSITIVES) -> None:
         self.target = target
         self.remote_ops = None
         self.local_session = None
 
         self._usersProfiles = None
+
+        self.false_positive = false_positive
 
     def listDirs(self, share: str, dirlist: List[str]) -> Dict[str, Any]:
         result = {}
@@ -244,7 +236,7 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
         mode=FILE_OPEN,
         offset=0,
         password=None,
-        shareAccessMode=FILE_SHARE_READ,
+        shareAccessMode=FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         bypass_shared_violation=False,
         looted_files=None
     ) -> bytes:

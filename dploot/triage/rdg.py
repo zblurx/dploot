@@ -4,6 +4,8 @@ import xml.etree.ElementTree as ET
 import base64
 from dataclasses import dataclass
 
+from dploot.triage import Triage
+from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -84,16 +86,7 @@ class RDGFile:
     rdg_creds: List[RDGProfile]
 
 
-class RDGTriage:
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
+class RDGTriage(Triage):
     user_rdcman_settings_generic_filepath = "Users\\%s\\AppData\\Local\\Microsoft\\Remote Desktop Connection Manager\\RDCMan.settings"
     user_rdg_generic_filepath = ["Users\\%s\\Documents", "Users\\%s\\Desktop"]
     share = "C$"
@@ -104,16 +97,17 @@ class RDGTriage:
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
         per_credential_callback: Any = None,
+        false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        self.target = target
-        self.conn = conn
-
+        super().__init__(
+            target, 
+            conn, 
+            masterkeys=masterkeys, 
+            per_loot_callback=per_credential_callback, 
+            false_positive=false_positive
+        )
         self._users = None
-        self.looted_files = {}
-        self.masterkeys = masterkeys
-
-        self.per_credential_callback = per_credential_callback
-
+        
     def triage_rdcman(self) -> Tuple[List[RDCMANFile], List[RDGFile]]:
         rdcman_files = []
         rdgfiles = []
@@ -183,8 +177,8 @@ class RDGTriage:
                     password=password,
                 )
                 rdg_creds.append(rdg_cred)
-                if self.per_credential_callback is not None:
-                    self.per_credential_callback(rdg_cred)
+                if self.per_loot_callback is not None:
+                    self.per_loot_callback(rdg_cred)
 
         for server_profile in rdgxml.findall(".//server"):
             server_name = server_profile.find(".//properties//name").text
@@ -197,8 +191,8 @@ class RDGTriage:
                     password=password,
                 )
                 rdg_creds.append(rdg_cred)
-                if self.per_credential_callback is not None:
-                    self.per_credential_callback(rdg_cred)
+                if self.per_loot_callback is not None:
+                    self.per_loot_callback(rdg_cred)
         return rdg_creds
 
     def triage_rdcman_settings(self, rdcman_settings: ET.Element) -> List[RDGProfile]:
@@ -212,8 +206,8 @@ class RDGTriage:
                     password=password,
                 )
                 rdcman_creds.append(rdcman_cred)
-                if self.per_credential_callback is not None:
-                    self.per_credential_callback(rdcman_cred)
+                if self.per_loot_callback is not None:
+                    self.per_loot_callback(rdcman_cred)
 
         for cred_profile in rdcman_settings.findall(".//logonCredentials"):
             if cred_profile is not None:
@@ -224,8 +218,8 @@ class RDGTriage:
                     password=password,
                 )
                 rdcman_creds.append(rdcman_cred)
-                if self.per_credential_callback is not None:
-                    self.per_credential_callback(rdcman_cred)
+                if self.per_loot_callback is not None:
+                    self.per_loot_callback(rdcman_cred)
         return rdcman_creds
 
     def triage_credprofile(self, cred_node: ET.Element) -> Tuple[str, str, Any]:

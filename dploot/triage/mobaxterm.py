@@ -3,13 +3,16 @@ import logging
 import ntpath
 import os
 import tempfile
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Callable
 from Cryptodome.Cipher import AES
 
 from impacket import winregistry
 from impacket.dcerpc.v5 import rrp
 from impacket.system_errors import ERROR_NO_MORE_ITEMS, ERROR_FILE_NOT_FOUND
 
+
+from dploot.triage import Triage
+from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -122,17 +125,7 @@ class MobaXtermMasterPassword:
         )
 
 
-class MobaXtermTriage:
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
-    
+class MobaXtermTriage(Triage):    
     mobaxterm_conf_file_path = "Users\\{username}\\AppData\\Roaming\\MobaXterm\\MobaXterm.ini"
     mobaxterm_registry_key_path = "SOFTWARE\\Mobatek\\MobaXterm"
     mobaxterm_sessionp_key_path = ntpath.join(mobaxterm_registry_key_path, "SessionP")
@@ -148,16 +141,17 @@ class MobaXtermTriage:
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_secret_callback: Any = None,
+        per_secret_callback: Callable = None,
+        false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        self.target = target
-        self.conn = conn
-        self.looted_files = {}
-
+        super().__init__(
+            target, 
+            conn, 
+            masterkeys=masterkeys, 
+            per_loot_callback=per_secret_callback, 
+            false_positive=false_positive
+        )
         self._users = None
-        self.masterkeys = masterkeys
-
-        self.per_secret_callback = per_secret_callback
 
     def triage_mobaxterm(
         self, offline_users: bool = False
@@ -298,8 +292,8 @@ class MobaXtermTriage:
                 )
                 mobaxterm_credential.decrypt(mobaxterm_masterpassword_key.key)
                 mobaxterm_credentials.append(mobaxterm_credential)
-                if self.per_secret_callback is not None:
-                    self.per_secret_callback(mobaxterm_credential)
+                if self.per_loot_callback is not None:
+                    self.per_loot_callback(mobaxterm_credential)
         except Exception as e:
             if logging.getLogger().level == logging.DEBUG:
                 import traceback
@@ -323,8 +317,8 @@ class MobaXtermTriage:
                 )
                 mobaxterm_credential.decrypt(mobaxterm_masterpassword_key.key)
                 mobaxterm_credentials.append(mobaxterm_credential)
-                if self.per_secret_callback is not None:
-                    self.per_secret_callback(mobaxterm_credential)
+                if self.per_loot_callback is not None:
+                    self.per_loot_callback(mobaxterm_credential)
         except Exception as e:
             if logging.getLogger().level == logging.DEBUG:
                 import traceback
@@ -412,8 +406,8 @@ class MobaXtermTriage:
                 )
                 mobaxterm_credential.decrypt(mobaxterm_masterpassword_key.key)
                 mobaxterm_credentials.append(mobaxterm_credential)
-                if self.per_secret_callback is not None:
-                    self.per_secret_callback(mobaxterm_credential)
+                if self.per_loot_callback is not None:
+                    self.per_loot_callback(mobaxterm_credential)
 
             passwords = conf_file.split(b"[Passwords]\r\n")[1].split(b"\r\n\r\n")[0]
             for password in passwords.split(b"\r\n"):
@@ -423,8 +417,8 @@ class MobaXtermTriage:
                 )
                 mobaxterm_credential.decrypt(mobaxterm_masterpassword_key.key)
                 mobaxterm_credentials.append(mobaxterm_credential)
-                if self.per_secret_callback is not None:
-                    self.per_secret_callback(mobaxterm_credential)
+                if self.per_loot_callback is not None:
+                    self.per_loot_callback(mobaxterm_credential)
         except Exception as e:
             if logging.getLogger().level == logging.DEBUG:
                 import traceback
@@ -558,8 +552,8 @@ class MobaXtermTriage:
                     mobaxterm_credential.decrypt(mobaxterm_masterpassword_key.key)
                     mobaxterm_credentials.append(mobaxterm_credential)
                     i += 1
-                    if self.per_secret_callback is not None:
-                        self.per_secret_callback(mobaxterm_credential)
+                    if self.per_loot_callback is not None:
+                        self.per_loot_callback(mobaxterm_credential)
                 except rrp.DCERPCSessionError as e:
                     if e.get_error_code() == ERROR_NO_MORE_ITEMS:
                         break

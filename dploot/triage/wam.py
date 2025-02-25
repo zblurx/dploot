@@ -2,7 +2,11 @@ from base64 import b64decode
 import json
 import logging
 import ntpath
-from typing import Any, List
+from typing import List, Callable
+
+
+from dploot.triage import Triage
+from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -173,15 +177,6 @@ class TBRESResponseData:
         print()
 
 class WamTriage:
-    false_positive = [
-        ".",
-        "..",
-        "desktop.ini",
-        "Public",
-        "Default",
-        "Default User",
-        "All Users",
-    ]
     share = "C$"
     token_broker_cache_path = "Users\\{username}\\AppData\\Local\\Microsoft\\TokenBroker\\Cache"
 
@@ -190,16 +185,16 @@ class WamTriage:
         target: Target,
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
-        per_token_callback: Any = None,
+        per_token_callback: Callable = None,
+        false_positive: List[str] = FALSE_POSITIVES,
     ) -> None:
-        self.target = target
-        self.conn = conn
-
-        self._users = None
-        self.looted_files = {}
-        self.masterkeys = masterkeys
-
-        self.per_token_callback = per_token_callback
+        super().__init__(
+            target, 
+            conn, 
+            masterkeys=masterkeys, 
+            per_loot_callback=per_token_callback, 
+            false_positive=false_positive
+        )
 
     def triage_wam(self):
         tbres_responses_cache = []
@@ -223,8 +218,8 @@ class WamTriage:
                 decrypted_blob = self.decypt_tbres_file(data_bytes)
                 if decrypted_blob is not None:
                     tbres_response_data = TBRESResponseData(winuser = user, data=decrypted_blob)
-                    if self.per_token_callback is not None:
-                        self.per_token_callback(tbres_response_data)
+                    if self.per_loot_callback is not None:
+                        self.per_loot_callback(tbres_response_data)
                     tbres_responses_cache.append(tbres_response_data)
         return tbres_responses_cache                
 
