@@ -212,7 +212,9 @@ class WamTriage(Triage):
             return []
         for file in tbc_dir:
             filename = file.get_longname()
-            if filename[-6:] ==".tbres" and filename not in self.false_positive and file.is_directory() == 0:
+            if filename[-6:].lower() ==".tbres" \
+                and filename.lower() not in list(map(lambda x:x.lower(), self.false_positive)) \
+                and file.is_directory() == 0:
                 logging.debug(f"Got {filename} cache file for user {user}")
                 tbres_filepath = ntpath.join(tbc_user_path, filename)
                 data_bytes = self.conn.readFile(self.share, tbres_filepath, looted_files=self.looted_files)
@@ -224,7 +226,7 @@ class WamTriage(Triage):
                     if self.per_loot_callback is not None:
                         self.per_loot_callback(tbres_response_data)
                     tbres_responses_cache.append(tbres_response_data)
-        return tbres_responses_cache                
+        return tbres_responses_cache
 
     def decypt_tbres_file(self, tbres_file_data_bytes):
         tbres_json_data = json.loads(tbres_file_data_bytes.decode("utf-16le").rstrip("\x00"))

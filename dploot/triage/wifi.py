@@ -198,7 +198,7 @@ class WifiTriage(Triage):
                                         unhexlify(dpapi_blob.text),
                                         masterkeys=self.masterkeys,
                                     )
-                                    password = ""
+                                    password = b''
                                     if masterkey is not None:
                                         cleartext = decrypt_blob(
                                             unhexlify(dpapi_blob.text),
@@ -263,13 +263,8 @@ class WifiTriage(Triage):
                 # For each user:
                 for user_sid, profile_path in self.conn.getUsersProfiles().items():
                     #   open user registry file in user profile's dir/NTUser.dat
-                    profile_path = profile_path.replace("C:\\", "").replace(
-                        "\\", os.sep
-                    )
-                    reg_file_path = os.path.join(
-                        self.target.local_root, profile_path, "NTUSER.DAT"
-                    )
-
+                    
+                    reg_file_path = self.conn.get_real_path(os.path.join(profile_path, "NTUSER.DAT"))
                     reg = None
 
                     # Workaround for a bug in impacket.winregistry.Registry:

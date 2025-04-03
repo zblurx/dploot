@@ -49,8 +49,8 @@ class Certificate:
     def dump(self) -> None:
         print("Issuer:\t\t\t%s" % str(self.cert.issuer.rfc4514_string()))
         print("Subject:\t\t%s" % str(self.cert.subject.rfc4514_string()))
-        print("Valid Date:\t\t%s" % self.cert.not_valid_before)
-        print("Expiry Date:\t\t%s" % self.cert.not_valid_after)
+        print("Valid Date (UTC):\t%s" % self.cert.not_valid_before_utc)
+        print("Expiry Date (UTC):\t%s" % self.cert.not_valid_after_utc)
         print("Extended Key Usage:")
         for i in self.cert.extensions.get_extension_for_oid(
             oid=ExtensionOID.EXTENDED_KEY_USAGE
@@ -113,7 +113,12 @@ class CertificatesTriage(Triage):
             self.conn.enable_remoteops()
         certificates = []
         pkeys = self.loot_privatekeys()
+        logging.debug(f'Got {len(pkeys)} private key(s).')
+        # stop here if no private key has been found.
+        if not pkeys:
+            return certificates
         certs = self.loot_system_certificates()
+        logging.debug(f'Got {len(certs)} certificate(s).')
         if len(pkeys) > 0 and len(certs) > 0:
             certificates = self.correlate_certificates_and_privatekeys(
                 certs=certs, private_keys=pkeys, winuser="SYSTEM"
@@ -153,8 +158,12 @@ class CertificatesTriage(Triage):
                     continue
 
                 # store in certificates dict
-                cert = self.der_to_cert(certblob.der)
-                certificates[certificate_key] = cert
+                try:
+                    cert = self.der_to_cert(certblob.der)
+                    certificates[certificate_key] = cert
+                except Exception as e:
+                    logging.debug(f'Excetpion while converting certificate: {repr(e)}')
+                    continue
             reg.close()
         else:
             ans = rrp.hOpenLocalMachine(self.conn.remote_ops._RemoteOperations__rrp)
@@ -200,8 +209,11 @@ class CertificatesTriage(Triage):
                     )
                     certblob = CERTBLOB(certblob_bytes)
                     if certblob.der is not None:
-                        cert = self.der_to_cert(certblob.der)
-                        certificates[certificate_key] = cert
+                        try:
+                            cert = self.der_to_cert(certblob.der)
+                            certificates[certificate_key] = cert
+                        except Exception as e:
+                            logging.debug(f'Excetpion while converting certificate: {repr(e)}')
                     rrp.hBaseRegCloseKey(
                         self.conn.remote_ops._RemoteOperations__rrp, keyHandle
                     )
@@ -254,11 +266,11 @@ class CertificatesTriage(Triage):
                         d not in self.false_positive
                         and d.is_directory() > 0
                         and (
-                            d.get_longname()[:2] == "S-"
-                            or d.get_longname() == "MachineKeys"
+                            d.get_longname()[:2].upper() == "S-"
+                            or d.get_longname().upper() == "MachineKeys".upper()
                         )
                     ):
-                        sid = d.get_longname()
+                        sid = d.get_longname().upper()
                         pkeys_sid_path = ntpath.join(pkeys_path, sid)
                         pkeys_sid_dir = self.conn.remote_list_dir(
                             self.share, path=pkeys_sid_path
@@ -305,7 +317,8 @@ class CertificatesTriage(Triage):
         for cert_dir_path, cert_dir in certificates_dir.items():
             if cert_dir is not None:
                 for cert in cert_dir:
-                    if cert not in self.false_positive and cert.is_directory() == 0:
+                    if str(cert).lower() not in list(map(lambda x:x.lower(),self.false_positive)) \
+                        and cert.is_directory() == 0:
                         try:
                             certname = cert.get_longname()
                             certpath = ntpath.join(cert_dir_path, certname)
@@ -317,7 +330,9 @@ class CertificatesTriage(Triage):
                             if certblob.der is not None:
                                 cert = self.der_to_cert(certblob.der)
                                 certificates[certname] = cert
-                        except Exception:
+                                logging.debug(f'added cert {cert.subject}')
+                        except Exception as e:
+                            logging.debug(repr(e))
                             pass
         return certificates
 

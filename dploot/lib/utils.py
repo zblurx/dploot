@@ -34,7 +34,7 @@ def is_certificate_guid(value: str):
 
 
 def is_credfile(value: str):
-    guid = re.compile(r"[A-F0-9]{32}")
+    guid = re.compile(r"[A-F0-9a-f]{32}")
     return guid.match(value)
 
 

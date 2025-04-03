@@ -2,6 +2,8 @@ import ntpath
 import os
 import logging
 import time
+
+
 from typing import Any, Dict, List, Optional
 
 from dploot.lib.target import Target
@@ -24,6 +26,7 @@ from impacket.smb3structs import (
 from dploot.lib.wmi import DPLootWmiExec
 from dploot.lib.consts import FALSE_POSITIVES
 
+from pathlib import Path
 
 class DPLootSMBConnection:    
     # if called with target = LOCAL, return an instance of DPLootLocalSMConnection,
@@ -390,8 +393,8 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
 
     SharedFile.fromDirEntry = _sharedfile_fromdirentry
 
-    def remote_list_dir(self, share, path, wildcard=True) -> "Any | None":
-        path = os.path.join(self.target.local_root, path.replace("\\", os.sep))
+    def remote_list_dir(self, share, path, wildcard=True) -> list[SharedFile]:
+        path = self.get_real_path(path)
         if not wildcard:
             raise NotImplementedError("Not implemented for wildcard == False")
         try:
@@ -405,7 +408,9 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
         directories = self.listPath(
             shareName=share, path=ntpath.normpath(users_dir_path)
         )
-        return [d.get_longname() for d in directories if d.get_longname() not in self.false_positive and d.is_directory() > 0]
+        return [d.get_longname() for d in directories \
+                                 if d.get_longname().lower() not in list(map(lambda x:x.lower(),self.false_positive))\
+                                 and d.is_directory() > 0]
 
     def listPath(self, shareName: str = "C$", path: Optional[str] = None, password: Optional[str] = None):
         if path[-2:] == r"\*":
@@ -417,6 +422,25 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
 
     def getFile(self, *args, **kwargs) -> "Any | None":
         raise NotImplementedError("getFile is not implemented in LOCAL mode")
+
+    def get_real_path(self, path:os.PathLike) -> Path:
+        # clean path (remove c:\, /, and current root if already present)
+        path=path.removeprefix(self.target.local_root)
+        if path[:3].lower() == "c:\\":
+            path = path[3:]
+        path=path.replace("\\", os.sep).lstrip(os.sep)
+
+        found  = False
+        # match path against real filesystem with or without case sensitivity and return the real path
+        try:
+            path=next(Path(self.target.local_root).glob(path, case_sensitive=False)) # case_sensitive exists since Python 3.12
+            found=True
+        except StopIteration:
+            # path does not exist. Return a representation of it anyway
+            path=os.path.join(self.target.local_root, path)
+
+        #logging.debug(f"get_real_path: [{found=}] returning {path}")
+        return path
 
     def readFile(
         self,
@@ -431,12 +455,10 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
     ) -> bytes:
         data = None
         try:
-            with open(
-                os.path.join(self.target.local_root, path.replace("\\", os.sep)), "rb"
-            ) as f:
+            with open(self.get_real_path(path), "rb") as f:
                 data = f.read()
         except Exception as e:
-            logging.debug(f"Exception occurred while trying to read {path}: {e}")
+            logging.debug(f"Exception occurred while trying to read {path}: {repr(e)}")
 
         return data
 
@@ -453,7 +475,7 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
 
         result = {}
         # open hive
-        reg_file_path = os.path.join(self.target.local_root, self.hklm_software_path)
+        reg_file_path = self.get_real_path(self.hklm_software_path)
         reg = Registry(reg_file_path, isRemote=False)
 
         # open key
@@ -474,6 +496,7 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
                 .replace(r"%systemroot%", self.systemroot)
             )
             path = ntpath.normpath(path)
+            path = self.get_real_path(path)
             # store in result dict
             result[user_sid] = path
 
