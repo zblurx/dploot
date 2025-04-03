@@ -63,10 +63,9 @@ sudo apt install python3-dploot
 ## Usage
 
 ```text
-dploot (https://github.com/zblurx/dploot) v3.0.0 by @_zblurx
+dploot (https://github.com/zblurx/dploot) v3.1.2 by @_zblurx
 usage: dploot [-h]
-              {certificates,credentials,masterkeys,vaults,backupkey,blob,rdg,sccm,triage,machinemasterkeys,machinecredentials,machinevaults,machinecertificates,machinetriage,browser,wifi,mobaxterm,wam}
-              ...
+              {backupkey,blob,browser,certificates,credentials,machinecertificates,machinecredentials,machinemasterkeys,machinetriage,machinevaults,masterkeys,mobaxterm,rdg,sccm,triage,vaults,wam,wifi} ...
 
 DPAPI looting locally remotely in Python
 
@@ -82,8 +81,7 @@ positional arguments:
                         Dump system certificates from local or remote target
     machinecredentials  Dump system credentials from local or remote target
     machinemasterkeys   Dump system masterkey from local or remote target
-    machinetriage       Loot SYSTEM Masterkeys (if not set), SYSTEM credentials, SYSTEM certificates and SYSTEM vaults from local or remote
-                        target
+    machinetriage       Loot SYSTEM Masterkeys (if not set), SYSTEM credentials, SYSTEM certificates and SYSTEM vaults from local or remote target
     machinevaults       Dump system vaults from local or remote target
     masterkeys          Dump users masterkey from local or remote target
     mobaxterm           Dump Passwords and Credentials from MobaXterm
@@ -120,13 +118,13 @@ $ dploot machinecertificates -d waza.local -u Administrator -p 'Password!123' -t
 A different way of gaining local administrator access to a system, for instance via physical access, extracting the drive and mounting the filesystem directly on your machine. To use this mode, specify `LOCAL` as the target. By default the target filesystem is expected to be the current directory, you can specify a different path with `-root`:
 
 ```text
-$ dploot sccm -root /media/C_drive/ LOCAL
-[*] Connected to LOCAL as \None (admin)
+$ dploot sccm -root /media/C_drive/ -t LOCAL
+[*] Connected to LOCAL as \ (admin)
 ```
 
 It can still be useful to give valid username and password as arguments, which will be used to decrypt masterkeys (see the instructions in [User Triage](#user-triage) below):
 ```text
-$ dploot masterkeys -root /mnt -u bob -p Password LOCAL
+$ dploot masterkeys -root /mnt -u bob -p Password -t LOCAL
 [*] Connected to LOCAL as \bob (admin)
 ```
 
