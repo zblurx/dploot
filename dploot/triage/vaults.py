@@ -191,15 +191,15 @@ class VaultsTriage(Triage):
                     filename = file.get_longname()
                     if (
                         filename != self.vpol_filename
-                        and filename not in self.false_positive
+                        and not self.false_positive.contains(filename)
                         and file.is_directory() == 0
-                        and filename[-4:] == "vcrd"
+                        and filename[-4:].lower() == "vcrd"
                     ):
                         vrcd_filepath = ntpath.join(vault_directory_path, filename)
                         vrcd_bytes = self.conn.readFile(self.share, vrcd_filepath, looted_files=self.looted_files)
                         if (
                             vrcd_bytes is not None
-                            and filename[-4:] in ["vsch", "vcrd"]
+                            and filename[-4:].lower() in ["vsch", "vcrd"]
                             and len(vpol_keys) > 0
                         ):
                             vault = decrypt_vcrd(vrcd_bytes, vpol_keys)

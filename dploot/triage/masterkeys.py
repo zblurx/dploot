@@ -104,7 +104,7 @@ class MasterkeysTriage(Triage):
         )
         for d in system_protect_dir:
             if (
-                str(d).lower() not in list(map(lambda s:s.lower(), self.false_positive))
+                not self.false_positive.contains(d)
                 and d.is_directory() > 0
                 and d.get_longname()[:2].upper() == "S-"
             ):  # could be a better way to deal with sid
@@ -197,7 +197,7 @@ class MasterkeysTriage(Triage):
             return masterkeys
         for d in user_protect_dir:
             if (
-                str(d).lower() not in list(map(lambda x:x.lower(), self.false_positive))
+                not self.false_positive.contains(d)
                 and d.is_directory() > 0
                 and d.get_longname()[:2].upper() == "S-"
             ):  # could be a better way to deal with sid

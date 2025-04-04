@@ -423,24 +423,35 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
     def getFile(self, *args, **kwargs) -> "Any | None":
         raise NotImplementedError("getFile is not implemented in LOCAL mode")
 
-    def get_real_path(self, path:os.PathLike) -> Path:
+    def get_real_path(self, path:str) -> str:
+        """Match path against file system (case insensitive if py>=3.12).
+            Only used when target is `LOCAL`.
+
+        Args:
+            path (str): pah representation (ie C:\\Windows\\...)
+
+        Returns:
+            str: real path on the filesystem
+        """
         # clean path (remove c:\, /, and current root if already present)
         path=path.removeprefix(self.target.local_root)
         if path[:3].lower() == "c:\\":
             path = path[3:]
         path=path.replace("\\", os.sep).lstrip(os.sep)
 
-        found  = False
-        # match path against real filesystem with or without case sensitivity and return the real path
+        globok = False
+        # The pattern to match does not contain jokers, so Path.glob() should return 0 or 1 match
         try:
-            path=next(Path(self.target.local_root).glob(path, case_sensitive=False)) # case_sensitive exists since Python 3.12
-            found=True
-        except StopIteration:
-            # path does not exist. Return a representation of it anyway
+            path=next(Path(self.target.local_root).glob(path, case_sensitive=False))
+            globok=True
+        except (StopIteration, TypeError):
+            # StopIteration: path does not exist.
+            # TypeError: unexpexted keyword (case_sensitive added in python 3.12)
+            # Return a representation of path anyway
             path=os.path.join(self.target.local_root, path)
 
-        #logging.debug(f"get_real_path: [{found=}] returning {path}")
-        return path
+        #logging.debug(f"get_real_path: [{globok=}] returning {path}")
+        return str(path)
 
     def readFile(
         self,

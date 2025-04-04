@@ -213,7 +213,7 @@ class WamTriage(Triage):
         for file in tbc_dir:
             filename = file.get_longname()
             if filename[-6:].lower() ==".tbres" \
-                and filename.lower() not in list(map(lambda x:x.lower(), self.false_positive)) \
+                and not self.false_positive.contains(filename) \
                 and file.is_directory() == 0:
                 logging.debug(f"Got {filename} cache file for user {user}")
                 tbres_filepath = ntpath.join(tbc_user_path, filename)

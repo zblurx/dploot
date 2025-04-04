@@ -156,7 +156,7 @@ class WifiTriage(Triage):
                 for directory in wifi_dir:
                     if (
                         directory.is_directory() > 0
-                        and directory.get_longname() not in self.false_positive
+                        and not self.false_positive.contains(directory.get_longname())
                     ):
                         wifi_interface_path = ntpath.join(
                             self.system_wifi_generic_path, directory.get_longname()
@@ -168,8 +168,8 @@ class WifiTriage(Triage):
                             filename = file.get_longname()
                             if (
                                 file.is_directory() == 0
-                                and filename not in self.false_positive
-                                and filename[-4:] == ".xml"
+                                and not self.false_positive.contains(filename)
+                                and filename[-4:].lower() == ".xml"
                             ):
                                 wifi_interface_filepath = ntpath.join(
                                     wifi_interface_path, filename

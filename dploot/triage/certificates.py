@@ -263,14 +263,14 @@ class CertificatesTriage(Triage):
             if pkeys_dir is not None:
                 for d in pkeys_dir:
                     if (
-                        d not in self.false_positive
+                        not self.false_positive.contains(d)
                         and d.is_directory() > 0
                         and (
                             d.get_longname()[:2].upper() == "S-"
                             or d.get_longname().upper() == "MachineKeys".upper()
                         )
                     ):
-                        sid = d.get_longname().upper()
+                        sid = d.get_longname()
                         pkeys_sid_path = ntpath.join(pkeys_path, sid)
                         pkeys_sid_dir = self.conn.remote_list_dir(
                             self.share, path=pkeys_sid_path
@@ -317,8 +317,7 @@ class CertificatesTriage(Triage):
         for cert_dir_path, cert_dir in certificates_dir.items():
             if cert_dir is not None:
                 for cert in cert_dir:
-                    if str(cert).lower() not in list(map(lambda x:x.lower(),self.false_positive)) \
-                        and cert.is_directory() == 0:
+                    if not self.false_positive.contains(cert) and cert.is_directory() == 0:
                         try:
                             certname = cert.get_longname()
                             certpath = ntpath.join(cert_dir_path, certname)
