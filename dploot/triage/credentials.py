@@ -134,7 +134,7 @@ class CredentialsTriage(Triage):
                                     description=cred["Description"].decode("utf-16le"),
                                     unknown=cred["Unknown"].decode("utf-16le"),
                                     username=cred["Username"].decode("utf-16le"),
-                                    password=cred["Unknown3"].decode("utf-16le"),
+                                    password=cred["Unknown3"].decode("latin1"),
                                 )
                             except UnicodeDecodeError:
                                 credential = Credential(
@@ -144,7 +144,7 @@ class CredentialsTriage(Triage):
                                     description=cred["Description"].decode("utf-16le"),
                                     unknown=cred["Unknown"].decode("utf-16le"),
                                     username=cred["Username"].decode("utf-16le"),
-                                    password=cred["Unknown3"].decode("latin-1"),
+                                    password=cred["Unknown3"].decode("utf-16le"),
                                 )
                             credentials.append(credential)
                             if self.per_loot_callback is not None:

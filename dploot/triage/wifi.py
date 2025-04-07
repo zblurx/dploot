@@ -197,7 +197,7 @@ class WifiTriage(Triage):
                                         unhexlify(dpapi_blob.text),
                                         masterkeys=self.masterkeys,
                                     )
-                                    password = ""
+                                    password = b''
                                     if masterkey is not None:
                                         cleartext = decrypt_blob(
                                             unhexlify(dpapi_blob.text),

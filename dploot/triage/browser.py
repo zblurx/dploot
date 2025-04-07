@@ -234,35 +234,40 @@ class BrowserTriage(Triage):
                     f"Found {browser.upper()} AppData files for user {user}"
                 )
                 aesStateKey_json = json.loads(aesStateKey_bytes)
-                profiles = aesStateKey_json['profile']['profiles_order']
-                blob = base64.b64decode(aesStateKey_json["os_crypt"]["encrypted_key"])
-                if blob[:5] == b"DPAPI":
-                    dpapi_blob = blob[5:]
-                    masterkey = find_masterkey_for_blob(
-                        dpapi_blob, masterkeys=self.masterkeys
-                    )
-                    if masterkey is not None:
-                        aeskey = decrypt_blob(
-                            blob_bytes=dpapi_blob, masterkey=masterkey
-                        )
-                
-                if "app_bound_encrypted_key" in aesStateKey_json["os_crypt"]:
-                    app_bound_blob = base64.b64decode(aesStateKey_json["os_crypt"]["app_bound_encrypted_key"])
-                    dpapi_blob = app_bound_blob[4:] # Trim off APPB
-                    masterkey = find_masterkey_for_blob(
+                try:
+                    blob = base64.b64decode(aesStateKey_json["os_crypt"]["encrypted_key"])
+                    if blob[:5] == b"DPAPI":
+                        dpapi_blob = blob[5:]
+                        masterkey = find_masterkey_for_blob(
                             dpapi_blob, masterkeys=self.masterkeys
                         )
-                    if masterkey is not None:
-                        intermediate_key = decrypt_blob(
-                            blob_bytes=dpapi_blob, masterkey=masterkey
-                        )
+                        if masterkey is not None:
+                            aeskey = decrypt_blob(
+                                blob_bytes=dpapi_blob, masterkey=masterkey
+                            )
+
+                    if "app_bound_encrypted_key" in aesStateKey_json["os_crypt"]:
+                        app_bound_blob = base64.b64decode(aesStateKey_json["os_crypt"]["app_bound_encrypted_key"])
+                        dpapi_blob = app_bound_blob[4:] # Trim off APPB
                         masterkey = find_masterkey_for_blob(
-                            intermediate_key, masterkeys=self.masterkeys
-                        )
-                        if masterkey:
-                            app_bound_key = AppBoundKey(decrypt_blob(
-                                blob_bytes=intermediate_key, masterkey=masterkey
-                            )).key
+                                dpapi_blob, masterkeys=self.masterkeys
+                            )
+                        if masterkey is not None:
+                            intermediate_key = decrypt_blob(
+                                blob_bytes=dpapi_blob, masterkey=masterkey
+                            )
+                            masterkey = find_masterkey_for_blob(
+                                intermediate_key, masterkeys=self.masterkeys
+                            )
+                            if masterkey:
+                                app_bound_key = AppBoundKey(decrypt_blob(
+                                    blob_bytes=intermediate_key, masterkey=masterkey
+                                )).key
+                    profiles = aesStateKey_json['profile']['profiles_order']
+                except KeyError as e:
+                    logging.debug(f"Key not found! {repr(e)}")
+                    # logging.debug(f"{aesStateKey_json=}")
+
             for profile in profiles:
                 loginData_bytes = self.conn.readFile(
                     shareName=self.share,
