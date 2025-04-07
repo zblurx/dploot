@@ -7,7 +7,6 @@ from impacket.dpapi import CREDENTIAL_BLOB
 
 
 from dploot.triage import Triage
-from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_credential, find_masterkey_for_credential_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -54,7 +53,7 @@ class CredentialsTriage(Triage):
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
         per_credential_callback: Callable = None,
-        false_positive: List[str] = FALSE_POSITIVES,
+        false_positive: List[str] | None = None,
     ) -> None:
         super().__init__(
             target, 

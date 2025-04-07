@@ -6,7 +6,6 @@ from typing import List, Callable
 
 
 from dploot.triage import Triage
-from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -186,7 +185,7 @@ class WamTriage(Triage):
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
         per_token_callback: Callable = None,
-        false_positive: List[str] = FALSE_POSITIVES,
+        false_positive: List[str] | None = None,
     ) -> None:
         super().__init__(
             target, 
@@ -212,7 +211,11 @@ class WamTriage(Triage):
             return []
         for file in tbc_dir:
             filename = file.get_longname()
-            if filename[-6:] ==".tbres" and filename not in self.false_positive and file.is_directory() == 0:
+            if (
+                filename[-6:].lower() ==".tbres"
+                and filename not in self.false_positive
+                and file.is_directory() == 0
+            ):
                 logging.debug(f"Got {filename} cache file for user {user}")
                 tbres_filepath = ntpath.join(tbc_user_path, filename)
                 data_bytes = self.conn.readFile(self.share, tbres_filepath, looted_files=self.looted_files)

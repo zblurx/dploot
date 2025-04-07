@@ -9,7 +9,6 @@ from typing import Any, List, Tuple, Callable
 from impacket.structure import Structure
 
 
-from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -165,7 +164,7 @@ class BrowserTriage(Triage):
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
         per_secret_callback: Callable = None,
-        false_positive: List[str] = FALSE_POSITIVES,
+        false_positive: List[str] | None = None,
     ) -> None:
         super().__init__(
             target, 

@@ -25,7 +25,6 @@ from pyasn1.codec.der import decoder
 from pyasn1.type.char import UTF8String
 
 from dploot.triage import Triage
-from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.crypto import CERTBLOB
 from dploot.lib.dpapi import decrypt_privatekey, find_masterkey_for_privatekey_blob
 from dploot.lib.smb import DPLootSMBConnection
@@ -92,7 +91,7 @@ class CertificatesTriage(Triage):
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
         per_certificate_callback: Callable = None,
-        false_positive: List[str] = FALSE_POSITIVES,
+        false_positive: List[str] | None = None,
     ) -> None:
         super().__init__(
             target, 
@@ -254,8 +253,8 @@ class CertificatesTriage(Triage):
                         d not in self.false_positive
                         and d.is_directory() > 0
                         and (
-                            d.get_longname()[:2] == "S-"
-                            or d.get_longname() == "MachineKeys"
+                            d.get_longname()[:2].upper() == "S-"
+                            or d.get_longname().upper() == "MachineKeys".upper()
                         )
                     ):
                         sid = d.get_longname()
