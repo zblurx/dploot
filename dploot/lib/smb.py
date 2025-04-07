@@ -2,9 +2,12 @@ import ntpath
 import os
 import logging
 import time
+
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dploot.lib.target import Target
+from dploot.lib.consts import FalsePositives
 
 from impacket.smbconnection import SMBConnection
 from impacket.winregistry import Registry
@@ -22,8 +25,6 @@ from impacket.smb3structs import (
 )
 
 from dploot.lib.wmi import DPLootWmiExec
-from dploot.lib.consts import FALSE_POSITIVES
-
 
 class DPLootSMBConnection:    
     # if called with target = LOCAL, return an instance of DPLootLocalSMConnection,
@@ -43,14 +44,14 @@ class DPLootSMBConnection:
             # we end up here when a child class is instantiated.
             return super().__new__(cls)
 
-    def __init__(self, target: Target, false_positive: List[str] = FALSE_POSITIVES) -> None:
+    def __init__(self, target: Target, false_positive: List[str] | None = None) -> None:
         self.target = target
         self.remote_ops = None
         self.local_session = None
 
         self._usersProfiles = None
 
-        self.false_positive = false_positive
+        self.false_positive = FalsePositives(false_positive)
 
     def listDirs(self, share: str, dirlist: List[str]) -> Dict[str, Any]:
         result = {}
@@ -390,8 +391,8 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
 
     SharedFile.fromDirEntry = _sharedfile_fromdirentry
 
-    def remote_list_dir(self, share, path, wildcard=True) -> "Any | None":
-        path = os.path.join(self.target.local_root, path.replace("\\", os.sep))
+    def remote_list_dir(self, share, path, wildcard=True) -> list[SharedFile]:
+        path = self.get_real_path(path)
         if not wildcard:
             raise NotImplementedError("Not implemented for wildcard == False")
         try:
@@ -418,6 +419,36 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
     def getFile(self, *args, **kwargs) -> "Any | None":
         raise NotImplementedError("getFile is not implemented in LOCAL mode")
 
+    def get_real_path(self, path:str) -> str:
+        """Match path against file system (case insensitive if py>=3.12).
+            Only used when target is `LOCAL`.
+
+        Args:
+            path (str): pah representation (ie C:\\Windows\\...)
+
+        Returns:
+            str: real path on the filesystem
+        """
+        # clean path (remove c:\, /, and current root if already present)
+        path=path.removeprefix(self.target.local_root)
+        if path[:3].lower() == "c:\\":
+            path = path[3:]
+        path=path.replace("\\", os.sep).lstrip(os.sep)
+
+        globok = False
+        # The pattern to match does not contain jokers, so Path.glob() should return 0 or 1 match
+        try:
+            path=next(Path(self.target.local_root).glob(path, case_sensitive=False))
+            globok=True
+        except (StopIteration, TypeError):
+            # StopIteration: path does not exist.
+            # TypeError: unexpexted keyword (case_sensitive added in python 3.12)
+            # Return a representation of path anyway
+            path=os.path.join(self.target.local_root, path)
+
+        #logging.debug(f"get_real_path: [{globok=}] returning {path}")
+        return str(path)
+
     def readFile(
         self,
         shareName,
@@ -431,12 +462,10 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
     ) -> bytes:
         data = None
         try:
-            with open(
-                os.path.join(self.target.local_root, path.replace("\\", os.sep)), "rb"
-            ) as f:
+            with open(self.get_real_path(path), "rb") as f:
                 data = f.read()
         except Exception as e:
-            logging.debug(f"Exception occurred while trying to read {path}: {e}")
+            logging.debug(f"Exception occurred while trying to read {path}: {repr(e)}")
 
         return data
 
@@ -453,7 +482,7 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
 
         result = {}
         # open hive
-        reg_file_path = os.path.join(self.target.local_root, self.hklm_software_path)
+        reg_file_path = self.get_real_path(self.hklm_software_path)
         reg = Registry(reg_file_path, isRemote=False)
 
         # open key
@@ -474,6 +503,7 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
                 .replace(r"%systemroot%", self.systemroot)
             )
             path = ntpath.normpath(path)
+            path = self.get_real_path(path)
             # store in result dict
             result[user_sid] = path
 

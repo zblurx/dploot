@@ -11,7 +11,6 @@ from impacket.dpapi import (
 )
 
 from dploot.triage import Triage
-from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_vcrd, decrypt_vpol, find_masterkey_for_vpol_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -92,7 +91,7 @@ class VaultsTriage(Triage):
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
         per_vault_callback: Callable = None,
-        false_positive: List[str] = FALSE_POSITIVES
+        false_positive: List[str] | None = None
     ) -> None:
         super().__init__(
             target, 
@@ -193,13 +192,13 @@ class VaultsTriage(Triage):
                         filename != self.vpol_filename
                         and filename not in self.false_positive
                         and file.is_directory() == 0
-                        and filename[-4:] == "vcrd"
+                        and filename[-4:].lower() == "vcrd"
                     ):
                         vrcd_filepath = ntpath.join(vault_directory_path, filename)
                         vrcd_bytes = self.conn.readFile(self.share, vrcd_filepath, looted_files=self.looted_files)
                         if (
                             vrcd_bytes is not None
-                            and filename[-4:] in ["vsch", "vcrd"]
+                            and filename[-4:].lower() in ["vsch", "vcrd"]
                             and len(vpol_keys) > 0
                         ):
                             vault = decrypt_vcrd(vrcd_bytes, vpol_keys)

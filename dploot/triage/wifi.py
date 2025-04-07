@@ -12,7 +12,6 @@ from impacket.system_errors import ERROR_NO_MORE_ITEMS, ERROR_FILE_NOT_FOUND
 
 
 from dploot.triage import Triage
-from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
@@ -136,7 +135,7 @@ class WifiTriage(Triage):
         conn: DPLootSMBConnection,
         masterkeys: List[Masterkey],
         per_profile_callback: Callable = None,
-        false_positive: List[str] = FALSE_POSITIVES,
+        false_positive: List[str] | None = None,
     ) -> None:
         super().__init__(
             target, 
@@ -169,7 +168,7 @@ class WifiTriage(Triage):
                             if (
                                 file.is_directory() == 0
                                 and filename not in self.false_positive
-                                and filename[-4:] == ".xml"
+                                and filename[-4:].lower() == ".xml"
                             ):
                                 wifi_interface_filepath = ntpath.join(
                                     wifi_interface_path, filename
@@ -198,7 +197,7 @@ class WifiTriage(Triage):
                                         unhexlify(dpapi_blob.text),
                                         masterkeys=self.masterkeys,
                                     )
-                                    password = ""
+                                    password = b''
                                     if masterkey is not None:
                                         cleartext = decrypt_blob(
                                             unhexlify(dpapi_blob.text),
@@ -263,13 +262,8 @@ class WifiTriage(Triage):
                 # For each user:
                 for user_sid, profile_path in self.conn.getUsersProfiles().items():
                     #   open user registry file in user profile's dir/NTUser.dat
-                    profile_path = profile_path.replace("C:\\", "").replace(
-                        "\\", os.sep
-                    )
-                    reg_file_path = os.path.join(
-                        self.target.local_root, profile_path, "NTUSER.DAT"
-                    )
 
+                    reg_file_path = self.conn.get_real_path(os.path.join(profile_path, "NTUSER.DAT"))
                     reg = None
 
                     # Workaround for a bug in impacket.winregistry.Registry:

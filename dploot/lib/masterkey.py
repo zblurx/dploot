@@ -11,10 +11,10 @@ from dploot.lib.dpapi import decrypt_masterkey
 
 
 class Masterkey:
-    def __init__(self, guid, blob = None, sid = None, key = None, sha1 = None, user: str = "None") -> None:
+    def __init__(self, guid, blob = None, sid:str = None, key = None, sha1 = None, user: str = "None") -> None:
         self.guid = guid
         self.blob = blob
-        self.sid = sid
+        self.sid = str(sid).upper()
         self.user = user
 
         self.key = key

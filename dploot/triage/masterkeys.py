@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional
 from impacket.examples.secretsdump import LSASecrets
 
 from dploot.triage import Triage
-from dploot.lib.consts import FALSE_POSITIVES
 from dploot.lib.masterkey import Masterkey
 from dploot.lib.target import Target
 from dploot.lib.utils import is_guid, find_guid, find_sha1, parse_file_as_list
@@ -42,7 +41,7 @@ class MasterkeysTriage(Triage):
         nthashes: Optional[Dict[str, str]] = None,
         dpapiSystem: Optional[Dict[str, str]] = None,
         per_masterkey_callback: Any = None,
-        false_positive: List[str] = FALSE_POSITIVES,
+        false_positive: List[str] | None = None,
     ) -> None:
         super().__init__(
             target, 
@@ -106,9 +105,9 @@ class MasterkeysTriage(Triage):
             if (
                 d not in self.false_positive
                 and d.is_directory() > 0
-                and d.get_longname()[:2] == "S-"
+                and d.get_longname()[:2].upper() == "S-"
             ):  # could be a better way to deal with sid
-                sid = d.get_longname()
+                sid = d.get_longname().upper()
                 system_protect_dir_sid_path = ntpath.join(
                     self.system_masterkeys_generic_path, sid
                 )
@@ -136,9 +135,9 @@ class MasterkeysTriage(Triage):
                                 masterkeys.append(masterkey)
                                 if self.per_loot_callback is not None:
                                     self.per_loot_callback(masterkey)
-                    elif f.is_directory() > 0 and f.get_longname() == "User":
+                    elif f.is_directory() > 0 and f.get_longname().upper() == "USER":
                         system_protect_dir_user_path = ntpath.join(
-                            system_protect_dir_sid_path, "User"
+                            system_protect_dir_sid_path, f.get_longname()
                         )
                         system_user_dir = self.conn.remote_list_dir(
                             self.share, path=system_protect_dir_user_path
@@ -199,9 +198,9 @@ class MasterkeysTriage(Triage):
             if (
                 d not in self.false_positive
                 and d.is_directory() > 0
-                and d.get_longname()[:2] == "S-"
+                and d.get_longname()[:2].upper() == "S-"
             ):  # could be a better way to deal with sid
-                sid = d.get_longname()
+                sid = d.get_longname().upper()
                 user_masterkey_path_sid = ntpath.join(
                     ntpath.join(
                         ntpath.join("Users", user), self.user_masterkeys_generic_path
