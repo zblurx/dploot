@@ -285,7 +285,6 @@ class WifiTriage(Triage):
                             f"Exception while instantiating Registry({reg_file_path}): {e}. Continuing."
                         )
                         continue
-
                     #   check for network profile in both eap_profiles_keys
                     for eap_profile_key in self.eap_profiles_keys:
                         #       retrieve MSMUserData
@@ -298,14 +297,16 @@ class WifiTriage(Triage):
                         msm_bytes = msm_tuple[1]
                         break
 
-                    if msm_bytes is None:
-                        # we searched the network profile in all found users, and could not find it.
-                        logging.debug("Could not find corresponding registry value")
-                        return None
+                    if msm_bytes is not None:
+                        logging.debug(
+                            f"Found profile in registry at HKU\\{user_sid}\\{ntpath.dirname(msm_value)}"
+                        )
+                        break
 
-                    logging.debug(
-                        f"Found profile in registry at HKU\\{user_sid}\\{ntpath.dirname(msm_value)}"
-                    )
+                if msm_bytes is None:
+                    # we searched the network profile in all found users, and could not find it.
+                    logging.debug(f"Could not find corresponding registry value MSMUserData for {eap_profile}")
+                    return None
 
             else:
                 self.conn.enable_remoteops()
