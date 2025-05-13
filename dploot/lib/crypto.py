@@ -280,12 +280,7 @@ def decrypt_chrome_password(encrypted_password: str, aeskey: bytes):
     iv, payload = rest[:12], rest[12:]
     cipher = AES.new(aeskey, AES.MODE_GCM, iv)
     decrypted = cipher.decrypt(payload)
-    if version in (b"v10",b"v11"):
-        decrypted = decrypted[:-16]
-    elif version in (b"v20"):
-        decrypted = decrypted[32:]
-        decrypted = decrypted[:-16]
-    decrypted = decrypted.decode("utf-8")
+    decrypted = decrypted[:-16]
     return decrypted or None
 
 def deriveKeysFromUser(sid, password):
