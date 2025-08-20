@@ -28,7 +28,7 @@ dploot = "dploot.entry:main"
 python = "^3.10.0"
 impacket = ">=0.12.0"
 cryptography = ">=40.0.1"
-pyasn1 = "^0.4.8"
+pyasn1 = ">=0.4.8"
 lxml = ">=5.0"
 
 [tool.poetry.group.dev.dependencies]
