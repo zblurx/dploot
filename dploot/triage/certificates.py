@@ -125,8 +125,9 @@ class CertificatesTriage(Triage):
         return certificates
 
     def loot_system_certificates(self) -> Dict[str, x509.Certificate]:
-        my_certificates_key = (
-            "SOFTWARE\\Microsoft\\SystemCertificates\\MY\\Certificates"
+        my_certificates_keys = (
+            "SOFTWARE\\Microsoft\\SystemCertificates\\MY\\Certificates",
+            "SOFTWARE\\Microsoft\\SystemCertificates\\My\\Certificates",
         )
         certificate_keys = []
         certificates = {}
@@ -138,11 +139,15 @@ class CertificatesTriage(Triage):
             reg = Registry(reg_file_path, isRemote=False)
 
             # open key
-            key_path = my_certificates_key[8:]
-            parentKey = reg.findKey(key_path)
-            if parentKey is None:
+            for my_certificates_key in my_certificates_keys:
+                key_path = my_certificates_key[8:]
+                parentKey = reg.findKey(key_path)
+                if parentKey is not None:
+                    break
+            else:
                 logging.error(f"Key {key_path} not found in {reg_file_path}")
                 return certificates
+                
             # for each certificate subkey (such as Microsoft\SystemCertificates\MY\Certificates\3FD2...)
             for certificate_key in reg.enumKey(parentKey):
                 # get 'Blob' value
@@ -165,6 +170,7 @@ class CertificatesTriage(Triage):
                     continue
             reg.close()
         else:
+            my_certificates_key=my_certificates_keys[0]
             ans = rrp.hOpenLocalMachine(self.conn.remote_ops._RemoteOperations__rrp)
             regHandle = ans["phKey"]
 
