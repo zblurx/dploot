@@ -3,67 +3,28 @@ import os
 import logging
 import time
 
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
-from dploot.lib.consts import FalsePositives
 
 from impacket.smbconnection import SMBConnection
-from impacket.winregistry import Registry
-from impacket.smb import ATTR_DIRECTORY
 from impacket.smb import SMB_DIALECT
-from impacket.smb import SharedFile
 from impacket.nmb import NetBIOSTimeout
 from impacket.smb import FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SHARE_DELETE
 from impacket.dcerpc.v5 import tsts
-from impacket.examples.secretsdump import RemoteOperations, LocalOperations
+from impacket.examples.secretsdump import RemoteOperations
 from impacket.smb3structs import (
     FILE_READ_DATA,
     FILE_OPEN,
     FILE_NON_DIRECTORY_FILE
 )
 
-from dploot.lib.wmi import DPLootWmiExec
+from dploot.lib.network.wmi import DPLootWmiExec
 
-class DPLootSMBConnection:    
-    # if called with target = LOCAL, return an instance of DPLootLocalSMConnection,
-    # else return an instance of DPLootRemoteSMBConnection
-    def __new__(
-        cls, target=None
-    ) -> "DPLootRemoteSMBConnection | DPLootLocalSMBConnection":
-        if (
-            target is not None
-            and target.address.upper() == "LOCAL"
-            and cls.__name__ != DPLootLocalSMBConnection.__name__
-        ):
-            return DPLootLocalSMBConnection.__new__(DPLootLocalSMBConnection, target)
-        elif cls.__name__ == DPLootSMBConnection.__name__:
-            return DPLootRemoteSMBConnection.__new__(DPLootRemoteSMBConnection, target)
-        else:
-            # we end up here when a child class is instantiated.
-            return super().__new__(cls)
-
-    def __init__(self, target: Target, false_positive: List[str] | None = None) -> None:
-        self.target = target
-        self.remote_ops = None
-        self.local_session = None
-
-        self._usersProfiles = None
-
-        self.false_positive = FalsePositives(false_positive)
-
-    def listDirs(self, share: str, dirlist: List[str]) -> Dict[str, Any]:
-        result = {}
-        for path in dirlist:
-            tmp = self.remote_list_dir(share, path=path)
-            result[path] = tmp
-        return result
-
-class DPLootRemoteSMBConnection(DPLootSMBConnection):
+class DPLootSMBConnection(DPLootConnection):
     def __init__(self, target: Target) -> None:
         super().__init__(target)
-
         self.smb_session = None
         self.smbv1 = False
 

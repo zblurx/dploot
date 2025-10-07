@@ -10,7 +10,7 @@ from dploot.triage import Triage
 from dploot.lib.masterkey import Masterkey
 from dploot.lib.target import Target
 from dploot.lib.utils import is_guid, find_guid, find_sha1, parse_file_as_list
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.lib.network import DPLootConnection
 
 
 def parse_masterkey_file(filename) -> List[Masterkey]:
@@ -35,7 +35,7 @@ class MasterkeysTriage(Triage):
     def __init__(
         self,
         target: Target,
-        conn: DPLootSMBConnection,
+        conn: DPLootConnection,
         pvkbytes: Optional[bytes] = None,
         passwords: Optional[Dict[str, str]] = None,
         nthashes: Optional[Dict[str, str]] = None,

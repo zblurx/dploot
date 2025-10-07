@@ -13,7 +13,7 @@ from impacket.system_errors import ERROR_NO_MORE_ITEMS, ERROR_FILE_NOT_FOUND
 
 from dploot.triage import Triage
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
 from dploot.triage.masterkeys import Masterkey
 from dataclasses import dataclass
@@ -138,7 +138,7 @@ class MobaXtermTriage(Triage):
     def __init__(
         self,
         target: Target,
-        conn: DPLootSMBConnection,
+        conn: DPLootConnection,
         masterkeys: List[Masterkey],
         per_secret_callback: Callable = None,
         false_positive: List[str] | None = None,

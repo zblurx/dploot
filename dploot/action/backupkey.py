@@ -5,7 +5,6 @@ import sys
 from typing import Callable, Tuple
 
 from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.smb import DPLootSMBConnection
 from dploot.triage.backupkey import BackupkeyTriage
 
 NAME = "backupkey"
@@ -28,7 +27,7 @@ class BackupkeyAction:
             self.outputfile = "key.pvk"
 
     def connect(self) -> None:
-        self.conn = DPLootSMBConnection(self.target)
+        self.conn = self.target.create_connection_object()
         if self.conn.connect() is None:
             logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)

@@ -9,7 +9,7 @@ from impacket.dpapi import P_BACKUP_KEY, PREFERRED_BACKUP_KEY, PVK_FILE_HDR
 
 from dploot.triage import Triage
 from dploot.lib.target import Target
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.lib.network import DPLootConnection
 
 
 class Backupkey:
@@ -21,7 +21,7 @@ class Backupkey:
 
 
 class BackupkeyTriage(Triage):
-    def __init__(self, target: Target, conn: DPLootSMBConnection) -> None:
+    def __init__(self, target: Target, conn: DPLootConnection) -> None:
         super().__init__(target=target, conn=conn)
         
         self.dce = None

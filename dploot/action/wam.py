@@ -7,7 +7,6 @@ from dploot.action.masterkeys import (
     parse_masterkeys_options,
 )
 
-from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
@@ -43,7 +42,7 @@ class WamAction:
         )
 
     def connect(self) -> None:
-        self.conn = DPLootSMBConnection(self.target)
+        self.conn = self.target.create_connection_object()
         if self.conn.connect() is None:
             logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)

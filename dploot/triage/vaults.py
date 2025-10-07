@@ -12,7 +12,7 @@ from impacket.dpapi import (
 
 from dploot.triage import Triage
 from dploot.lib.dpapi import decrypt_vcrd, decrypt_vpol, find_masterkey_for_vpol_blob
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
 from dploot.lib.utils import is_guid
 from dploot.triage.masterkeys import Masterkey
@@ -88,7 +88,7 @@ class VaultsTriage(Triage):
     def __init__(
         self,
         target: Target,
-        conn: DPLootSMBConnection,
+        conn: DPLootConnection,
         masterkeys: List[Masterkey],
         per_vault_callback: Callable = None,
         false_positive: List[str] | None = None

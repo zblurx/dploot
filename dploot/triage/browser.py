@@ -10,7 +10,7 @@ from impacket.structure import Structure
 
 
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
 from dploot.lib.masterkey import Masterkey
 from dploot.lib.crypto import CHROME_KEY_DATA_BLOB, byte_xor, decrypt_chrome_password
@@ -184,7 +184,7 @@ class BrowserTriage(Triage):
     def __init__(
         self,
         target: Target,
-        conn: DPLootSMBConnection,
+        conn: DPLootConnection,
         masterkeys: List[Masterkey],
         per_secret_callback: Callable = None,
         false_positive: List[str] | None = None,

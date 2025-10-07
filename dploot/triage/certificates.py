@@ -28,7 +28,7 @@ from pyasn1.type.char import UTF8String
 from dploot.triage import Triage
 from dploot.lib.crypto import CERTBLOB
 from dploot.lib.dpapi import decrypt_privatekey, find_masterkey_for_privatekey_blob
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
 from dploot.lib.utils import is_certificate_guid
 from dploot.triage.masterkeys import Masterkey
@@ -86,7 +86,7 @@ class CertificatesTriage(Triage):
     def __init__(
         self,
         target: Target,
-        conn: DPLootSMBConnection,
+        conn: DPLootConnection,
         masterkeys: List[Masterkey],
         per_certificate_callback: Callable = None,
         false_positive: List[str] | None = None,

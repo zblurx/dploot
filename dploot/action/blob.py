@@ -12,7 +12,6 @@ from dploot.action.masterkeys import (
 from impacket.dpapi import DPAPI_BLOB
 
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
-from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import dump_looted_files_to_disk, find_guid, find_sha1, handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file, Masterkey
@@ -57,7 +56,7 @@ class BlobAction:
         )
 
     def connect(self) -> None:
-        self.conn = DPLootSMBConnection(self.target)
+        self.conn = self.target.create_connection_object()
         if self.conn.connect() is None:
             logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)

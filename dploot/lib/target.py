@@ -1,4 +1,5 @@
 import argparse
+import logging
 import sys
 from typing import Optional
 
@@ -128,6 +129,16 @@ class Target:
 
     def __repr__(self) -> str:
         return "<Target (%s)>" % repr(self.__dict__)
+    
+    def create_connection_object(self, connection_type: str = "smb"):
+        if connection_type == "smb":
+            from dploot.lib.network.smb import DPLootSMBConnection
+            return DPLootSMBConnection(self)
+        elif connection_type == "local":
+            from dploot.lib.network.local import DPLootLocalConnection
+            return DPLootLocalConnection(self)
+        else :
+            logging.error("Not implemented")
 
 
 def add_target_argument_group(
