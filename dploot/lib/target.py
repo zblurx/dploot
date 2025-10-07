@@ -86,6 +86,8 @@ class Target:
         if (
             not password
             and username != ""
+            and lmhash == ""
+            and nthash == ""
             and hashes is None
             and aesKey is None
             and no_pass is not True
