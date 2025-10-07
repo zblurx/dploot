@@ -130,21 +130,21 @@ class CredentialsTriage(Triage):
                                 credential = Credential(
                                     winuser=winuser,
                                     credblob=cred,
-                                    target=cred["Target"].decode("utf-16le"),
-                                    description=cred["Description"].decode("utf-16le"),
-                                    unknown=cred["Unknown"].decode("utf-16le"),
-                                    username=cred["Username"].decode("utf-16le"),
-                                    password=cred["Unknown3"].decode("latin1"),
+                                    target=cred["Target"].decode("utf-16le").rstrip("\0"),
+                                    description=cred["Description"].decode("utf-16le").rstrip("\0"),
+                                    unknown=cred["Unknown"].decode("utf-16le").rstrip("\0"),
+                                    username=cred["Username"].decode("utf-16le").rstrip("\0"),
+                                    password=cred["Unknown3"].decode("utf-16le").rstrip("\0"),
                                 )
                             except UnicodeDecodeError:
                                 credential = Credential(
                                     winuser=winuser,
                                     credblob=cred,
-                                    target=cred["Target"].decode("utf-16le"),
-                                    description=cred["Description"].decode("utf-16le"),
-                                    unknown=cred["Unknown"].decode("utf-16le"),
-                                    username=cred["Username"].decode("utf-16le"),
-                                    password=cred["Unknown3"].decode("utf-16le"),
+                                    target=cred["Target"].decode("utf-16le").rstrip("\0"),
+                                    description=cred["Description"].decode("utf-16le").rstrip("\0"),
+                                    unknown=cred["Unknown"].decode("utf-16le").rstrip("\0"),
+                                    username=cred["Username"].decode("utf-16le").rstrip("\0"),
+                                    password=cred["Unknown3"].decode("latin-1").rstrip("\0"),
                                 )
                             credentials.append(credential)
                             if self.per_loot_callback is not None:

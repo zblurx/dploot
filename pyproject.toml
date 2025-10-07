@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dploot"
-version = "3.1.2"
+version = "3.1.3"
 description = "DPAPI looting remotely in Python"
 readme = "README.md"
 homepage = "https://github.com/zblurx/dploot"
@@ -28,7 +28,7 @@ dploot = "dploot.entry:main"
 python = "^3.10.0"
 impacket = ">=0.12.0"
 cryptography = ">=40.0.1"
-pyasn1 = "^0.4.8"
+pyasn1 = ">=0.4.8"
 lxml = ">=5.0"
 
 [tool.poetry.group.dev.dependencies]
