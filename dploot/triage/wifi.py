@@ -1,4 +1,4 @@
-from binascii import unhexlify
+from binascii import hexlify, unhexlify
 import itertools
 import logging
 import ntpath
@@ -33,7 +33,7 @@ class WifiCred:
         ssid: str,
         auth: str,
         encryption: str,
-        password: Optional[str] = None,
+        password: Optional[bytes] = None,
         xml_data: Any = None,
         eap_username: Optional[str] = None,
         eap_domain: Optional[str] = None,
@@ -76,7 +76,8 @@ class WifiCred:
         if self.auth.upper() in ["WPAPSK", "WPA2PSK", "WPA3SAE"]:
             print("AuthType:\t%s" % self.auth.upper())
             print("Encryption:\t%s" % self.encryption.upper())
-            print("Preshared key:\t%s" % self.password)
+            print("Preshared key:\t%s" % self.password.decode("latin-1", errors="backslashreplace"))
+            print("Preshared key(hex):\t%s" % hexlify(self.password).decode('ascii'))
         elif self.auth.upper() in ["WPA", "WPA2"]:
             print("AuthType:\t%s EAP" % self.auth.upper())
             print("Encryption:\t%s" % self.encryption.upper())
@@ -209,9 +210,10 @@ class WifiTriage(Triage):
                                         ssid=ssid,
                                         auth=auth_type,
                                         encryption=encryption,
-                                        password=password.decode(
-                                            "latin-1", errors="backslashreplace"
-                                        ),
+                                        password=password,
+                                        # password=password.decode(
+                                        #     "latin-1", errors="backslashreplace"
+                                        #),
                                         xml_data=main,
                                     )
                                 elif auth_type in ["WPA", "WPA2"]:
