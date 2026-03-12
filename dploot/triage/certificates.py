@@ -21,6 +21,7 @@ from cryptography.hazmat.primitives.serialization import (
     PublicFormat,
     load_der_private_key,
 )
+
 from pyasn1.codec.der import decoder
 from pyasn1.type.char import UTF8String
 
@@ -51,10 +52,15 @@ class Certificate:
         print("Valid Date (UTC):\t%s" % self.cert.not_valid_before_utc)
         print("Expiry Date (UTC):\t%s" % self.cert.not_valid_after_utc)
         print("Extended Key Usage:")
-        for i in self.cert.extensions.get_extension_for_oid(
-            oid=ExtensionOID.EXTENDED_KEY_USAGE
-        ).value:
-            print(f"\t{i._name} ({i.dotted_string})")
+        try:
+            for i in self.cert.extensions.get_extension_for_oid(
+                oid=ExtensionOID.EXTENDED_KEY_USAGE
+            ).value:
+                print(f"\t{i._name} ({i.dotted_string})")
+        except x509.ExtensionNotFound:
+            pass
+        except (x509.DuplicateExtension, x509.UnsupportedGeneralNameType) as e:
+            logging.debug(e)
 
         if self.clientauth:
             print("\t[!] Certificate is used for client auth!")
@@ -359,17 +365,23 @@ class CertificatesTriage(Triage):
                     "@", "_"
                 )
                 clientauth = False
-                for i in cert.extensions.get_extension_for_oid(
-                    oid=ExtensionOID.EXTENDED_KEY_USAGE
-                ).value:
-                    if i.dotted_string in [
-                        "1.3.6.1.5.5.7.3.2",  # Client Authentication
-                        "1.3.6.1.5.2.3.4",  # PKINIT Client Authentication
-                        "1.3.6.1.4.1.311.20.2.2",  # Smart Card Logon
-                        "2.5.29.37.0",  # Any Purpose
-                    ]:
-                        clientauth = True
-                        break
+                try:
+                    ext=cert.extensions.get_extension_for_oid(oid=ExtensionOID.EXTENDED_KEY_USAGE)
+                    for i in ext.value:
+                        if i.dotted_string in [
+                            "1.3.6.1.5.5.7.3.2",  # Client Authentication
+                            "1.3.6.1.5.2.3.4",  # PKINIT Client Authentication
+                            "1.3.6.1.4.1.311.20.2.2",  # Smart Card Logon
+                            "2.5.29.37.0",  # Any Purpose
+                        ]:
+                            clientauth = True
+                            break
+                except x509.ExtensionNotFound:
+                    logging.debug('no extended key usage in certificate')
+                except (x509.DuplicateExtension, x509.UnsupportedGeneralNameType) as e:
+                    logging.debug(e)
+
+
                 cert_object = Certificate(
                     winuser=winuser,
                     cert=cert,
