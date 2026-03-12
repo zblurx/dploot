@@ -43,6 +43,107 @@ class CERTBLOB:
             print()
             print("DER             : %s " % (self.der))
 
+# CNG PART
+class CNG_PROPERTY(Structure):
+    structure = (
+        ("StructLen", "<L=0"),
+        ('Type', '<L=0'),
+        ('Unknown', '<L=0'),
+        ('NameLen', '<L=0'),
+        ('PropertyLen', '<L=0'),
+        ("_Name", "_-Name", 'self["NameLen"]'),
+        ('Name', ':'),
+        ("_Property", "_-Property", 'self["PropertyLen"]'),
+        ('Property', ':'),
+    )
+
+    def dump(self):
+        print("[CNG PROPERTY]")
+        print("StructLen        : %8x (%d)" % (self["StructLen"], self["StructLen"]))
+        print("Type             : %8x (%d)" % (self["Type"], self["Type"]))
+        print("Unknown          : %8x (%d)" % (self["Unknown"], self["Unknown"]))
+        print("NameLen          : %8x (%d)" % (self["NameLen"], self["NameLen"]))
+        print("PropertyLen      : %8x (%d)" % (self["PropertyLen"], self["PropertyLen"]))
+        print("Name             : %s" % (self["Name"].decode("utf-16le").rstrip("\0")))
+        print("Property         : %s" % hexlify(self["Property"]))
+
+class CNG_PROPERTIES:
+    def __init__(self, data=None, alignment=0):
+        remaining = data
+        self.properties = []
+        while len(remaining) > 0:
+            prop = CNG_PROPERTY(remaining)
+            self.properties.append(prop)
+            remaining = remaining[len(prop) :]
+    
+    def __len__(self):
+        length = 0
+        for prop in self.properties:
+            length += len(prop)
+        return length
+    
+    def dump(self):
+        for prop in self.properties:
+            prop.dump()
+
+class CNG_BLOB(Structure):
+    structure = (
+        ("Version", "<L=1"),
+        ("Unknown", "<L=0"),
+        ("NameLen", "<L=0"),
+        ("Type", "<L=0"),
+        ("PublicPropLen", "<L=0"),
+        ("PrivatePropLen", "<L=0"),
+        ("PrivateKeyLen", "<L=0"),
+        ("Unknown2", "16s=b'\\x00'*16"),
+        ("_Name", "_-Name", 'self["NameLen"]'),
+        ('Name', ':'),
+        ("_PublicProperties", "_-PublicProperties", 'self["PublicPropLen"]'),
+        ('PublicProperties', ':', CNG_PROPERTIES),
+        ("_PrivateProperties", "_-PrivateProperties", 'self["PrivatePropLen"]'),
+        ('PrivateProperties', ':', DPAPI_BLOB),
+        ("_PrivateKey", "_-PrivateKey", 'self["PrivateKeyLen"]'),
+        ('PrivateKey', ':', DPAPI_BLOB),
+    )
+
+    def dump(self):
+        print("[CNG BLOB]")
+        print("Version          : %8x (%d)" % (self["Version"], self["Version"]))
+        print("Unknown          : %8x (%d)" % (self["Unknown"], self["Unknown"]))
+        print("NameLen          : %8x (%d)" % (self["NameLen"], self["NameLen"]))
+        print("Type             : %8x (%d)" % (self["Type"], self["Type"]))
+        print("PublicPropLen    : %8x (%d)" % (self["PublicPropLen"], self["PublicPropLen"]))
+        print("PrivatePropLey   : %8x (%d)" % (self["PrivatePropLen"], self["PrivatePropLen"]))
+        print("PrivateKeyLen    : %8x (%d)" % (self["PrivateKeyLen"], self["PrivateKeyLen"]))
+        print("Unknown2         : %s " % (self["Unknown2"]))
+        print("Name             : %s" % (self["Name"].decode("utf-16le").rstrip("\0")))
+        print()
+        print("PublicProperties:")
+        self["PublicProperties"].dump()
+        print()
+        print("PrivateProperties:")
+        self["PrivateProperties"].dump()
+        print()
+        print("PrivateKey:")
+        self["PrivateKey"].dump()
+
+class CHROME_KEY_DATA_BLOB(Structure):
+    structure = (
+        ("Magic", "<I"),
+        ("Version", "<I"),
+        ("KeyLen", "<I"),
+        ("_Key", "_-Key", 'self["KeyLen"]'),
+        ('Key', ':'),
+        ('Remaining', ':')
+    )
+
+    def dump(self):
+        print("[BCRYPT KEY DATA]")
+        print("Magic            : %4x (%s)" % (self["Magic"], self["Magic"]))
+        print("Version          : %4x (%d)" % (self["Version"], self["Version"]))
+        print("KeyLen           : %4x (%d)" % (self["KeyLen"], self["KeyLen"]))
+        print("Key              : %s" % hexlify(self["Key"]))
+        print("Remaining              : %s" % hexlify(self["Remaining"]))
 
 # https://github.com/SecureAuthCorp/impacket/pull/1120
 # Private Decrypted Private Key
@@ -298,6 +399,8 @@ def deriveKeysFromUser(sid, password):
 
     return key1, key2, key3
 
+def byte_xor(ba1, ba2):
+    return bytes([_a ^ _b for _a, _b in zip(ba1, ba2, strict=False)])
 
 def deriveKeysFromUserkey(sid, nthash):
     key1 = HMAC.new(nthash, (sid + "\0").encode("utf-16le"), SHA1).digest()  # SHA1

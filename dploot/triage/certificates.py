@@ -69,16 +69,8 @@ class CertificatesTriage(Triage):
         "ProgramData\\Microsoft\\Crypto\\RSA",
         "Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\RSA",
     ]
-    system_cng_keys_generic_path = [
-        "ProgramData\\Microsoft\\Crypto\\Keys",
-        "ProgramData\\Microsoft\\Crypto\\SystemKeys",
-        "Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\Microsoft\\Crypto\\Keys",
-    ]
     user_capi_keys_generic_path = [
         "Users\\%s\\AppData\\Roaming\\Microsoft\\Crypto\\RSA",
-    ]
-    user_cng_keys_generic_path = [
-        "Users\\%s\\AppData\\Roaming\\Microsoft\\Crypto\\Keys",
     ]
     user_mycertificates_generic_path = [
         "Users\\%s\\AppData\\Roaming\\Microsoft\\SystemCertificates\\My\\Certificates"

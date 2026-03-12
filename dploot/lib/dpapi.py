@@ -141,7 +141,7 @@ def find_masterkey_for_credential_blob(
 
 
 def decrypt_privatekey(
-    privatekey_bytes: bytes, masterkey: Any, cng: bool = False
+    privatekey_bytes: bytes, masterkey: Any
 ) -> RSA.RsaKey:
     blob = PVKHeader(privatekey_bytes)
     blob = PVKFile_SIG(privatekey_bytes) if blob["SigHeadLen"] > 0 else PVKFile(privatekey_bytes)
@@ -152,7 +152,7 @@ def decrypt_privatekey(
 
 
 def find_masterkey_for_privatekey_blob(
-    privatekey_bytes: bytes, masterkeys: List[Any], cng: bool = False
+    privatekey_bytes: bytes, masterkeys: List[Any]
 ) -> "Any | None":
     blob = PVKHeader(privatekey_bytes)
     if len(blob["Remaining"]) == 0:
