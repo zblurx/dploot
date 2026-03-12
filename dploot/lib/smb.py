@@ -70,8 +70,8 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
     def create_smbv1_conn(self, kdc=""):
         try:
             self.smb_session = SMBConnection(
-                kdc if kdc else self.target.address,
-                kdc if kdc else self.target.address,
+                kdc or self.target.address,
+                kdc or self.target.address,
                 None,
                 preferredDialect=SMB_DIALECT,
             )
@@ -79,12 +79,12 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
         except OSError as e:
             if str(e).find("Connection reset by peer") != -1:
                 logging.debug(
-                    f"SMBv1 might be disabled on {kdc if kdc else self.target.address}"
+                    f"SMBv1 might be disabled on {kdc or self.target.address}"
                 )
             return False
         except (Exception, NetBIOSTimeout) as e:
             logging.debug(
-                f"Error creating SMBv1 connection to {kdc if kdc else self.target.address}: {e}"
+                f"Error creating SMBv1 connection to {kdc or self.target.address}: {e}"
             )
             return False
 
@@ -93,20 +93,20 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
     def create_smbv3_conn(self, kdc=""):
         try:
             self.smb_session = SMBConnection(
-                kdc if kdc else self.target.address,
-                kdc if kdc else self.target.address,
+                kdc or self.target.address,
+                kdc or self.target.address,
                 None,
             )
             self.smbv1 = False
         except OSError as e:
             if str(e).find("Too many open files") != -1:
                 logging.error(
-                    f"SMBv3 connection error on {kdc if kdc else self.target.address}: {e}"
+                    f"SMBv3 connection error on {kdc or self.target.address}: {e}"
                 )
             return False
         except (Exception, NetBIOSTimeout) as e:
             logging.debug(
-                f"Error creating SMBv3 connection to {kdc if kdc else self.target.address}: {e}"
+                f"Error creating SMBv3 connection to {kdc or self.target.address}: {e}"
             )
             return False
 
@@ -117,7 +117,7 @@ class DPLootRemoteSMBConnection(DPLootSMBConnection):
             return True
         logging.debug(
             "Could not create connection object to %s"
-            % (kdc if kdc else self.target.address)
+            % (kdc or self.target.address)
         )
         return False
 
@@ -428,6 +428,7 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
 
         Returns:
             str: real path on the filesystem
+
         """
         # clean path (remove c:\, /, and current root if already present)
         path=path.removeprefix(self.target.local_root)
@@ -465,7 +466,7 @@ class DPLootLocalSMBConnection(DPLootSMBConnection):
             with open(self.get_real_path(path), "rb") as f:
                 data = f.read()
         except Exception as e:
-            logging.debug(f"Exception occurred while trying to read {path}: {repr(e)}")
+            logging.debug(f"Exception occurred while trying to read {path}: {e!r}")
 
         return data
 

@@ -5,7 +5,7 @@ import json
 import logging
 import tempfile
 import sqlite3
-from typing import Any, List, Tuple, Callable
+from typing import List, Tuple, Callable
 from impacket.structure import Structure
 
 
@@ -288,12 +288,12 @@ class BrowserTriage(Triage):
                                 app_bound_key = AppBoundKey(decrypt_blob(
                                     blob_bytes=intermediate_key, masterkey=masterkey
                                 )).decrypt_key(cng_chromekey=cng_chromekey)
-                    profiles = aesStateKey_json['profile']['profiles_order']
+                    profiles = aesStateKey_json["profile"]["profiles_order"]
                 except KeyError as e:
-                    logging.debug(f"Key not found! {repr(e)}")
+                    logging.debug(f"Key not found! {e!r}")
                     # logging.debug(f"{aesStateKey_json=}")
                 except ValueError as e:
-                    logging.error(f"ValueError: {repr(e)}")
+                    logging.error(f"ValueError: {e!r}")
 
             for profile in profiles:
                 loginData_bytes = self.conn.readFile(

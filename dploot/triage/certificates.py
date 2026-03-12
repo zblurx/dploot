@@ -104,12 +104,12 @@ class CertificatesTriage(Triage):
             self.conn.enable_remoteops()
         certificates = []
         pkeys = self.loot_privatekeys()
-        logging.debug(f'Got {len(pkeys)} private key(s).')
+        logging.debug(f"Got {len(pkeys)} private key(s).")
         # stop here if no private key has been found.
         if not pkeys:
             return certificates
         certs = self.loot_system_certificates()
-        logging.debug(f'Got {len(certs)} certificate(s).')
+        logging.debug(f"Got {len(certs)} certificate(s).")
         if len(pkeys) > 0 and len(certs) > 0:
             certificates = self.correlate_certificates_and_privatekeys(
                 certs=certs, private_keys=pkeys, winuser="SYSTEM"
@@ -153,7 +153,7 @@ class CertificatesTriage(Triage):
                     cert = self.der_to_cert(certblob.der)
                     certificates[certificate_key] = cert
                 except Exception as e:
-                    logging.debug(f'Excetpion while converting certificate: {repr(e)}')
+                    logging.debug(f"Excetpion while converting certificate: {e!r}")
                     continue
             reg.close()
         else:
@@ -204,7 +204,7 @@ class CertificatesTriage(Triage):
                             cert = self.der_to_cert(certblob.der)
                             certificates[certificate_key] = cert
                         except Exception as e:
-                            logging.debug(f'Excetpion while converting certificate: {repr(e)}')
+                            logging.debug(f"Excetpion while converting certificate: {e!r}")
                     rrp.hBaseRegCloseKey(
                         self.conn.remote_ops._RemoteOperations__rrp, keyHandle
                     )
@@ -320,10 +320,9 @@ class CertificatesTriage(Triage):
                             if certblob.der is not None:
                                 cert = self.der_to_cert(certblob.der)
                                 certificates[certname] = cert
-                                logging.debug(f'added cert {cert.subject}')
+                                logging.debug(f"added cert {cert.subject}")
                         except Exception as e:
                             logging.debug(repr(e))
-                            pass
         return certificates
 
     def correlate_certificates_and_privatekeys(

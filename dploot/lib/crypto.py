@@ -47,14 +47,14 @@ class CERTBLOB:
 class CNG_PROPERTY(Structure):
     structure = (
         ("StructLen", "<L=0"),
-        ('Type', '<L=0'),
-        ('Unknown', '<L=0'),
-        ('NameLen', '<L=0'),
-        ('PropertyLen', '<L=0'),
+        ("Type", "<L=0"),
+        ("Unknown", "<L=0"),
+        ("NameLen", "<L=0"),
+        ("PropertyLen", "<L=0"),
         ("_Name", "_-Name", 'self["NameLen"]'),
-        ('Name', ':'),
+        ("Name", ":"),
         ("_Property", "_-Property", 'self["PropertyLen"]'),
-        ('Property', ':'),
+        ("Property", ":"),
     )
 
     def dump(self):
@@ -97,13 +97,13 @@ class CNG_BLOB(Structure):
         ("PrivateKeyLen", "<L=0"),
         ("Unknown2", "16s=b'\\x00'*16"),
         ("_Name", "_-Name", 'self["NameLen"]'),
-        ('Name', ':'),
+        ("Name", ":"),
         ("_PublicProperties", "_-PublicProperties", 'self["PublicPropLen"]'),
-        ('PublicProperties', ':', CNG_PROPERTIES),
+        ("PublicProperties", ":", CNG_PROPERTIES),
         ("_PrivateProperties", "_-PrivateProperties", 'self["PrivatePropLen"]'),
-        ('PrivateProperties', ':', DPAPI_BLOB),
+        ("PrivateProperties", ":", DPAPI_BLOB),
         ("_PrivateKey", "_-PrivateKey", 'self["PrivateKeyLen"]'),
-        ('PrivateKey', ':', DPAPI_BLOB),
+        ("PrivateKey", ":", DPAPI_BLOB),
     )
 
     def dump(self):
@@ -133,8 +133,8 @@ class CHROME_KEY_DATA_BLOB(Structure):
         ("Version", "<I"),
         ("KeyLen", "<I"),
         ("_Key", "_-Key", 'self["KeyLen"]'),
-        ('Key', ':'),
-        ('Remaining', ':')
+        ("Key", ":"),
+        ("Remaining", ":")
     )
 
     def dump(self):
@@ -359,7 +359,7 @@ class PVKHeader(Structure):
 
 def pvkblob_to_pkcs1(key):
     """
-    modified from impacket dpapi.py
+    Modified from impacket dpapi.py
     parse private key into pkcs#1 format
     :param key:
     :return:
