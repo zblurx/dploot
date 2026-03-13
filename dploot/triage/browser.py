@@ -71,7 +71,8 @@ class AppBoundKey(Structure):
                 xored_intermediate_key = byte_xor(intermediate_key, xor_key)
                 cipher = AES.new(xored_intermediate_key, AES.MODE_GCM, nonce=iv)
             else:
-                raise ValueError(f"Unsupported flag: {flag}. Oops, Chrome did it again!")
+                if flag not in [1,2,3]:
+                    raise ValueError(f"Unsupported flag: {flag}. Oops, Chrome did it again!")
             self.key = cipher.decrypt(ciphertext=encrypted_text)
         return self.key
     
@@ -293,7 +294,7 @@ class BrowserTriage(Triage):
                     logging.debug(f"Key not found! {e!r}")
                     # logging.debug(f"{aesStateKey_json=}")
                 except ValueError as e:
-                    logging.error(f"ValueError: {e!r}")
+                    logging.debug(f"ValueError: {e!r}")
 
             for profile in profiles:
                 loginData_bytes = self.conn.readFile(
