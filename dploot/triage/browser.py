@@ -73,6 +73,7 @@ class AppBoundKey(Structure):
             else:
                 if flag not in [1,2,3]:
                     raise ValueError(f"Unsupported flag: {flag}. Oops, Chrome did it again!")
+                return None
             self.key = cipher.decrypt(ciphertext=encrypted_text)
         return self.key
     
