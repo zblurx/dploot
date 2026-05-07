@@ -4,20 +4,16 @@ from binascii import hexlify
 import sys
 from typing import Callable, Tuple
 
-from dploot.lib.target import Target, add_target_argument_group
+from dploot.action import DPLootAction
+from dploot.lib.target import add_target_argument_group
 from dploot.triage.backupkey import BackupkeyTriage
 
 NAME = "backupkey"
 
 
-class BackupkeyAction:
+class BackupkeyAction(DPLootAction):
     def __init__(self, options: argparse.Namespace) -> None:
-        self.options = options
-        self.target = Target.from_options(options)
-
-        self.conn = None
-        self._is_admin = None
-        self.dce = None
+        super().init(options)
         self.outputfile = None
         self.legacy = self.options.legacy
 
@@ -26,24 +22,12 @@ class BackupkeyAction:
         else:
             self.outputfile = "key.pvk"
 
-    def connect(self) -> None:
         if self.target.protocol not in ["smb"]:
             logging.error(f"Protocol {self.target.protocol} not implemented for backupkey. Protocol supported: SMB")
-        self.conn = self.target.create_connection_object()
-        if  not self.conn.connect():
-            logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)
 
     def run(self) -> None:
-        self.connect()
-        logging.info(
-            "Connected to {} as {}\\{} {}\n".format(
-                self.target.address,
-                self.target.domain,
-                self.target.username,
-                ("(admin)" if self.is_admin else ""),
-            )
-        )
+        super().run()
         triage = BackupkeyTriage(target=self.target, conn=self.conn)
         backupkey = triage.triage_backupkey()
         if backupkey.backupkey_v1 is not None and self.legacy:
@@ -51,8 +35,8 @@ class BackupkeyAction:
                 print("Legacy key:")
                 print("0x%s" % hexlify(backupkey.backupkey_v1).decode("latin-1"))
                 print("\n")
-            logging.info("Exporting key to file {}".format(self.outputfile + ".key"))
-            open(self.outputfile + ".key", "wb").write(backupkey.backupkey_v1)
+            logging.info("Exporting key to file {}".format(self.outputfile))
+            open(self.outputfile, "wb").write(backupkey.backupkey_v1)
         if not self.options.quiet:
             print("[DOMAIN BACKUPKEY V2]")
             backupkey.pvk_header.dump()
@@ -66,19 +50,9 @@ class BackupkeyAction:
         )
         open(self.outputfile, "wb").write(backupkey.backupkey_v2)
 
-    @property
-    def is_admin(self) -> bool:
-        if self._is_admin is not None:
-            return self._is_admin
-
-        self._is_admin = self.conn.is_admin()
-        return self._is_admin
-
-
 def entry(options: argparse.Namespace) -> None:
     a = BackupkeyAction(options)
     a.run()
-
 
 def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(NAME, help="Backup Keys from domain controller")

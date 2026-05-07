@@ -118,7 +118,10 @@ class DPLootLocalConnection(DPLootConnection):
             self._bootkey = self.local_ops.getBootKey()
         return self._bootkey
 
-    # Common protocl functions
+    # Common protocol functions
+
+    def print_connected_info(self) -> None:
+        logging.info(f"Reading {os.path.abspath(self.target.local_root)}")
 
     def connect(self) -> bool:
         return True

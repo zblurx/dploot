@@ -12,34 +12,6 @@ from impacket.dcerpc.v5.dtypes import NULL
 from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
 
-def prepare_path_and_share(path, share, isfile=True, double_escape=False):
-    # Only for C$, we change the sharename for C:, to make the default dploot
-    # work without touching the code to much.
-    if share == "C$":
-        share = "C:"
-
-    # Adapt path to be compatible with WMI Queries
-    if isfile:
-        path = f"\\{path}"
-    else:
-        path = f"\\{path}\\"    
-    if double_escape:
-        path = path.replace('\\', '\\\\')
-    return path, share
-
-def check_error(banner, resp) -> bool:
-    call_status = resp.GetCallStatus(0) & 0xffffffff
-    if call_status != 0:
-        from impacket.dcerpc.v5.dcom.wmi import WBEMSTATUS
-        try:
-            error_name = WBEMSTATUS.enumItems(call_status).name
-        except ValueError:
-            error_name = 'Unknown'
-        logging.error('%s - ERROR: %s (0x%08x)' % (banner, error_name, call_status))
-        return False
-    else:
-        logging.debug('%s - OK' % banner)
-        return True
 
 class DPLootWMIConnection(DPLootConnection):
     def __init__(self, target: Target) -> None:
@@ -56,6 +28,34 @@ class DPLootWMIConnection(DPLootConnection):
             namespace = self.cimv2_namespace
         logging.debug(f"Executing WQL Query: {query}")
         return namespace.ExecQuery(query)
+    
+    def __check_error(self, banner, resp) -> bool:
+        call_status = resp.GetCallStatus(0) & 0xffffffff
+        if call_status != 0:
+            try:
+                error_name = wmi.WBEMSTATUS.enumItems(call_status).name
+            except ValueError:
+                error_name = 'Unknown'
+            logging.error('%s - ERROR: %s (0x%08x)' % (banner, error_name, call_status))
+            return False
+        else:
+            logging.debug('%s - OK' % banner)
+            return True
+
+    def __prepare_path_and_share(self, path, share, isfile=True, double_escape=False):
+        # Only for C$, we change the sharename for C:, to make the default dploot
+        # work without touching the code to much.
+        if share == "C$":
+            share = "C:"
+
+        # Adapt path to be compatible with WMI Queries
+        if isfile:
+            path = f"\\{path}"
+        else:
+            path = f"\\{path}\\"    
+        if double_escape:
+            path = path.replace('\\', '\\\\')
+        return path, share
     
     def __get_hive_to_wmihive(self, hive:str) -> bytes:
         if hive.lower() == "hkcr":
@@ -112,7 +112,7 @@ class DPLootWMIConnection(DPLootConnection):
         if not wildcard:
             raise NotImplementedError("Not implemented for wildcard == False")
 
-        path, share = prepare_path_and_share(path, share, isfile=False, double_escape=True)
+        path, share = self.__prepare_path_and_share(path, share, isfile=False, double_escape=True)
         records = []
 
         # There is no WMI class that allow to query dirs AND files at the same time, so
@@ -156,7 +156,7 @@ class DPLootWMIConnection(DPLootConnection):
         if bypass_shared_violation:
             logging.error("bypass_shared_violation is not supported yet in WMI protocol")
         if share != "": # not a UNC path
-            path, share = prepare_path_and_share(path, share)
+            path, share = self.__prepare_path_and_share(path, share)
         fullpath = f"{share}{path}"
         escaped_path = fullpath.replace('\\', '\\\\')
         object_path = f'PS_ModuleFile.InstanceID="{escaped_path}"'
@@ -249,7 +249,7 @@ class DPLootWMIConnection(DPLootConnection):
         wmiPath = f"Win32_ShadowCopy.ID=\"{shadow_id}\""
         logging.debug(f"Trying to delete ShadowCopy with ID {shadow_id}")
         ret = self.cimv2_namespace.DeleteInstance(wmiPath)
-        if not check_error("Deleting Shadow Copy",ret):
+        if not self.__check_error("Deleting Shadow Copy",ret):
             logging.error("You will need to delete this by yourself.")
 
         # Get bootkey

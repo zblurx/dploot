@@ -1,59 +1,28 @@
 import argparse
 import logging
-import sys
-from typing import Callable, Dict, Tuple
+from typing import Callable, Tuple
 
-from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option, parse_file_as_dict
+from dploot.action import DPLootAction
+from dploot.lib.target import add_target_argument_group
+from dploot.lib.utils import dump_looted_files_to_disk
 from dploot.triage.masterkeys import MasterkeysTriage
 
 
 NAME = "masterkeys"
 
 
-class MasterkeysAction:
+class MasterkeysAction(DPLootAction):
     def __init__(self, options: argparse.Namespace) -> None:
-        self.options = options
-
-        self.target = Target.from_options(options)
-
-        self.conn = None
-        self._is_admin = None
-        self.outputfile = None
-        self.pvkbytes = None
-        self.passwords = None
-        self.nthashes = None
-        self.outputdir = None
-
-        self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
-
-        if self.options.outputfile is not None and self.options.outputfile != "":
-            self.outputfile = self.options.outputfile
-
-        self.pvkbytes, self.passwords, self.nthashes = parse_masterkeys_options(
-            self.options, self.target
-        )
-
-    def connect(self) -> None:
-        self.conn = self.target.create_connection_object()
-        if  not self.conn.connect():
-            logging.error("Could not connect to %s" % self.target.address)
-            sys.exit(1)
+        if options.mkfile: # workaround to make sure the file exists
+            open(options.mkfile, "a+").close()
+        super().init_triage_user(options)
 
     def run(self) -> None:
-        self.connect()
-        logging.info(
-            "Connected to {} as {}\\{} {}\n".format(
-                self.target.address,
-                self.target.domain,
-                self.target.username,
-                ("(admin)" if self.is_admin else ""),
-            )
-        )
-        if self.is_admin:
+        super().run()
+        if self.conn.is_admin():
             fd = (
-                open(self.outputfile + ".mkf", "a+")
-                if self.outputfile is not None
+                open(self.mkfile, "a+")
+                if self.mkfile is not None
                 else None
             )
 
@@ -73,8 +42,8 @@ class MasterkeysAction:
             )
             logging.info("Triage ALL USERS masterkeys\n")
             triage.triage_masterkeys()
-            if self.outputfile is not None:
-                logging.critical("Writting masterkeys to %s" % self.outputfile)
+            if self.mkfile is not None:
+                logging.critical("Writting masterkeys to %s" % self.mkfile)
                 fd.close()
             if self.options.hashes_outputfile:
                 print()
@@ -89,65 +58,9 @@ class MasterkeysAction:
         else:
             logging.info("Not an admin, exiting...")
 
-    @property
-    def is_admin(self) -> bool:
-        if self._is_admin is not None:
-            return self._is_admin
-
-        self._is_admin = self.conn.is_admin()
-        return self._is_admin
-
-
 def entry(options: argparse.Namespace) -> None:
     a = MasterkeysAction(options)
     a.run()
-
-
-def parse_masterkeys_options(
-    options: argparse.Namespace, target: Target
-) -> Tuple[bytes, Dict[str, str], Dict[str, str]]:
-    pvkbytes = None
-    passwords = {}
-    nthashes = {}
-    if hasattr(options, "pvk") and options.pvk is not None:
-        try:
-            pvkbytes = open(options.pvk, "rb").read()
-        except Exception as e:
-            logging.error(str(e))
-            sys.exit(1)
-
-    if hasattr(options, "passwords") and options.passwords is not None:
-        try:
-            passwords = parse_file_as_dict(options.passwords)
-        except Exception as e:
-            logging.error(str(e))
-            sys.exit(1)
-
-    if hasattr(options, "nthashes") and options.nthashes is not None:
-        try:
-            nthashes = parse_file_as_dict(options.nthashes)
-        except Exception as e:
-            logging.error(str(e))
-            sys.exit(1)
-
-    if target.password is not None and target.password != "":
-        if passwords is None:
-            passwords = {}
-        passwords[target.username] = target.password
-
-    if target.nthash is not None and target.nthash != "":
-        if nthashes is None:
-            nthashes = {}
-        nthashes[target.username] = target.nthash.lower()
-
-    if nthashes is not None:
-        nthashes = {k.lower(): v.lower() for k, v in nthashes.items()}
-
-    if passwords is not None:
-        passwords = {k.lower(): v for k, v in passwords.items()}
-
-    return pvkbytes, passwords, nthashes
-
 
 def add_masterkeys_argument_group(group: argparse._ArgumentGroup) -> None:
     group.add_argument(
@@ -183,9 +96,9 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     add_masterkeys_argument_group(group)
 
     group.add_argument(
-        "-outputfile",
+        "-mkfile",
         action="store",
-        help=("Export keys to file"),
+        help=("File containing {GUID}:SHA1 masterkeys mappings. Will append new keys to this file."),
     )
 
     group.add_argument(

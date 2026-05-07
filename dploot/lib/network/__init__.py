@@ -25,6 +25,18 @@ class DPLootConnection:
         directories = self.list_dir(path="Users")
         return [d.get_longname() for d in directories if d.get_longname() not in self.false_positive and d.is_directory() > 0]
     
+    def print_connected_info(self) -> None:
+        logging.info(
+                "Connected to {} as {}\\{}{} through {} connection {}\n".format(
+                    self.target.address,
+                    self.target.domain,
+                    self.target.username,
+                    (" with kerberos" if self.target.do_kerberos else " with NTLM"),
+                    self.target.protocol.upper(),
+                    ("(admin)" if self.is_admin() else ""),
+                )
+            )
+    
     # The following functions should be implemented by every protocol if possible
     
     def connect(self) -> bool:
