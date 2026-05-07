@@ -22,6 +22,7 @@ class Target:
         self.aesKey: str = None
         self.local_root: str = None
         self.is_local: bool = False
+        self.protocol: str = "smb"
 
     @staticmethod
     def from_options(options) -> "Target":
@@ -42,7 +43,7 @@ class Target:
             no_pass=options.no_pass,
             dc_ip=options.dc_ip,
             aesKey=options.aesKey,
-            local_root=options.localroot,
+            protocol=options.protocol
         )
 
     @staticmethod
@@ -60,26 +61,13 @@ class Target:
         no_pass: bool = False,
         dc_ip: Optional[str] = None,
         aesKey: Optional[str] = None,
-        local_root: Optional[str] = None,
+        protocol: str = "smb"
     ) -> "Target":
         self = Target()
 
-        if target == "LOCAL":
+        self.protocol = protocol
+        if self.protocol == "local":
             self.is_local = True
-
-        if self.is_local is True:
-            if do_kerberos or use_kcache or kdcHost is not None:
-                print(
-                    "Invalid options: Use kerberos does not make sense when target=LOCAL",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            if dc_ip is not None and dc_ip != "LOCAL":
-                print(
-                    "Invalid options: dc-ip conflicts with target=LOCAL",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
 
         if domain is None:
             domain = ""
@@ -123,18 +111,21 @@ class Target:
         self.use_kcache = use_kcache
         self.dc_ip = dc_ip
         self.aesKey = aesKey
-        self.local_root = local_root
+        self.local_root = target
 
         return self
 
     def __repr__(self) -> str:
         return "<Target (%s)>" % repr(self.__dict__)
     
-    def create_connection_object(self, connection_type: str = "smb"):
-        if connection_type == "smb":
+    def create_connection_object(self):
+        if self.protocol == "smb":
             from dploot.lib.network.smb import DPLootSMBConnection
             return DPLootSMBConnection(self)
-        elif connection_type == "local":
+        if self.protocol == "wmi":
+            from dploot.lib.network.wmi import DPLootWMIConnection
+            return DPLootWMIConnection(self)
+        elif self.protocol == "local":
             from dploot.lib.network.local import DPLootLocalConnection
             return DPLootLocalConnection(self)
         else :
@@ -150,7 +141,7 @@ def add_target_argument_group(
         action="store",
         dest="target",
         metavar="<target name or address>",
-        help="Target ip or address, or LOCAL",
+        help="Target ip or address, or Root Path if local protocol used",
     )
 
     parser.add_argument(
@@ -219,12 +210,12 @@ def add_target_argument_group(
         ),
     )
     group.add_argument(
-        "-root",
+        "-protocol",
         action="store",
-        dest="localroot",
-        metavar="path",
-        default=".",
+        metavar="PROTOCOL",
+        default="smb",
+        choices=["smb", "wmi", "local"],
         help=(
-            "Root directory (for local operations). This directory should contain Windows and Users subdirectories"
+            "Protocol to use: smb(default), wmi, local"
         ),
     )

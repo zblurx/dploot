@@ -27,12 +27,11 @@ class BackupkeyAction:
             self.outputfile = "key.pvk"
 
     def connect(self) -> None:
+        if self.target.protocol not in ["smb"]:
+            logging.error(f"Protocol {self.target.protocol} not implemented for backupkey. Protocol supported: SMB")
         self.conn = self.target.create_connection_object()
-        if self.conn.connect() is None:
+        if  not self.conn.connect():
             logging.error("Could not connect to %s" % self.target.address)
-            sys.exit(1)
-        if self.conn.local_session:
-            logging.error("Backup key is not implemented with LOCAL target.")
             sys.exit(1)
 
     def run(self) -> None:

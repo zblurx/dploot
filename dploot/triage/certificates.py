@@ -5,10 +5,6 @@ import os
 from typing import Dict, List, Tuple, Callable
 from dataclasses import dataclass
 
-from impacket.dcerpc.v5 import rrp
-from impacket.system_errors import ERROR_NO_MORE_ITEMS
-from impacket.winregistry import Registry
-
 from Cryptodome.PublicKey import RSA
 from cryptography import x509
 from cryptography.hazmat._oid import ExtensionOID
@@ -98,16 +94,8 @@ class CertificatesTriage(Triage):
             per_loot_callback=per_certificate_callback, 
             false_positive=false_positive
         )
-        self._users = None
 
     def triage_system_certificates(self) -> List[Certificate]:
-        logging.getLogger("impacket").disabled = True
-        if self.conn.local_session:
-            self.conn.enable_localops(
-                os.path.join(self.target.local_root, r"Windows/System32/config/SYSTEM")
-            )
-        else:
-            self.conn.enable_remoteops()
         certificates = []
         pkeys = self.loot_privatekeys()
         logging.debug(f"Got {len(pkeys)} private key(s).")
@@ -123,109 +111,23 @@ class CertificatesTriage(Triage):
         return certificates
 
     def loot_system_certificates(self) -> Dict[str, x509.Certificate]:
-        my_certificates_keys = (
-            "SOFTWARE\\Microsoft\\SystemCertificates\\MY\\Certificates",
-            "SOFTWARE\\Microsoft\\SystemCertificates\\My\\Certificates",
-        )
-        certificate_keys = []
+        my_certificates_key = [
+            "SOFTWARE\\Microsoft\\SystemCertificates\\MY\\Certificates"
+        ]
         certificates = {}
-        if self.conn.local_session:
-            # open hive
-            reg_file_path = os.path.join(
-                self.target.local_root, r"Windows/System32/config/SOFTWARE"
-            )
-            reg = Registry(reg_file_path, isRemote=False)
-
-            # open key
-            for my_certificates_key in my_certificates_keys:
-                key_path = my_certificates_key[8:]
-                parentKey = reg.findKey(key_path)
-                if parentKey is not None:
-                    break
-            else:
-                logging.error(f"Key {key_path} not found in {reg_file_path}")
-                return certificates
-                
-            # for each certificate subkey (such as Microsoft\SystemCertificates\MY\Certificates\3FD2...)
-            for certificate_key in reg.enumKey(parentKey):
-                # get 'Blob' value
-                (_, certblob_bytes) = reg.getValue(
-                    ntpath.join(key_path, certificate_key, "Blob")
-                )
+        for my_key in my_certificates_key:
+            for certificate_key in self.conn.reg_enum_key("HKLM",my_key):
+                certblob_bytes = self.conn.reg_get_key_value("HKLM",f"{my_key}\\{certificate_key}","Blob")
                 logging.debug(
-                    f"Found Certificates Blob: \\\\{self.target.address}\\{ntpath.join(my_certificates_key, certificate_key)}"
+                    f"Found Certificates Blob: \\\\{self.target.address}\\{ntpath.join(my_key, certificate_key)}"
                 )
                 certblob = CERTBLOB(certblob_bytes)
-                if certblob.der is None:
-                    continue
-
-                # store in certificates dict
-                try:
-                    cert = self.der_to_cert(certblob.der)
-                    certificates[certificate_key] = cert
-                except Exception as e:
-                    logging.debug(f"Excetpion while converting certificate: {e!r}")
-                    continue
-            reg.close()
-        else:
-            my_certificates_key=my_certificates_keys[0]
-            ans = rrp.hOpenLocalMachine(self.conn.remote_ops._RemoteOperations__rrp)
-            regHandle = ans["phKey"]
-
-            ans = rrp.hBaseRegOpenKey(
-                self.conn.remote_ops._RemoteOperations__rrp,
-                regHandle,
-                my_certificates_key,
-                samDesired=rrp.KEY_ENUMERATE_SUB_KEYS,
-            )
-            keyHandle = ans["phkResult"]
-            i = 0
-            while True:
-                try:
-                    enum_ans = rrp.hBaseRegEnumKey(
-                        self.conn.remote_ops._RemoteOperations__rrp, keyHandle, i
-                    )
-                    certificate_keys.append(enum_ans["lpNameOut"][:-1])
-                    i += 1
-                except rrp.DCERPCSessionError as e:
-                    if e.get_error_code() == ERROR_NO_MORE_ITEMS:
-                        break
-                except Exception as e:
-                    import traceback
-
-                    traceback.print_exc()
-                    logging.error(str(e))
-            rrp.hBaseRegCloseKey(self.conn.remote_ops._RemoteOperations__rrp, keyHandle)
-
-            for certificate_key in certificate_keys:
-                try:
-                    regKey = my_certificates_key + "\\" + certificate_key
-                    ans = rrp.hBaseRegOpenKey(
-                        self.conn.remote_ops._RemoteOperations__rrp, regHandle, regKey
-                    )
-                    keyHandle = ans["phkResult"]
-                    _, certblob_bytes = rrp.hBaseRegQueryValue(
-                        self.conn.remote_ops._RemoteOperations__rrp, keyHandle, "Blob"
-                    )
-                    logging.debug(
-                        f"Found Certificates Blob: \\\\{self.target.address}\\{regKey}"
-                    )
-                    certblob = CERTBLOB(certblob_bytes)
-                    if certblob.der is not None:
-                        try:
-                            cert = self.der_to_cert(certblob.der)
-                            certificates[certificate_key] = cert
-                        except Exception as e:
-                            logging.debug(f"Excetpion while converting certificate: {e!r}")
-                    rrp.hBaseRegCloseKey(
-                        self.conn.remote_ops._RemoteOperations__rrp, keyHandle
-                    )
-                except Exception as e:
-                    if logging.getLogger().level == logging.DEBUG:
-                        import traceback
-
-                        traceback.print_exc()
-                        logging.debug(str(e))
+                if certblob.der is not None:
+                    try:
+                        cert = self.der_to_cert(certblob.der)
+                        certificates[certificate_key] = cert
+                    except Exception as e:
+                        logging.debug(f'Excetpion while converting certificate: {repr(e)}')
         return certificates
 
     def triage_certificates(self) -> List[Certificate]:
@@ -261,7 +163,7 @@ class CertificatesTriage(Triage):
         self, privatekeys_paths: List[str] = system_capi_keys_generic_path
     ) -> Dict[str, Tuple[str, RSA.RsaKey]]:
         pkeys = {}
-        pkeys_dirs = self.conn.listDirs(self.share, privatekeys_paths)
+        pkeys_dirs = self.conn.list_dirs(self.share, privatekeys_paths)
         for pkeys_path, pkeys_dir in pkeys_dirs.items():
             if pkeys_dir is not None:
                 for d in pkeys_dir:
@@ -275,8 +177,8 @@ class CertificatesTriage(Triage):
                     ):
                         sid = d.get_longname()
                         pkeys_sid_path = ntpath.join(pkeys_path, sid)
-                        pkeys_sid_dir = self.conn.remote_list_dir(
-                            self.share, path=pkeys_sid_path
+                        pkeys_sid_dir = self.conn.list_dir(
+                            path=pkeys_sid_path, share=self.share
                         )
                         for file in pkeys_sid_dir:
                             if file.is_directory() == 0 and is_certificate_guid(
@@ -287,7 +189,7 @@ class CertificatesTriage(Triage):
                                 logging.debug(
                                     f"Found PrivateKey Blob: \\\\{self.target.address}\\{self.share}\\{filepath}"
                                 )
-                                pkey_bytes = self.conn.readFile(self.share, filepath, looted_files=self.looted_files)
+                                pkey_bytes = self.conn.read_file(share=self.share, path=filepath, looted_files=self.looted_files)
                                 if (
                                     pkey_bytes is not None
                                     and self.masterkeys is not None
@@ -316,7 +218,7 @@ class CertificatesTriage(Triage):
         self, certificates_paths: List[str]
     ) -> Dict[str, x509.Certificate]:
         certificates = {}
-        certificates_dir = self.conn.listDirs(self.share, certificates_paths)
+        certificates_dir = self.conn.list_dirs(self.share, certificates_paths)
         for cert_dir_path, cert_dir in certificates_dir.items():
             if cert_dir is not None:
                 for cert in cert_dir:
@@ -327,7 +229,7 @@ class CertificatesTriage(Triage):
                             logging.debug(
                                 f"Found Certificates Blob: \\\\{self.target.address}\\{self.share}\\{certpath}"
                             )
-                            certbytes = self.conn.readFile(self.share, certpath, looted_files=self.looted_files)
+                            certbytes = self.conn.read_file(share=self.share, path=certpath, looted_files=self.looted_files)
                             certblob = CERTBLOB(certbytes)
                             if certblob.der is not None:
                                 cert = self.der_to_cert(certblob.der)
@@ -433,12 +335,3 @@ class CertificatesTriage(Triage):
             pass
 
         return "", "SAN not found"
-
-    @property
-    def users(self) -> List[str]:
-        if self._users is not None:
-            return self._users
-
-        self._users = self.conn.list_users(self.share)
-
-        return self._users

@@ -42,7 +42,7 @@ class MobaXtermAction:
 
     def connect(self) -> None:
         self.conn = self.target.create_connection_object()
-        if self.conn.connect() is None:
+        if  not self.conn.connect():
             logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)
 
@@ -91,7 +91,7 @@ class MobaXtermAction:
                 per_secret_callback=secret_callback,
             )
             logging.info("Triage MobaXterm Secrets\n")
-            triage.triage_mobaxterm(offline_users=self.options.dump_offline_users)
+            triage.triage_mobaxterm()
             if self.outputdir is not None:
                 dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:
@@ -125,13 +125,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     )
 
     add_masterkeys_argument_group(group)
-
-    group.add_argument(
-        "-dump-offline-users",
-        action="store_true",
-        help=("Will try to offline users by dumping them NTUSER.DAT file. Noisy"),
-    )
-
     add_target_argument_group(subparser)
 
     return NAME, entry

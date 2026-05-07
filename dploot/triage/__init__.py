@@ -28,3 +28,13 @@ class Triage:
         self.false_positive = FalsePositives(false_positive)
 
         self.looted_files = {}
+        self._users = None
+
+    @property
+    def users(self) -> List[str]:
+        if self._users is not None:
+            return self._users
+
+        self._users = self.conn.list_users()
+
+        return self._users

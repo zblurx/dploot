@@ -105,7 +105,6 @@ class RDGTriage(Triage):
             per_loot_callback=per_credential_callback, 
             false_positive=false_positive
         )
-        self._users = None
         
     def triage_rdcman(self) -> Tuple[List[RDCMANFile], List[RDGFile]]:
         rdcman_files = []
@@ -130,8 +129,8 @@ class RDGTriage(Triage):
             user_rcdman_settings_filepath = (
                 self.user_rdcman_settings_generic_filepath % user
             )
-            rdcmanblob_bytes = self.conn.readFile(
-                self.share, user_rcdman_settings_filepath, looted_files=self.looted_files
+            rdcmanblob_bytes = self.conn.read_file(
+                share=self.share, path=user_rcdman_settings_filepath, looted_files=self.looted_files
             )
             if rdcmanblob_bytes:
                 logging.debug("Found RDCMan Settings for %s user" % (user))
@@ -148,7 +147,7 @@ class RDGTriage(Triage):
                         filename = item.text
                         if "\\\\" not in filename and "C:\\" in filename:
                             filepath = filename.replace("C:\\", "")
-                            rdg_bytes = self.conn.readFile(self.share, filepath, looted_files=self.looted_files)
+                            rdg_bytes = self.conn.read_file(share=self.share, path=filepath, looted_files=self.looted_files)
                             rdg_xml = ET.fromstring(rdg_bytes)
                             rdgfiles.append(
                                 RDCMANFile(
@@ -238,12 +237,3 @@ class RDGTriage(Triage):
                     password = decrypt_blob(pass_dpapi_blob, masterkey)
 
         return profile_name, full_username, password
-
-    @property
-    def users(self) -> List[str]:
-        if self._users is not None:
-            return self._users
-
-        self._users = self.conn.list_users(self.share)
-
-        return self._users

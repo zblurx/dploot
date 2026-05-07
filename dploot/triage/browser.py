@@ -196,9 +196,7 @@ class BrowserTriage(Triage):
             per_loot_callback=per_secret_callback, 
             false_positive=false_positive
         )
-
-        self._users: List[str] = None
-    
+            
     def triage_browsers(
         self, gather_cookies: bool = False, bypass_shared_violation: bool = False, cng_chromekey: bytes = None
     ) -> Tuple[List[LoginData], List[Cookie]]:
@@ -250,8 +248,8 @@ class BrowserTriage(Triage):
         for browser, paths in self.user_generic_chrome_paths.items():
             aeskey = None
             app_bound_key = None
-            aesStateKey_bytes = self.conn.readFile(
-                shareName=self.share,
+            aesStateKey_bytes = self.conn.read_file(
+                share=self.share,
                 path=paths["aesStateKeyPath"] % user,
                 bypass_shared_violation=bypass_shared_violation,
                 looted_files=self.looted_files
@@ -298,8 +296,8 @@ class BrowserTriage(Triage):
                     logging.debug(f"ValueError: {e!r}")
 
             for profile in profiles:
-                loginData_bytes = self.conn.readFile(
-                    shareName=self.share,
+                loginData_bytes = self.conn.read_file(
+                    share=self.share,
                     path=paths["loginDataPath"] % (user,profile),
                     bypass_shared_violation=bypass_shared_violation,
                     looted_files=self.looted_files
@@ -345,8 +343,8 @@ class BrowserTriage(Triage):
                     fh.close()
                 if gather_cookies:
                     for cookiepath in paths["cookiesDataPath"]:
-                        cookiesData_bytes = self.conn.readFile(
-                            shareName=self.share,
+                        cookiesData_bytes = self.conn.read_file(
+                            share=self.share,
                             path=cookiepath % (user,profile),
                             bypass_shared_violation=bypass_shared_violation,
                             looted_files=self.looted_files
@@ -402,8 +400,8 @@ class BrowserTriage(Triage):
                                     if self.per_loot_callback is not None:
                                         self.per_loot_callback(cookie)
                             fh.close()
-                webData_bytes = self.conn.readFile(
-                    shareName=self.share,
+                webData_bytes = self.conn.read_file(
+                    share=self.share,
                     path=paths["webDataPath"] % (user,profile),
                     bypass_shared_violation=bypass_shared_violation,
                     looted_files=self.looted_files
@@ -432,12 +430,3 @@ class BrowserTriage(Triage):
                             if self.per_loot_callback is not None:
                                 self.per_loot_callback(google_refresh_token)
         return credentials, cookies
-
-    @property
-    def users(self) -> List[str]:
-        if self._users is not None:
-            return self._users
-
-        self._users = self.conn.list_users(self.share)
-
-        return self._users

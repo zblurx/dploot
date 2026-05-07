@@ -35,7 +35,7 @@ class MachineVaultsAction:
 
     def connect(self) -> None:
         self.conn = self.target.create_connection_object()
-        if self.conn.connect() is None:
+        if  not self.conn.connect():
             logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)
 

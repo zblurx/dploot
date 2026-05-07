@@ -4,8 +4,6 @@ import ntpath
 import os
 from typing import Any, Dict, List, Optional
 
-from impacket.examples.secretsdump import LSASecrets
-
 from dploot.triage import Triage
 from dploot.lib.masterkey import Masterkey
 from dploot.lib.target import Target
@@ -53,7 +51,6 @@ class MasterkeysTriage(Triage):
         self.passwords = passwords
         self.nthashes = nthashes
 
-        self._users = None
         self.all_looted_masterkeys = []
         self.dpapiSystem = dpapiSystem
         if self.dpapiSystem is None:
@@ -62,44 +59,13 @@ class MasterkeysTriage(Triage):
 
     def triage_system_masterkeys(self) -> List[Masterkey]:
         masterkeys = []
-        logging.getLogger("impacket").disabled = True
         if len(self.dpapiSystem) == 0:
-            if self.conn.local_session:
-                self.conn.enable_localops(
-                    os.path.join(
-                        self.target.local_root, r"Windows/System32/config/SYSTEM"
-                    )
-                )
-            else:
-                self.conn.enable_remoteops()
-            if self.conn.bootkey:
-                logging.debug(f"Got Bootkey: {hexlify(self.conn.bootkey)}")
-
-                try:
-                    SECURITYFileName = (
-                        os.path.join(
-                            self.target.local_root, r"Windows/System32/config/SECURITY"
-                        )
-                        if self.conn.local_session
-                        else self.conn.remote_ops.saveSECURITY()
-                    )
-                    # retrieve DPAPI keys
-                    LSA = LSASecrets(
-                        SECURITYFileName,
-                        self.conn.bootkey,
-                        self.conn.remote_ops,
-                        isRemote=(not bool(self.conn.local_session)),
-                        perSecretCallback=self.getDPAPI_SYSTEM,
-                    )
-                    LSA.dumpSecrets()
-                    LSA.finish()
-                except Exception as e:
-                    logging.error("LSA hashes extraction failed: %s" % str(e))
+            self.dpapiSystem = self.conn.get_dpapi_system_keys(self.looted_files)
         if self.dpapiSystem is None or len(self.dpapiSystem) != 2:
             logging.debug("Could not get DPAPI SYSTEM keys")
             return masterkeys
-        system_protect_dir = self.conn.remote_list_dir(
-            self.share, path=self.system_masterkeys_generic_path
+        system_protect_dir = self.conn.list_dir(
+            path=self.system_masterkeys_generic_path, share=self.share
         )
         for d in system_protect_dir:
             if (
@@ -111,8 +77,8 @@ class MasterkeysTriage(Triage):
                 system_protect_dir_sid_path = ntpath.join(
                     self.system_masterkeys_generic_path, sid
                 )
-                system_sid_dir = self.conn.remote_list_dir(
-                    self.share, path=system_protect_dir_sid_path
+                system_sid_dir = self.conn.list_dir(
+                    share=self.share, path=system_protect_dir_sid_path
                 )
                 for f in system_sid_dir:
                     if f.is_directory() == 0 and is_guid(f.get_longname()):
@@ -122,7 +88,7 @@ class MasterkeysTriage(Triage):
                             f"Found SYSTEM system MasterKey: \\\\{self.target.address}\\{self.share}\\{filepath}"
                         )
                         # read masterkey
-                        masterkey_bytes = self.conn.readFile(self.share, filepath, looted_files=self.looted_files)
+                        masterkey_bytes = self.conn.read_file(share=self.share, path=filepath, looted_files=self.looted_files)
                         if masterkey_bytes is not None:
                             masterkey = Masterkey(
                                 guid=guid,
@@ -139,8 +105,8 @@ class MasterkeysTriage(Triage):
                         system_protect_dir_user_path = ntpath.join(
                             system_protect_dir_sid_path, f.get_longname()
                         )
-                        system_user_dir = self.conn.remote_list_dir(
-                            self.share, path=system_protect_dir_user_path
+                        system_user_dir = self.conn.list_dir(
+                            share=self.share, path=system_protect_dir_user_path
                         )
                         for g in system_user_dir:
                             if g.is_directory() == 0 and is_guid(g.get_longname()):
@@ -152,8 +118,8 @@ class MasterkeysTriage(Triage):
                                     f"Found SYSTEM user MasterKey: \\\\{self.target.address}\\{self.share}\\{filepath}"
                                 )
                                 # read masterkey
-                                masterkey_bytes = self.conn.readFile(
-                                    self.share, filepath, looted_files=self.looted_files
+                                masterkey_bytes = self.conn.read_file(
+                                    share=self.share, path=filepath, looted_files=self.looted_files
                                 )
                                 if masterkey_bytes is not None:
                                     masterkey = Masterkey(
@@ -187,8 +153,8 @@ class MasterkeysTriage(Triage):
         user_masterkey_path = ntpath.join(
             ntpath.join("Users", user), self.user_masterkeys_generic_path
         )
-        user_protect_dir = self.conn.remote_list_dir(
-            self.share, path=user_masterkey_path
+        user_protect_dir = self.conn.list_dir(
+            share=self.share, path=user_masterkey_path
         )
         if (
             user_protect_dir is None
@@ -207,8 +173,8 @@ class MasterkeysTriage(Triage):
                     ),
                     sid,
                 )
-                user_sid_dir = self.conn.remote_list_dir(
-                    self.share, path=user_masterkey_path_sid
+                user_sid_dir = self.conn.list_dir(
+                    path=user_masterkey_path_sid
                 )
                 for f in user_sid_dir:
                     if f.is_directory() == 0 and is_guid(f.get_longname()):
@@ -218,7 +184,7 @@ class MasterkeysTriage(Triage):
                             f"Found MasterKey: \\\\{self.target.address}\\{self.share}\\{filepath}"
                         )
                         # read masterkey
-                        masterkey_bytes = self.conn.readFile(self.share, filepath, looted_files=self.looted_files)
+                        masterkey_bytes = self.conn.read_file(path=filepath, looted_files=self.looted_files)
                         if masterkey_bytes is not None:
                             password = None
                             nthash = None
@@ -260,20 +226,3 @@ class MasterkeysTriage(Triage):
                                 if self.per_loot_callback is not None:
                                     self.per_loot_callback(masterkey)
         return masterkeys
-
-    def getDPAPI_SYSTEM(self, _, secret) -> None:
-        if secret.startswith("dpapi_machinekey:"):
-            machineKey, userKey = secret.split("\n")
-            machineKey = machineKey.split(":")[1]
-            userKey = userKey.split(":")[1]
-            self.dpapiSystem["MachineKey"] = unhexlify(machineKey[2:])
-            self.dpapiSystem["UserKey"] = unhexlify(userKey[2:])
-
-    @property
-    def users(self) -> List[str]:
-        if self._users is not None:
-            return self._users
-
-        self._users = self.conn.list_users(self.share)
-
-        return self._users

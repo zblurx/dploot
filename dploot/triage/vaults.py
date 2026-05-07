@@ -100,11 +100,10 @@ class VaultsTriage(Triage):
             per_loot_callback=per_vault_callback, 
             false_positive=false_positive
         )
-        self._users = None
 
     def triage_system_vaults(self) -> List[VaultCred]:
         vaults_creds = []
-        vault_dirs = self.conn.listDirs(self.share, self.system_vault_generic_path)
+        vault_dirs = self.conn.list_dirs(self.share, self.system_vault_generic_path)
         for system_vault_path, system_vault_dir in vault_dirs.items():
             if system_vault_dir is not None:
                 vaults_creds += self.triage_vaults_folder(
@@ -129,7 +128,7 @@ class VaultsTriage(Triage):
 
     def triage_vaults_for_user(self, user: str) -> List[VaultCred]:
         vaults_creds = []
-        vault_dirs = self.conn.listDirs(
+        vault_dirs = self.conn.list_dirs(
             self.share, [elem % user for elem in self.user_vault_generic_path]
         )
         for user_vault_path, user_vault_dir in vault_dirs.items():
@@ -155,7 +154,7 @@ class VaultsTriage(Triage):
 
                 # read vpol blob
                 vpol_filepath = ntpath.join(vault_directory_path, self.vpol_filename)
-                vpolblob_bytes = self.conn.readFile(self.share, vpol_filepath, looted_files=self.looted_files)
+                vpolblob_bytes = self.conn.read_file(share=self.share, path=vpol_filepath, looted_files=self.looted_files)
                 vpol_keys = []
                 if vpolblob_bytes is not None and self.masterkeys is not None:
                     masterkey = find_masterkey_for_vpol_blob(
@@ -185,7 +184,7 @@ class VaultsTriage(Triage):
                         logging.debug("Could not decrypt...")
 
                 # read vrcd blob
-                vault_dir = self.conn.remote_list_dir(self.share, vault_directory_path)
+                vault_dir = self.conn.list_dir(share=self.share, path=vault_directory_path)
                 for file in vault_dir:
                     filename = file.get_longname()
                     if (
@@ -195,7 +194,7 @@ class VaultsTriage(Triage):
                         and filename[-4:].lower() == "vcrd"
                     ):
                         vrcd_filepath = ntpath.join(vault_directory_path, filename)
-                        vrcd_bytes = self.conn.readFile(self.share, vrcd_filepath, looted_files=self.looted_files)
+                        vrcd_bytes = self.conn.read_file(share=self.share, path=vrcd_filepath, looted_files=self.looted_files)
                         if (
                             vrcd_bytes is not None
                             and filename[-4:].lower() in ["vsch", "vcrd"]
@@ -296,12 +295,3 @@ class VaultsTriage(Triage):
                                     f"{e!s} while parsing vault:{vault.__class__} {vault.__dict__}"
                                 )
         return vaults_creds
-
-    @property
-    def users(self) -> List[str]:
-        if self._users is not None:
-            return self._users
-
-        self._users = self.conn.list_users(self.share)
-
-        return self._users

@@ -1,20 +1,18 @@
+from binascii import unhexlify
 import ntpath
 import os
 import logging
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional
 
 from dploot.lib.network import DPLootConnection
 
 from impacket.smb import SharedFile
-from impacket.winregistry import Registry
+from impacket.winregistry import get_registry_parser
 from impacket.smb import ATTR_DIRECTORY
-from impacket.examples.secretsdump import LocalOperations
-from impacket.smb import FILE_SHARE_READ
-from impacket.smb3structs import (
-    FILE_OPEN
-)
+from impacket.examples.secretsdump import LocalOperations, LSASecrets
+
 
 class DPLootLocalConnection(DPLootConnection):
     systemroot = "C:\\Windows"
@@ -22,68 +20,22 @@ class DPLootLocalConnection(DPLootConnection):
 
     def __init__(self, target=None) -> None:
         super().__init__(target)
-        self.local_ops = None
         self.local_session = True
-        self.smb_session = DPLootDummySession()
-        # the following are functions that should never be called on this class.
-        self.enable_remoteops = None
-        self.reconnect = None
-
-
-    def connect(self) -> "Any | None":
-        return self.smb_session
-
-    def is_admin(self) -> bool:
-        return True
-
-    def enable_localops(self, systemHive, force=False) -> None:
-        if self.local_ops is not None and self.bootkey is not None and not force:
-            return
-        try:
-            self.local_ops = LocalOperations(systemHive)
-            self.bootkey = self.local_ops.getBootKey()
-        except Exception as e:
-            logging.error(f"LocalOperations failed: {e}")
+        self._usersProfiles = None
+        self._local_ops = None
+        self._bootkey = None
 
     # we 'emulate' remote file operations by converting local os.DirEntry() to impacket.SharedFile()
-    def _sharedfile_fromdirentry(d: os.DirEntry):
+    def __sharedfile_fromdirentry(d: os.DirEntry):
         (filesize, atime, mtime, ctime) = d.stat(follow_symlinks=False)[6:]
         attribs = 0
         if d.is_dir(follow_symlinks=False):
             attribs |= ATTR_DIRECTORY
-        return SharedFile(ctime, atime, mtime, filesize, None, attribs, d.name, d.name)
+        return SharedFile(ctime, atime, mtime, mtime, filesize, None, attribs, d.name, d.name)
 
-    SharedFile.fromDirEntry = _sharedfile_fromdirentry
+    SharedFile.fromDirEntry = __sharedfile_fromdirentry
 
-    def remote_list_dir(self, share, path, wildcard=True) -> list[SharedFile]:
-        path = self.get_real_path(path)
-        if not wildcard:
-            raise NotImplementedError("Not implemented for wildcard == False")
-        try:
-            result = list(map(SharedFile.fromDirEntry, os.scandir(path)))
-        except FileNotFoundError:
-            result = []
-        return result
-
-    def list_users(self, share):
-        users_dir_path = "Users\\*"
-        directories = self.listPath(
-            shareName=share, path=ntpath.normpath(users_dir_path)
-        )
-        return [d.get_longname() for d in directories if d.get_longname() not in self.false_positive and d.is_directory() > 0]
-
-    def listPath(self, shareName: str = "C$", path: Optional[str] = None, password: Optional[str] = None):
-        if path[-2:] == r"\*":
-            return self.remote_list_dir(shareName, path[:-2], wildcard=True)
-        if path[-1] == "*":
-            return self.remote_list_dir(shareName, path[:-1], wildcard=True)
-        else:
-            raise NotImplementedError("Not implemented for wildcard == False")
-
-    def getFile(self, *args, **kwargs) -> "Any | None":
-        raise NotImplementedError("getFile is not implemented in LOCAL mode")
-
-    def get_real_path(self, path:str) -> str:
+    def __get_real_path(self, path:str) -> str:
         """Match path against file system (case insensitive if py>=3.12).
             Only used when target is `LOCAL`.
 
@@ -95,6 +47,8 @@ class DPLootLocalConnection(DPLootConnection):
         """
         # clean path (remove c:\, /, and current root if already present)
         path=path.removeprefix(self.target.local_root)
+        if r"%systemroot%" in path:
+            path = path.replace(r"%systemroot%", self.systemroot)
         if path[:3].lower() == "c:\\":
             path = path[3:]
         path=path.replace("\\", os.sep).lstrip(os.sep)
@@ -112,69 +66,155 @@ class DPLootLocalConnection(DPLootConnection):
 
         #logging.debug(f"get_real_path: [{globok=}] returning {path}")
         return str(path)
+    
+    def __get_user_profile(self, sid:str) -> str | None:
+        userlist_key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+        profile_path = self.reg_get_key_value("HKLM",f"{userlist_key}\\{sid}","ProfileImagePath")
+        return profile_path
 
-    def readFile(
+    def __open_corresponding_hive(self, hive:str, path:str):
+        if hive.lower() == "hklm":
+            if path[:9] == "SOFTWARE\\":
+                return self.__get_real_path(r"Windows/System32/config/SOFTWARE"), path[8:]
+            else:
+                raise ValueError(f"__open_corresponding_hive not implemented for path {hive}\\{path}")
+        elif hive.lower() == "hku":
+            sid,tail = path.split("\\",1)
+            profile_path = self.__get_user_profile(sid)
+            return self.__get_real_path(os.path.join(profile_path,"NTUSER.DAT")), tail
+        else:
+            raise ValueError(f"__open_corresponding_hive not implemented for hive {hive}")
+    
+    def __get_registry_if_exists(self, reg_filepath):
+        try:
+            return get_registry_parser(reg_filepath, isRemote=False)
+        except FileNotFoundError:
+            logging.debug(f"Could not find {reg_filepath}")
+            return None 
+
+    @property
+    def local_ops(self) -> LocalOperations:
+        if self._local_ops is not None:
+            return self._local_ops
+        logging.getLogger("impacket").disabled = True
+        try:
+            self._local_ops = LocalOperations(
+                    os.path.join(
+                        self.target.local_root, r"Windows/System32/config/SYSTEM"
+                    )
+                )
+        except Exception as e:
+            logging.error(f"LocalOperations failed: {e}")
+
+        return self._local_ops
+    
+    @property
+    def bootkey(self):
+        if self._bootkey is not None:
+            return self._bootkey
+        if os.path.exists(os.path.join(self.target.local_root, "Windows/System32/config/SYSTEM_bootkey")):
+            self._bootkey = self.read_file("Windows/System32/config/SYSTEM_bootkey")
+        else:
+            self._bootkey = self.local_ops.getBootKey()
+        return self._bootkey
+
+    # Common protocl functions
+
+    def connect(self) -> bool:
+        return True
+    
+    def list_dir(self, path, share:str="N/A", wildcard=True) -> list[SharedFile]:
+        path = self.__get_real_path(path)
+        if not wildcard:
+            raise NotImplementedError("Not implemented for wildcard == False")
+        try:
+            result = list(map(SharedFile.fromDirEntry, os.scandir(path)))
+        except FileNotFoundError:
+            result = []
+        return result
+
+    def is_admin(self) -> bool:
+        return True
+    
+    def read_file(
         self,
-        shareName,
         path,
-        mode=FILE_OPEN,
-        offset=0,
-        password=None,
-        shareAccessMode=FILE_SHARE_READ,
-        bypass_shared_violation=False,
-        looted_files=None
+        share:str="N/A",
+        looted_files=None,
     ) -> bytes:
         data = None
         try:
-            with open(self.get_real_path(path), "rb") as f:
+            with open(self.__get_real_path(path), "rb") as f:
                 data = f.read()
         except Exception as e:
             logging.debug(f"Exception occurred while trying to read {path}: {repr(e)}")
 
         return data
-
-    def getUsersProfiles(self) -> dict[str, str] | None:
-        """Returns the list of user profiles (from registry) in a dict
-
-        Each subkey of HKLM/SOFTWARE/Microsoft/Windows NT/CurrentVersion/ProfileList is a user SID,
-        and the ProfileImagePath value inside is the path to the user's profile
-        :return: dict of user_sid: path_to_profile
-
-        """
-        if self._usersProfiles is not None:
-            return self._usersProfiles
-
-        result = {}
-        # open hive
-        reg_file_path = self.get_real_path(self.hklm_software_path)
-        reg = Registry(reg_file_path, isRemote=False)
-
-        # open key
-        key_path = "Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+    
+    def reg_enum_key(self, hive:str, path:str) -> List[str]:
+        keys = []
+        hive_filepath, key_path = self.__open_corresponding_hive(hive, path)
+        reg = self.__get_registry_if_exists(hive_filepath)
+        if reg is None:
+            return keys
         parentKey = reg.findKey(key_path)
         if parentKey is None:
-            logging.error(f"Key {key_path} not found in {reg_file_path}")
-            return None
+            logging.error(f"Key {key_path} not found in {hive_filepath}")
+            return keys
+        keys = reg.enumKey(parentKey)
+        reg.close()
+        return keys
+    
+    def reg_enum_values(self, hive:str, keypath:str) -> List[str]:
+        values = []
+        hive_filepath, key_path = self.__open_corresponding_hive(hive, keypath)
+        reg = self.__get_registry_if_exists(hive_filepath)
+        if reg is None:
+            return values
+        values = reg.enumValues(key_path)
+        reg.close()
+        return values
 
-        for user_sid in reg.enumKey(parentKey):
-            # get 'ProfileImagePath' value
-            (_, path) = reg.getValue(
-                ntpath.join(key_path, user_sid, "ProfileImagePath")
+    def reg_get_key_value(self, hive:str, keypath:str, value_name:str) -> Any:
+        value = None
+        hive_filepath, updated_key_path = self.__open_corresponding_hive(hive, keypath)
+        reg = self.__get_registry_if_exists(hive_filepath)
+        if reg is None:
+            return value
+        (_, value) = reg.getValue(
+            ntpath.join(updated_key_path, value_name)
+        )
+        if type(value) == bytes: 
+            value = value.decode("utf-16le")
+        reg.close()
+        return value.rstrip("\0")
+
+    def get_dpapi_system_keys(self, looted_files=None) -> Dict[str,bytes]:
+        dpapiSystem = {}
+        logging.getLogger("impacket").disabled = True
+        SECURITYFileName = os.path.join(
+            self.target.local_root, r"Windows/System32/config/SECURITY"
+        )
+        
+        def getDPAPI_SYSTEM(_, secret) -> None:
+            if secret.startswith("dpapi_machinekey:"):
+                machineKey, userKey = secret.split("\n")
+                machineKey = machineKey.split(":")[1]
+                userKey = userKey.split(":")[1]
+                dpapiSystem["MachineKey"] = unhexlify(machineKey[2:])
+                dpapiSystem["UserKey"] = unhexlify(userKey[2:])
+
+        try:
+            LSA = LSASecrets(
+                SECURITYFileName,
+                self.bootkey,
+                self.local_ops,
+                isRemote=False,
+                perSecretCallback=getDPAPI_SYSTEM,
             )
-            path = (
-                path.decode("utf-16le")
-                .rstrip("\0")
-                .replace(r"%systemroot%", self.systemroot)
-            )
-            path = ntpath.normpath(path)
-            path = self.get_real_path(path)
-            # store in result dict
-            result[user_sid] = path
+            LSA.dumpSecrets()
+            LSA.finish()
+        except Exception as e:
+            logging.error("LSA hashes extraction failed: %s" % str(e))
 
-        self._usersProfiles = result
-        return self._usersProfiles
-
-
-class DPLootDummySession:
-    def login(*args, **kwargs) -> bool:
-        return True
+        return dpapiSystem

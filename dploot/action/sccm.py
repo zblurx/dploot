@@ -33,7 +33,7 @@ class SCCMAction:
 
     def connect(self) -> None:
         self.conn = self.target.create_connection_object()
-        if self.conn.connect() is None:
+        if  not self.conn.connect():
             logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)
 
@@ -79,7 +79,7 @@ class SCCMAction:
                 per_secret_callback=secret_callback,
             )
             logging.info("Triage SCCM Secrets\n")
-            triage.triage_sccm(use_wmi=self.options.wmi)
+            triage.triage_sccm()
             if self.outputdir is not None:
                 dump_looted_files_to_disk(self.outputdir, triage.looted_files)
         else:

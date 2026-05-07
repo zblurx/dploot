@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from impacket.dpapi import CREDENTIAL_BLOB
 
-
 from dploot.triage import Triage
 from dploot.lib.dpapi import decrypt_credential, find_masterkey_for_credential_blob
 from dploot.lib.network import DPLootConnection
@@ -62,11 +61,10 @@ class CredentialsTriage(Triage):
             per_loot_callback=per_credential_callback, 
             false_positive=false_positive
         )
-        self._users = None
 
     def triage_system_credentials(self) -> List[Credential]:
         credentials = []
-        credential_dirs = self.conn.listDirs(
+        credential_dirs = self.conn.list_dirs(
             self.share, self.system_credentials_generic_path
         )
         for system_credential_path, system_credential_dir in credential_dirs.items():
@@ -93,7 +91,7 @@ class CredentialsTriage(Triage):
 
     def triage_credentials_for_user(self, user: str) -> List[Credential]:
         credentials = []
-        credential_dirs = self.conn.listDirs(
+        credential_dirs = self.conn.list_dirs(
             self.share, [elem % user for elem in self.user_credentials_generic_path]
         )
         for user_credential_path, user_credential_dir in credential_dirs.items():
@@ -117,7 +115,7 @@ class CredentialsTriage(Triage):
                     f"Found Credential Manager blob: \\\\{self.target.address}\\{self.share}\\{cred_filename_path}"
                 )
                 # read credman blob
-                credmanblob_bytes = self.conn.readFile(self.share, cred_filename_path, looted_files=self.looted_files)
+                credmanblob_bytes = self.conn.read_file(share=self.share, path=cred_filename_path, looted_files=self.looted_files)
                 if credmanblob_bytes is not None and self.masterkeys is not None:
                     masterkey = find_masterkey_for_credential_blob(
                         credmanblob_bytes, self.masterkeys
@@ -152,12 +150,3 @@ class CredentialsTriage(Triage):
                     else:
                         logging.debug("Could not decrypt...")
         return credentials
-
-    @property
-    def users(self) -> List[str]:
-        if self._users is not None:
-            return self._users
-
-        self._users = self.conn.list_users(self.share)
-
-        return self._users

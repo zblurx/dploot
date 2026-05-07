@@ -44,7 +44,7 @@ class BrowserAction:
 
     def connect(self) -> None:
         self.conn = self.target.create_connection_object()
-        if self.conn.connect() is None:
+        if  not self.conn.connect():
             logging.error("Could not connect to %s" % self.target.address)
             sys.exit(1)
 
@@ -81,11 +81,6 @@ class BrowserAction:
                 print()
                 if self.outputdir is not None:
                     dump_looted_files_to_disk(self.outputdir, masterkeytriage.looted_files)
-
-            if self.options.kill_browser:
-                logging.info("Killing browsers")
-                for browser_process_name in ["chrome.exe", "msedge.exe", "brave.exe"]:
-                    self.conn.perform_taskkill(process_name=browser_process_name)
 
             def secret_callback(secret):
                 if not self.options.show_cookies and isinstance(secret, Cookie):
