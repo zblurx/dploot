@@ -73,12 +73,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         help=("File containing {GUID}:SHA1 masterkeys mappings"),
     )
 
-    group.add_argument(
-        "-wmi",
-        action="store_true",
-        help=("Dump SCCM secrets from WMI requests results"),
-    )
-
     add_target_argument_group(subparser)
 
     return NAME, entry

@@ -23,6 +23,11 @@ class DPLootWMIConnection(DPLootConnection):
         self._default_namespace = None
         self._managementtools_namespace = None
 
+    def get_namespace(self, namespace_name:str):
+        namespace = self.iWbemLevel1Login.NTLMLogin(namespace_name, NULL, NULL)
+        self.iWbemLevel1Login.RemRelease()
+        return namespace
+
     def execute_wmi_query(self, query, namespace=None):
         if namespace is None:
             namespace = self.cimv2_namespace
@@ -240,7 +245,7 @@ class DPLootWMIConnection(DPLootConnection):
         logging.debug(f"Found ShadowCopy at {shadow_copy['DeviceObject']}")
             
         # Get the SECURITY
-        security_hive_path = f"{shadow_copy["DeviceObject"]}\\Windows\\System32\\config\\SECURITY"
+        security_hive_path = f"{shadow_copy['DeviceObject']}\\Windows\\System32\\config\\SECURITY"
         security_hive = self.read_file(security_hive_path, "", looted_files=looted_files)
         if security_hive is not None:
             logging.debug(f"Got SECURITY hive")
@@ -272,36 +277,28 @@ class DPLootWMIConnection(DPLootConnection):
     def default_namespace(self) -> wmi.IWbemServices:
         if self._default_namespace is not None:
             return self._default_namespace
-        self._default_namespace = self.iWbemLevel1Login.NTLMLogin('//./root/default', NULL, NULL)
-        self.iWbemLevel1Login.RemRelease()
-
+        self._default_namespace = get_namespace("//./root/default")
         return self._default_namespace
 
     @property
     def cimv2_namespace(self) -> wmi.IWbemServices:
         if self._cimv2_namespace is not None:
             return self._cimv2_namespace
-        self._cimv2_namespace = self.iWbemLevel1Login.NTLMLogin('//./root/cimv2', NULL, NULL)
-        self.iWbemLevel1Login.RemRelease()
-
+        self._cimv2_namespace = get_namespace("//./root/cimv2")
         return self._cimv2_namespace
     
     @property
     def pwshellv3_namespace(self) -> wmi.IWbemServices:
         if self._pwshellv3_namespace is not None:
             return self._pwshellv3_namespace
-        self._pwshellv3_namespace = self.iWbemLevel1Login.NTLMLogin('//./root/Microsoft/Windows/Powershellv3', NULL, NULL)
-        self.iWbemLevel1Login.RemRelease()
-
+        self._pwshellv3_namespace = get_namespace("//./root/Microsoft/Windows/Powershellv3")
         return self._pwshellv3_namespace
     
     @property
     def managementtools_namespace(self) -> wmi.IWbemServices:
         if self._managementtools_namespace is not None:
             return self._managementtools_namespace
-        self._managementtools_namespace = self.iWbemLevel1Login.NTLMLogin('//./root/Microsoft/Windows/ManagementTools', NULL, NULL)
-        self.iWbemLevel1Login.RemRelease()
-
+        self._managementtools_namespace = get_namespace("//./root/Microsoft/Windows/ManagementTools")
         return self._managementtools_namespace
     
 class DPLootWmiExec:

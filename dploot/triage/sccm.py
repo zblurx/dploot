@@ -5,6 +5,7 @@ import re
 from dploot.triage import Triage
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.network import DPLootConnection
+from dploot.lib.network.wmi import DPLootWMIConnection
 from dploot.lib.target import Target
 from dploot.triage.masterkeys import Masterkey
 
@@ -222,10 +223,12 @@ class SCCMTriage(Triage):
         sccm_cred = []
         sccm_task = []
         sccm_collection = []
-        namespace = "root\\ccm\\Policy\\Machine\\RequestedConfig"
+    
+        namespace = self.conn.get_namespace("root\\ccm\\Policy\\Machine\\RequestedConfig")
         query_naa = "SELECT NetworkAccessUsername, NetworkAccessPassword FROM CCM_NetworkAccessAccount"
         query_task = "SELECT TS_Sequence FROM CCM_TaskSequence"
         query_collection = "SELECT Name, Value FROM CCM_CollectionVariable"
+        
         try:
 
             logging.debug("Query WMI for Network access accounts")
@@ -259,7 +262,7 @@ class SCCMTriage(Triage):
         sccm_task = []
         sccm_collection = []
         try:
-            if self.target.protocol == "wmi":
+            if type(self.conn) == DPLootWMIConnection:
                 sccm_cred, sccm_task, sccm_collection = self.wmi_collect_sccm_secrets()
             else:
                 objectfile = self.conn.read_file(
