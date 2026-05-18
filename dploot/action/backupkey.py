@@ -69,6 +69,6 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
         "-legacy", action="store_true", help=("Get also backupkey v1 (legacy)")
     )
 
-    add_target_argument_group(subparser)
+    add_target_argument_group(subparser, multiproto_support=False)
 
     return NAME, entry

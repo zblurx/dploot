@@ -134,6 +134,7 @@ class Target:
 
 def add_target_argument_group(
     parser: argparse.ArgumentParser,
+    multiproto_support:bool = True,
 ) -> None:
     parser.add_argument(
         "-t",
@@ -209,13 +210,14 @@ def add_target_argument_group(
             "part (FQDN) specified in the target parameter"
         ),
     )
-    group.add_argument(
-        "-protocol",
-        action="store",
-        metavar="PROTOCOL",
-        default="smb",
-        choices=["smb", "wmi", "local"],
-        help=(
-            "Protocol to use: smb(default), wmi, local"
-        ),
-    )
+    if multiproto_support:
+        group.add_argument(
+            "-protocol",
+            action="store",
+            metavar="PROTOCOL",
+            default="smb",
+            choices=["smb", "wmi", "local"],
+            help=(
+                "Protocol to use: smb(default), wmi, local"
+            ),
+        )
