@@ -277,28 +277,28 @@ class DPLootWMIConnection(DPLootConnection):
     def default_namespace(self) -> wmi.IWbemServices:
         if self._default_namespace is not None:
             return self._default_namespace
-        self._default_namespace = get_namespace("//./root/default")
+        self._default_namespace = self.get_namespace("//./root/default")
         return self._default_namespace
 
     @property
     def cimv2_namespace(self) -> wmi.IWbemServices:
         if self._cimv2_namespace is not None:
             return self._cimv2_namespace
-        self._cimv2_namespace = get_namespace("//./root/cimv2")
+        self._cimv2_namespace = self.get_namespace("//./root/cimv2")
         return self._cimv2_namespace
     
     @property
     def pwshellv3_namespace(self) -> wmi.IWbemServices:
         if self._pwshellv3_namespace is not None:
             return self._pwshellv3_namespace
-        self._pwshellv3_namespace = get_namespace("//./root/Microsoft/Windows/Powershellv3")
+        self._pwshellv3_namespace = self.get_namespace("//./root/Microsoft/Windows/Powershellv3")
         return self._pwshellv3_namespace
     
     @property
     def managementtools_namespace(self) -> wmi.IWbemServices:
         if self._managementtools_namespace is not None:
             return self._managementtools_namespace
-        self._managementtools_namespace = get_namespace("//./root/Microsoft/Windows/ManagementTools")
+        self._managementtools_namespace = self.get_namespace("//./root/Microsoft/Windows/ManagementTools")
         return self._managementtools_namespace
     
 class DPLootWmiExec:
