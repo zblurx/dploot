@@ -1,4 +1,5 @@
 import struct
+from binascii import hexlify
 
 from impacket.dcerpc.v5 import transport
 from impacket import crypto
@@ -18,6 +19,19 @@ class Backupkey:
         self.pvk_header = pvk_header
         self.pvk_data = pvk_data
         self.backupkey_v2 = self.pvk_header.getData() + self.pvk_data
+
+    def dump(self):
+        print("[DOMAIN BACKUPKEY V2]")
+        self.pvk_header.dump()
+        print(
+            "PRIVATEKEYBLOB:{%s}"
+            % (hexlify(self.backupkey_v2).decode("latin-1"))
+        )
+        print("\n")
+        if self.backupkey_v1 is not None:
+            print("Legacy key:")
+            print("0x%s" % hexlify(self.backupkey_v1).decode("latin-1"))
+            print("\n")
 
 
 class BackupkeyTriage(Triage):

@@ -1,6 +1,5 @@
 import argparse
 import logging
-from binascii import hexlify
 import sys
 from typing import Callable, Tuple
 
@@ -26,24 +25,18 @@ class BackupkeyAction(DPLootAction):
         super().run()
         triage = BackupkeyTriage(target=self.target, conn=self.conn)
         backupkey = triage.triage_backupkey()
-        if backupkey.backupkey_v1 is not None and self.legacy:
-            if not self.options.quiet:
-                print("Legacy key:")
-                print("0x%s" % hexlify(backupkey.backupkey_v1).decode("latin-1"))
-                print("\n")
-            logging.info("Exporting key to file {}".format(self.outputfile))
-            open(self.outputfile, "wb").write(backupkey.backupkey_v1)
         if not self.options.quiet:
-            print("[DOMAIN BACKUPKEY V2]")
-            backupkey.pvk_header.dump()
-            print(
-                "PRIVATEKEYBLOB:{%s}"
-                % (hexlify(backupkey.backupkey_v2).decode("latin-1"))
+            backupkey.dump()
+        
+        if self.legacy:
+            if not self.options.quiet:
+                logging.critical("Exporting legacy key to file {}.legacy".format(self.outputfile))
+            open(self.outputfile + ".legacy", "wb").write(backupkey.backupkey_v1)
+        
+        if not self.options.quiet:
+            logging.critical(
+                f"Exporting domain backupkey to file {self.outputfile}"
             )
-            print("\n")
-        logging.critical(
-            f"Exporting domain backupkey to file {self.outputfile}"
-        )
         open(self.outputfile, "wb").write(backupkey.backupkey_v2)
 
 def entry(options: argparse.Namespace) -> None:
