@@ -9,7 +9,7 @@ from impacket.dpapi import P_BACKUP_KEY, PREFERRED_BACKUP_KEY, PVK_FILE_HDR
 
 from dploot.triage import Triage
 from dploot.lib.target import Target
-from dploot.lib.network import DPLootConnection
+from dploot.lib.network.smb import DPLootSMBConnection
 
 
 class Backupkey:
@@ -21,11 +21,11 @@ class Backupkey:
 
 
 class BackupkeyTriage(Triage):
-    def __init__(self, target: Target, conn: DPLootConnection) -> None:
+    def __init__(self, target: Target, conn: DPLootSMBConnection) -> None:
+        if type(conn) != DPLootSMBConnection:
+            raise Exception(f"BackupkeyTriage only supports connection with DPLootSMBConnection, not {type(conn)}")
         super().__init__(target=target, conn=conn)
-        
         self.dce = None
-        self._users = None
 
     def connect(self) -> None:
         rpctransport = transport.DCERPCTransportFactory(r"ncacn_np:445[\pipe\lsarpc]")

@@ -22,10 +22,6 @@ class BackupkeyAction(DPLootAction):
         else:
             self.outputfile = "key.pvk"
 
-        if self.target.protocol not in ["smb"]:
-            logging.error(f"Protocol {self.target.protocol} not implemented for backupkey. Protocol supported: SMB")
-            sys.exit(1)
-
     def run(self) -> None:
         super().run()
         triage = BackupkeyTriage(target=self.target, conn=self.conn)

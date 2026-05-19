@@ -210,14 +210,16 @@ def add_target_argument_group(
             "part (FQDN) specified in the target parameter"
         ),
     )
-    if multiproto_support:
-        group.add_argument(
-            "-protocol",
-            action="store",
-            metavar="PROTOCOL",
-            default="smb",
-            choices=["smb", "wmi", "local"],
-            help=(
-                "Protocol to use: smb(default), wmi, local"
-            ),
-        )
+
+    group.add_argument(
+        "-protocol",
+        action="store",
+        metavar="PROTOCOL",
+        default="smb",
+        choices=["smb", "wmi", "local"],
+        help= (
+            "Protocol to use: smb(default), wmi, local"
+        ) if multiproto_support else argparse.SUPPRESS,
+    )
+
+        
