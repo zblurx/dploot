@@ -15,26 +15,22 @@ NAME = "machinemasterkeys"
 
 class MachineMasterkeysAction(DPLootAction):
     def __init__(self, options: argparse.Namespace) -> None:
-        super().init(options)
-        self.outputfile = None
-        self.outputdir = None
+        if options.mkfile: # workaround to make sure the file exists
+            open(options.mkfile, "a+").close()
+        super().init_triage_generic(options)
+        
         self.dpapi_system_key = {}
 
         if self.options.dpapi_system_key is not None and self.options.dpapi_system_key != "":
             correl_table = {"dpapi_machinekey":"MachineKey","dpapi_userkey":"UserKey"}
             self.dpapi_system_key = {correl_table[k] :unhexlify(v[2:]) for k, v in (elem.split(":") for elem in options.dpapi_system_key.split(","))}
 
-        self.outputdir = handle_outputdir_option(directory=self.options.export_dir)
-
-        if self.options.outputfile is not None and self.options.outputfile != "":
-            self.outputfile = self.options.outputfile
-
     def run(self) -> None:
         super().run()
         if self.conn.is_admin():
             fd = (
-                open(self.outputfile + ".mkf", "a+")
-                if self.outputfile is not None
+                open(self.mkfile , "a+")
+                if self.mkfile is not None
                 else None
             )
 
@@ -51,8 +47,8 @@ class MachineMasterkeysAction(DPLootAction):
             )
             logging.info("Triage SYSTEM masterkeys\n")
             triage.triage_system_masterkeys()
-            if self.outputfile is not None:
-                logging.critical("Writting masterkeys to %s.mkf" % self.outputfile)
+            if self.mkfile is not None:
+                logging.critical("Writting masterkeys to %s" % self.mkfile)
                 fd.close()
             if self.outputdir is not None:
                 dump_looted_files_to_disk(self.outputdir, triage.looted_files)
@@ -72,9 +68,9 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     group = subparser.add_argument_group("machinemasterkeys options")
 
     group.add_argument(
-        "-outputfile",
+        "-mkfile",
         action="store",
-        help=("Export keys to file"),
+        help=("File containing {GUID}:SHA1 masterkeys mappings. Will append new keys to this file."),
     )
 
     group.add_argument(
