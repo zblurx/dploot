@@ -6,7 +6,7 @@ from typing import Callable, List
 from dploot.lib.crypto import CNG_BLOB, CNG_PROPERTIES
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.masterkey import Masterkey
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
 from dploot.triage import Triage
 
@@ -85,7 +85,7 @@ class CngTriage(Triage):
     def __init__(
         self,
         target: Target,
-        conn: DPLootSMBConnection,
+        conn: DPLootConnection,
         masterkeys: List[Masterkey],
         per_cng_callback: Callable = None,
         false_positive: List[str] | None = None,
@@ -97,11 +97,10 @@ class CngTriage(Triage):
             per_loot_callback=per_cng_callback, 
             false_positive=false_positive
         )
-        self._users = None
 
     def triage_system_cng(self) -> List[CngFile]:
         cng_files = []
-        cng_dirs = self.conn.listDirs(
+        cng_dirs = self.conn.list_dirs(
             self.share, self.system_cng_keys_generic_path
         )
         for system_cng_path, system_cng_dir in cng_dirs.items():
@@ -128,7 +127,7 @@ class CngTriage(Triage):
     def triage_cng_for_user(self, user: str) -> List[CngFile]:
         cng_files = []
         cng_files_path = self.user_cng_keys_generic_path[0] % user
-        cng_files_dir = self.conn.remote_list_dir(self.share, cng_files_path)
+        cng_files_dir = self.conn.list_dirs(self.share, cng_files_path)
         if cng_files_dir is not None:
             cng_files += self.triage_cng_folder(
                 cng_folder_path=cng_files_path,
@@ -147,19 +146,10 @@ class CngTriage(Triage):
                 logging.debug(
                     f"Found CNG file: \\\\{self.target.address}\\{self.share}\\{cng_filepath}"
                 )
-                cng_bytes = self.conn.readFile(self.share, cng_filepath, looted_files=self.looted_files)
+                cng_bytes = self.conn.read_file(share=self.share, path=cng_filepath, looted_files=self.looted_files)
                 cng_file = CngFile(winuser=winuser, cng_blob=cng_bytes)
                 if cng_file.decrypt_cng_file(self.masterkeys):
                     cng_files.append(cng_file)
                     if self.per_loot_callback is not None:
                         self.per_loot_callback(cng_file)
         return cng_files
-    @property
-    def users(self) -> List[str]:
-        if self._users is not None:
-            return self._users
-
-        self._users = self.conn.list_users(self.share)
-
-        return self._users
-                
