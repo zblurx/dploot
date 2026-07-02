@@ -2,8 +2,7 @@ import argparse
 import logging
 from typing import Callable, Tuple
 from dploot.action import DPLootAction
-from dploot.action.masterkeys import add_masterkeys_argument_group
-from dploot.lib.target import add_target_argument_group
+from dploot.action.masterkeys import add_user_masterkeys_argument_group
 from dploot.lib.utils import dump_looted_files_to_disk
 from dploot.triage.browser import BrowserTriage, Cookie
 from dploot.triage.cng import CngTriage
@@ -89,7 +88,7 @@ def entry(options: argparse.Namespace) -> None:
     a = BrowserAction(options)
     a.run()
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+def add_subparser(subparsers: argparse._SubParsersAction, protocol: str) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
         NAME,
         help="Dump users credentials and cookies saved in browser from local or remote target",
@@ -98,39 +97,31 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     group = subparser.add_argument_group("browser options")
 
     group.add_argument(
-        "-mkfile",
+        "--mkfile",
         action="store",
         help=("File containing {GUID}:SHA1 masterkeys mappings"),
     )
 
-    add_masterkeys_argument_group(group)
+    add_user_masterkeys_argument_group(group)
 
     group.add_argument(
-        "-show-cookies",
+        "--show-cookies",
         action="store_true",
         help=("Output dumped cookies from browsers"),
     )
 
     group.add_argument(
-        "-bypass-shared-violation",
+        "--bypass-shared-violation",
         action="store_true",
         help=("Will try to bypass Shared Violation Error with a silly esentutl trick"),
     )
 
     group.add_argument(
-        "-v20support",
+        "--v20support",
         action="store_true",
         help=("Will dump v20 chromium credentials (will perform a LSA dump in form of reg save)"),
     )
 
-    group.add_argument(
-        "-kill-browser",
-        action="store_true",
-        help=(
-            "Will try to kill browser's process. Usefull when Shared Violation Error"
-        ),
-    )
-
-    add_target_argument_group(subparser)
+    DPLootAction.add_general_args(subparser, protocol)
 
     return NAME, entry

@@ -3,7 +3,6 @@ import logging
 from typing import Callable, Tuple
 
 from dploot.action import DPLootAction
-from dploot.lib.target import add_target_argument_group
 from dploot.lib.utils import dump_looted_files_to_disk
 from dploot.triage.masterkeys import MasterkeysTriage
 
@@ -62,15 +61,15 @@ def entry(options: argparse.Namespace) -> None:
     a = MasterkeysAction(options)
     a.run()
 
-def add_masterkeys_argument_group(group: argparse._ArgumentGroup) -> None:
+def add_user_masterkeys_argument_group(group: argparse._ArgumentGroup) -> None:
     group.add_argument(
-        "-pvk",
+        "--pvk",
         action="store",
         help=("Pvk file with domain backup key"),
     )
 
     group.add_argument(
-        "-passwords",
+        "--passwords",
         action="store",
         help=(
             "File containing username:password that will be used eventually to decrypt masterkeys"
@@ -78,7 +77,7 @@ def add_masterkeys_argument_group(group: argparse._ArgumentGroup) -> None:
     )
 
     group.add_argument(
-        "-nthashes",
+        "--nthashes",
         action="store",
         help=(
             "File containing username:nthash that will be used eventually to decrypt masterkeys"
@@ -86,27 +85,27 @@ def add_masterkeys_argument_group(group: argparse._ArgumentGroup) -> None:
     )
 
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+def add_subparser(subparsers: argparse._SubParsersAction, protocol: str) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
         NAME, help="Dump users masterkey from local or remote target"
     )
 
     group = subparser.add_argument_group("masterkeys options")
 
-    add_masterkeys_argument_group(group)
+    add_user_masterkeys_argument_group(group)
 
     group.add_argument(
-        "-mkfile",
+        "--mkfile",
         action="store",
         help=("File containing {GUID}:SHA1 masterkeys mappings. Will append new keys to this file."),
     )
 
     group.add_argument(
-        "-hashes-outputfile",
+        "--hashes-outputfile",
         action="store",
         help=("Export hashes of masterkeys to file in Hashcat/JtR format"),
     )
 
-    add_target_argument_group(subparser)
+    DPLootAction.add_general_args(subparser, protocol)
 
     return NAME, entry

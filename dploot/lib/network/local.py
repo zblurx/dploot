@@ -2,11 +2,13 @@ from binascii import unhexlify
 import ntpath
 import os
 import logging
+import argparse
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dploot.lib.network import DPLootConnection
+from dploot.lib.target import Target
 
 from impacket.smb import SharedFile
 from impacket.winregistry import get_registry_parser
@@ -18,7 +20,7 @@ class DPLootLocalConnection(DPLootConnection):
     systemroot = "C:\\Windows"
     hklm_software_path = r"Windows/System32/config/SOFTWARE"
 
-    def __init__(self, target=None) -> None:
+    def __init__(self, target: Target) -> None:
         super().__init__(target)
         self.local_session = True
         self._usersProfiles = None
@@ -221,3 +223,98 @@ class DPLootLocalConnection(DPLootConnection):
             logging.error("LSA hashes extraction failed: %s" % str(e))
 
         return dpapiSystem
+
+class LocalTarget(Target):
+    def __init__(self) -> None:
+        self.username: str = None
+        self.password: str = None
+        self.address: str = None
+        self.hashes: str = None
+        self.lmhash: str = None
+        self.nthash: str = None
+        self.local_root: str = None
+
+    @staticmethod
+    def from_options(options) -> "Target":
+        return LocalTarget.create(
+            username=options.username if options.username is not None else "",
+            password=options.password if options.password is not None else "",
+            hashes=options.hashes,
+            lmhash=None,
+            nthash=None,
+            local_root=options.root,
+        )
+
+    @staticmethod
+    def create(
+        username: str = "",
+        password: str = "",
+        hashes: Optional[str] = None,
+        lmhash: str = "",
+        nthash: str = "",
+        local_root: Optional[str] = None,
+    ) -> "Target":
+        self = LocalTarget()
+        self.protocol = "local"
+
+        if hashes is not None:
+            hashes = hashes.split(":")
+            if len(hashes) == 1:
+                (nthash,) = hashes
+                lmhash = nthash
+            else:
+                lmhash, nthash = hashes
+        elif lmhash is None and nthash is None:
+            lmhash = nthash = ""
+
+        self.username = username
+        self.password = password
+        self.address = local_root
+        self.lmhash = lmhash
+        self.nthash = nthash
+        self.local_root = local_root
+
+        return self
+
+    @staticmethod
+    def add_network_argument_group(
+    parser: argparse.ArgumentParser,
+) -> None:
+        group = parser.add_argument_group("local authentication")
+        group.add_argument(
+            "-r",
+            "--root",
+            action="store",
+            dest="root",
+            metavar="path",
+            default=".",
+            help="Path of the Windows Root directory. This directory should contain Windows and Users subdirectories",
+        )
+
+        group.add_argument(
+            "-u",
+            "--username",
+            metavar="username",
+            dest="username",
+            action="store",
+            help="Username. Will be use to potentially decrypt masterkeys",
+        )
+
+        group.add_argument(
+            "-p",
+            "--password",
+            metavar="password",
+            dest="password",
+            action="store",
+            help="Password. Will be use to potentially decrypt masterkeys",
+        )
+
+        group.add_argument(
+            "--hashes",
+            action="store",
+            metavar="LMHASH:NTHASH",
+            help="NTLM hashes, format is LMHASH:NTHASH. Will be use to potentially decrypt masterkeys",
+        )
+
+    def create_connection_object(self):
+        return DPLootLocalConnection(self)

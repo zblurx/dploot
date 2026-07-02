@@ -3,8 +3,7 @@ import logging
 from typing import Callable, Tuple
 
 from dploot.action import DPLootAction
-from dploot.action.masterkeys import add_masterkeys_argument_group
-from dploot.lib.target import add_target_argument_group
+from dploot.action.masterkeys import add_user_masterkeys_argument_group
 from dploot.lib.utils import dump_looted_files_to_disk
 from dploot.triage.masterkeys import MasterkeysTriage
 from dploot.triage.rdg import RDGTriage
@@ -63,7 +62,7 @@ def entry(options: argparse.Namespace) -> None:
     a = RDGAction(options)
     a.run()
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+def add_subparser(subparsers: argparse._SubParsersAction, protocol: str) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
         NAME,
         help="Dump users saved password information for RDCMan.settings from local or remote target",
@@ -72,12 +71,12 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     group = subparser.add_argument_group("rdg options")
 
     group.add_argument(
-        "-mkfile",
+        "--mkfile",
         action="store",
         help=("File containing {GUID}:SHA1 masterkeys mappings"),
     )
 
-    add_masterkeys_argument_group(group)
-    add_target_argument_group(subparser)
+    add_user_masterkeys_argument_group(group)
+    DPLootAction.add_general_args(subparser, protocol)
 
     return NAME, entry

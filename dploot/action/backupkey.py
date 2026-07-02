@@ -4,7 +4,6 @@ import sys
 from typing import Callable, Tuple
 
 from dploot.action import DPLootAction
-from dploot.lib.target import add_target_argument_group
 from dploot.triage.backupkey import BackupkeyTriage
 
 NAME = "backupkey"
@@ -43,21 +42,21 @@ def entry(options: argparse.Namespace) -> None:
     a = BackupkeyAction(options)
     a.run()
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+def add_subparser(subparsers: argparse._SubParsersAction, protocol: str) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(NAME, help="Backup Keys from domain controller")
 
     group = subparser.add_argument_group("backupkey options")
 
     group.add_argument(
-        "-outputfile",
+        "--outputfile",
         action="store",
         help=("Export keys to specific filename (default key.pvk)"),
     )
 
     group.add_argument(
-        "-legacy", action="store_true", help=("Get also backupkey v1 (legacy)")
+        "--legacy", action="store_true", help=("Get also backupkey v1 (legacy)")
     )
 
-    add_target_argument_group(subparser, multiproto_support=False)
+    DPLootAction.add_general_args(subparser, 'protocol', supported_protocol=["smb"])
 
     return NAME, entry

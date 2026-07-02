@@ -3,7 +3,7 @@ import logging
 import sys
 from typing import Dict, Tuple
 
-from dploot.lib.target import Target
+from dploot.lib.target import get_network_protocol_subparser
 from dploot.lib.utils import handle_outputdir_option, parse_file_as_dict
 from dploot.triage.masterkeys import parse_masterkey_file
 
@@ -11,8 +11,18 @@ from dploot.triage.masterkeys import parse_masterkey_file
 class DPLootAction:
     def init(self, options: argparse.Namespace) -> None:
         self.options = options
-        self.target = Target.from_options(options)
         self.conn = None
+
+        match self.options.protocol:
+            case "smb":
+                from dploot.lib.network.smb import SMBTarget
+                self.target = SMBTarget.from_options(options)
+            case "wmi":
+                from dploot.lib.network.wmi import WMITarget
+                self.target = WMITarget.from_options(options)
+            case "local":
+                from dploot.lib.network.local import LocalTarget
+                self.target = LocalTarget.from_options(options)
 
     def init_triage_generic(self, options: argparse.Namespace) -> None:
         self.init(options=options)
@@ -36,9 +46,7 @@ class DPLootAction:
         self.passwords = None
         self.nthashes = None
 
-        self.pvkbytes, self.passwords, self.nthashes = self.parse_masterkeys_options(
-            self.options, self.target
-        )
+        self.pvkbytes, self.passwords, self.nthashes = self.parse_masterkeys_options(self.options)
 
     def connect(self) -> bool:
         self.conn = self.target.create_connection_object()
@@ -53,7 +61,7 @@ class DPLootAction:
 
     def parse_masterkeys_options(
         self,
-        options: argparse.Namespace, target: Target
+        options: argparse.Namespace
     ) -> Tuple[bytes, Dict[str, str], Dict[str, str]]:
         pvkbytes = None
         passwords = {}
@@ -79,15 +87,15 @@ class DPLootAction:
                 logging.error(str(e))
                 sys.exit(1)
 
-        if target.password is not None and target.password != "":
+        if hasattr(options, "password") and options.password is not None:
             if passwords is None:
                 passwords = {}
-            passwords[target.username] = target.password
+            passwords[options.username] = options.password
 
-        if target.nthash is not None and target.nthash != "":
+        if hasattr(options, "nthash") and options.nthash is not None:
             if nthashes is None:
                 nthashes = {}
-            nthashes[target.username] = target.nthash.lower()
+            nthashes[options.username] = options.nthash.lower()
 
         if nthashes is not None:
             nthashes = {k.lower(): v.lower() for k, v in nthashes.items()}
@@ -96,3 +104,33 @@ class DPLootAction:
             passwords = {k.lower(): v for k, v in passwords.items()}
 
         return pvkbytes, passwords, nthashes
+
+    @staticmethod
+    def add_general_args(parser, protocol: str = "smb", supported_protocol = ["smb", "wmi", "local"]):
+        parser.add_argument("--debug", action="store_true", help="Turn DEBUG output ON")
+
+        parser.add_argument(
+            "--quiet", action="store_true", help="Only output dumped credentials"
+        )
+
+        parser.add_argument(
+            "--export-dir",
+            action="store",
+            metavar="DIR",
+            help=(
+                "Dump looted files to specified directory, regardless they were decrypted"
+            ),
+        )
+
+        parser.add_argument(
+            "--protocol",
+            action="store",
+            metavar="PROTOCOL",
+            default=supported_protocol[0],
+            choices=supported_protocol,
+            help= (
+                f"Protocol to use ({', '.join(supported_protocol)}). Default: {supported_protocol[0]}"
+            )
+        )
+
+        get_network_protocol_subparser(parser, protocol)

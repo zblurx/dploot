@@ -3,7 +3,6 @@ import logging
 from typing import Callable, Tuple
 
 from dploot.action import DPLootAction
-from dploot.lib.target import add_target_argument_group
 from dploot.lib.utils import dump_looted_files_to_disk
 from dploot.triage.masterkeys import MasterkeysTriage
 from dploot.triage.sccm import SCCMTriage
@@ -59,7 +58,7 @@ def entry(options: argparse.Namespace) -> None:
     a = SCCMAction(options)
     a.run()
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+def add_subparser(subparsers: argparse._SubParsersAction, protocol: str) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
         NAME,
         help="Dump SCCM secrets (NAA, Collection variables, tasks sequences credentials)  from local or remote target",
@@ -68,11 +67,11 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     group = subparser.add_argument_group("sccm options")
 
     group.add_argument(
-        "-mkfile",
+        "--mkfile",
         action="store",
         help=("File containing {GUID}:SHA1 masterkeys mappings"),
     )
 
-    add_target_argument_group(subparser)
+    DPLootAction.add_general_args(subparser, protocol)
 
     return NAME, entry

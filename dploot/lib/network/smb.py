@@ -3,8 +3,9 @@ import ntpath
 import os
 import logging
 import time
+import argparse
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
@@ -404,3 +405,167 @@ class DPLootSMBConnection(DPLootConnection):
             logging.error("LSA hashes extraction failed: %s" % str(e))
 
         return dpapiSystem
+
+class SMBTarget(Target):
+    def __init__(self) -> None:
+        self.domain: str = None
+        self.username: str = None
+        self.password: str = None
+        self.address: str = None
+        self.hashes: str = None
+        self.lmhash: str = None
+        self.nthash: str = None
+        self.do_kerberos: bool = False
+        self.kdcHost: str = None
+        self.use_kcache: bool = False
+        self.dc_ip: str = None
+        self.aesKey: str = None
+
+    @staticmethod
+    def from_options(options) -> "Target":
+        if options.dc_ip is None:
+            options.dc_ip = options.target
+
+        return SMBTarget.create(
+            domain=options.domain,
+            username=options.username if options.username is not None else "",
+            password=options.password if options.password is not None else "",
+            address=options.target,
+            hashes=options.hashes,
+            lmhash=None,
+            nthash=None,
+            do_kerberos=options.k or options.aesKey is not None or options.use_kcache,
+            kdcHost=options.kdcHost,
+            use_kcache=options.use_kcache,
+            no_pass=options.no_pass,
+            dc_ip=options.dc_ip,
+            aesKey=options.aesKey,
+        )
+
+    @staticmethod
+    def create(
+        domain: Optional[str] = None,
+        username: str = "",
+        password: str = "",
+        address: Optional[str] = None,
+        hashes: Optional[str] = None,
+        lmhash: str = "",
+        nthash: str = "",
+        do_kerberos: bool = False,
+        kdcHost: Optional[str] = None,
+        use_kcache: bool = False,
+        no_pass: bool = False,
+        dc_ip: Optional[str] = None,
+        aesKey: Optional[str] = None,
+    ) -> "Target":
+        self = SMBTarget()
+        self.protocol = "smb"
+
+        if domain is None:
+            domain = ""
+
+        if hashes is not None:
+            hashes = hashes.split(":")
+            if len(hashes) == 1:
+                (nthash,) = hashes
+                lmhash = nthash
+            else:
+                lmhash, nthash = hashes
+        elif lmhash is None and nthash is None:
+            lmhash = nthash = ""
+
+        if dc_ip is None:
+            dc_ip = target
+
+        self.domain = domain
+        self.username = username
+        self.password = password
+        self.address = address
+        self.lmhash = lmhash
+        self.nthash = nthash
+        self.do_kerberos = do_kerberos or aesKey is not None or use_kcache
+        self.kdcHost = kdcHost
+        self.use_kcache = use_kcache
+        self.dc_ip = dc_ip
+        self.aesKey = aesKey
+
+        return self
+
+    @staticmethod
+    def add_network_argument_group(
+    parser: argparse.ArgumentParser,
+) -> None:
+        group = parser.add_argument_group("smb authentication")
+        group.add_argument(
+            "-t",
+            "--target",
+            action="store",
+            dest="target",
+            metavar="<target name or address>",
+            help="Target ip or address",
+        )
+
+        group.add_argument(
+            "-d",
+            "--domain",
+            metavar="domain.local",
+            dest="domain",
+            action="store",
+            help="Domain name",
+        )
+
+        group.add_argument(
+            "-u",
+            "--username",
+            metavar="username",
+            dest="username",
+            action="store",
+            help="Username",
+        )
+
+        group.add_argument(
+            "-p",
+            "--password",
+            metavar="password",
+            dest="password",
+            action="store",
+            help="Password",
+        )
+
+        group.add_argument(
+            "--hashes",
+            action="store",
+            metavar="LMHASH:NTHASH",
+            help="NTLM hashes, format is LMHASH:NTHASH",
+        )
+        group.add_argument(
+            "--no-pass", action="store_true", help="don't ask for password (useful for -k)"
+        )
+        group.add_argument("-k", action="store_true", help="Use Kerberos authentication")
+        group.add_argument(
+            "--aesKey",
+            action="store",
+            metavar="hex key",
+            help="AES key to use for Kerberos Authentication (128 or 256 bits)",
+        )
+        group.add_argument(
+            "--use-kcache",
+            action="store_true",
+            help="Use Kerberos authentication from ccache file (KRB5CCNAME)",
+        )
+        group.add_argument(
+            "--kdcHost",
+            help="FQDN of the domain controller. If omitted it will use the domain part (FQDN) specified in the target parameter",
+        )
+        group.add_argument(
+            "--dc-ip",
+            action="store",
+            metavar="ip address",
+            help=(
+                "IP Address of the domain controller. If omitted it will use the domain "
+                "part (FQDN) specified in the target parameter"
+            ),
+        )
+
+    def create_connection_object(self):
+        return DPLootSMBConnection(self)

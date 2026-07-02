@@ -3,7 +3,6 @@ import logging
 from typing import Callable, Tuple
 
 from dploot.action import DPLootAction
-from dploot.lib.target import add_target_argument_group
 from dploot.lib.utils import dump_looted_files_to_disk
 from dploot.triage.certificates import CertificatesTriage
 from dploot.triage.credentials import CredentialsTriage
@@ -92,7 +91,7 @@ def entry(options: argparse.Namespace) -> None:
     a.run()
 
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+def add_subparser(subparsers: argparse._SubParsersAction, protocol: str) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
         NAME,
         help="Loot SYSTEM Masterkeys (if not set), SYSTEM credentials, SYSTEM certificates and SYSTEM vaults from local or remote target",
@@ -101,17 +100,17 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     group = subparser.add_argument_group("machinetriage options")
 
     group.add_argument(
-        "-mkfile",
+        "--mkfile",
         action="store",
         help=("File containing {GUID}:SHA1 masterkeys mappings"),
     )
 
     group.add_argument(
-        "-dump-all",
+        "--dump-all",
         action="store_true",
         help=("Dump also certificates not used for client authentication"),
     )
 
-    add_target_argument_group(subparser)
+    DPLootAction.add_general_args(subparser, protocol)
 
     return NAME, entry

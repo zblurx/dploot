@@ -5,7 +5,6 @@ import sys
 from typing import Callable, Tuple
 
 from dploot.action import DPLootAction
-from dploot.lib.target import add_target_argument_group
 from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
 from dploot.triage.masterkeys import MasterkeysTriage
 
@@ -60,7 +59,7 @@ def entry(options: argparse.Namespace) -> None:
     a.run()
 
 
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+def add_subparser(subparsers: argparse._SubParsersAction, protocol: str) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(
         NAME, help="Dump system masterkey from local or remote target"
     )
@@ -68,18 +67,18 @@ def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable
     group = subparser.add_argument_group("machinemasterkeys options")
 
     group.add_argument(
-        "-mkfile",
+        "--mkfile",
         action="store",
         help=("File containing {GUID}:SHA1 masterkeys mappings. Will append new keys to this file."),
     )
 
     group.add_argument(
-        "-dpapi-system-key",
+        "--dpapi-system-key",
         action="store",
         metavar="dpapi_machinekey:0x0123456789abcdef0123456789abcdef01234567,dpapi_userkey:0x0123456789abcdef0123456789abcdef01234567",
         help=("Use custom DPAPI SYSTEM keys"),
     )
 
-    add_target_argument_group(subparser)
+    DPLootAction.add_general_args(subparser, protocol)
 
     return NAME, entry
