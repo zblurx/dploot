@@ -3,6 +3,7 @@ name = "dploot"
 version = "4.0.0"
 description = "DPAPI looting remotely in Python"
 readme = "README.md"
+requires-python = ">=3.10,<4.0"
 homepage = "https://github.com/zblurx/dploot"
 repository = "https://github.com/zblurx/dploot"
 keywords = ["DPAPI", "credentials", "Windows"]
@@ -22,7 +23,7 @@ packages = [
 ]
 
 dependencies = [
-    "impacket>=0.12.0",
+    "impacket>=0.13.0",
     "cryptography>=40.0.1",
     "pyasn1>=0.4.8",
     "lxml>=5.0",

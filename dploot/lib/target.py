@@ -25,15 +25,3 @@ class Target:
 
     def create_connection_object(self):
         raise NotImplementedError(f"function is not implemented for {self.__class__.__name__}")
-
-def get_network_protocol_subparser(parser, protocol: str):
-    match protocol:
-        case "smb":
-            from dploot.lib.network.smb import SMBTarget
-            SMBTarget.add_network_argument_group(parser)
-        case "wmi":
-            from dploot.lib.network.wmi import WMITarget
-            WMITarget.add_network_argument_group(parser)
-        case "local":
-            from dploot.lib.network.local import LocalTarget
-            LocalTarget.add_network_argument_group(parser)

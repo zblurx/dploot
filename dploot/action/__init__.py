@@ -3,7 +3,6 @@ import logging
 import sys
 from typing import Dict, Tuple
 
-from dploot.lib.target import get_network_protocol_subparser
 from dploot.lib.utils import handle_outputdir_option, parse_file_as_dict
 from dploot.triage.masterkeys import parse_masterkey_file
 
@@ -20,6 +19,9 @@ class DPLootAction:
             case "wmi":
                 from dploot.lib.network.wmi import WMITarget
                 self.target = WMITarget.from_options(options)
+            case "mssql":
+                from dploot.lib.network.mssql import MSSQLTarget
+                self.target = MSSQLTarget.from_options(options)
             case "local":
                 from dploot.lib.network.local import LocalTarget
                 self.target = LocalTarget.from_options(options)
@@ -106,7 +108,23 @@ class DPLootAction:
         return pvkbytes, passwords, nthashes
 
     @staticmethod
-    def add_general_args(parser, protocol: str = "smb", supported_protocol = ["smb", "wmi", "local"]):
+    def get_network_protocol_subparser(parser, protocol: str):
+        match protocol:
+            case "smb":
+                from dploot.lib.network.smb import SMBTarget
+                SMBTarget.add_network_argument_group(parser)
+            case "wmi":
+                from dploot.lib.network.wmi import WMITarget
+                WMITarget.add_network_argument_group(parser)
+            case "mssql":
+                from dploot.lib.network.mssql import MSSQLTarget
+                MSSQLTarget.add_network_argument_group(parser)
+            case "local":
+                from dploot.lib.network.local import LocalTarget
+                LocalTarget.add_network_argument_group(parser)
+
+    @staticmethod
+    def add_general_args(parser, protocol: str = "smb", supported_protocol = ["smb", "wmi", "mssql", "local"]):
         parser.add_argument("--debug", action="store_true", help="Turn DEBUG output ON")
 
         parser.add_argument(
@@ -129,8 +147,10 @@ class DPLootAction:
             default=supported_protocol[0],
             choices=supported_protocol,
             help= (
-                f"Protocol to use ({', '.join(supported_protocol)}). Default: {supported_protocol[0]}"
+                f"Protocol to use ({', '.join(supported_protocol)}). Default: {supported_protocol[0]}. "
+                f"To see helper for other protocol, choose a specific protocol with --protocol and show helper with --help"
             )
         )
 
-        get_network_protocol_subparser(parser, protocol)
+        DPLootAction.get_network_protocol_subparser(parser, protocol)
+        
