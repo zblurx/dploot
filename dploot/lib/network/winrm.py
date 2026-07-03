@@ -155,7 +155,10 @@ class DPLootWINRMConnection(DPLootConnection):
     def reg_get_key_value(self, hive:str, keypath:str, value_name:str) -> Any:
         fullpath = f"{hive.upper()}:{keypath}"
         results = self.execute_ps(f"(Get-ItemProperty -Path '{fullpath}' -Name '{value_name}').{value_name}")
-        return bytes(int(x) for x in results)
+        
+        if isinstance(results,list):
+            return bytes(int(x) for x in results)
+        return results
 
 class WINRMTarget(Target):
     def __init__(self) -> None:
