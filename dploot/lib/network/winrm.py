@@ -147,6 +147,15 @@ class DPLootWINRMConnection(DPLootConnection):
                 logging.debug(e)
         return None
 
+    def reg_enum_key(self, hive:str, path:str) -> List[str]:
+        fullpath = f"{hive.upper()}:{path}"
+        results = self.execute_ps(f"Get-ChildItem -Path '{fullpath}'  | Select-Object -ExpandProperty PSChildName")
+        return results
+    
+    def reg_get_key_value(self, hive:str, keypath:str, value_name:str) -> Any:
+        fullpath = f"{hive.upper()}:{keypath}"
+        results = self.execute_ps(f"(Get-ItemProperty -Path '{fullpath}' -Name '{value_name}').{value_name}")
+        return bytes(int(x) for x in results)
 
 class WINRMTarget(Target):
     def __init__(self) -> None:
