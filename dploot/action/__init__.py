@@ -19,6 +19,9 @@ class DPLootAction:
             case "wmi":
                 from dploot.lib.network.wmi import WMITarget
                 self.target = WMITarget.from_options(options)
+            case "winrm":
+                from dploot.lib.network.winrm import WINRMTarget
+                self.target = WINRMTarget.from_options(options)
             case "mssql":
                 from dploot.lib.network.mssql import MSSQLTarget
                 self.target = MSSQLTarget.from_options(options)
@@ -116,6 +119,9 @@ class DPLootAction:
             case "wmi":
                 from dploot.lib.network.wmi import WMITarget
                 WMITarget.add_network_argument_group(parser)
+            case "winrm":
+                from dploot.lib.network.winrm import WINRMTarget
+                WINRMTarget.add_network_argument_group(parser)
             case "mssql":
                 from dploot.lib.network.mssql import MSSQLTarget
                 MSSQLTarget.add_network_argument_group(parser)
@@ -124,7 +130,7 @@ class DPLootAction:
                 LocalTarget.add_network_argument_group(parser)
 
     @staticmethod
-    def add_general_args(parser, protocol: str = "smb", supported_protocol = ["smb", "wmi", "mssql", "local"]):
+    def add_general_args(parser, protocol: str = "smb", supported_protocol = ["smb", "wmi", "winrm", "winrm", "mssql", "local"]):
         parser.add_argument("--debug", action="store_true", help="Turn DEBUG output ON")
 
         parser.add_argument(

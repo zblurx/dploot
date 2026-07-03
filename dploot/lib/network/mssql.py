@@ -95,7 +95,7 @@ class DPLootMSSQLConnection(DPLootConnection):
             is_admin = int(results[0][""])
             return is_admin
         except Exception as e:
-            self.logger.fail(f"Error querying for sysadmin role: {e}")
+            logging.error(f"Error querying for sysadmin role: {e}")
 
     def list_dir(self, path, share:str="C:", wildcard=True) -> list[SharedFile]:
         if not wildcard:

@@ -108,7 +108,7 @@ def main(argv=None) -> None:
         if options.debug:
             traceback.print_exc()
         else:
-            logging.error("Use -debug to print a stacktrace")
+            logging.error("Use --debug to print a stacktrace")
 
 if __name__ == "__main__":
     main()
