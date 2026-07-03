@@ -329,8 +329,8 @@ class DPLootSMBConnection(DPLootConnection):
             try:
                 ans2 = rrp.hBaseRegEnumValue(
                     self.remote_ops._RemoteOperations__rrp,
-                    ans['phkResult'], i)
-                lp_value_name = ans2['lpValueNameOut'][:-1]
+                    ans["phkResult"], i)
+                lp_value_name = ans2["lpValueNameOut"][:-1]
                 values_names.append(lp_value_name)
                 i += 1
             except rrp.DCERPCSessionError as e:

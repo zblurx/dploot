@@ -1,13 +1,9 @@
 from base64 import b64decode
-from binascii import unhexlify
 import logging
 import ntpath
-import os
-import tempfile
 from typing import Dict, List, Tuple, Optional, Callable
 from Cryptodome.Cipher import AES
 
-from impacket import winregistry
 
 from dploot.triage import Triage
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
@@ -94,7 +90,7 @@ class MobaXtermMasterPassword:
             self.masterpassword_decrypted = decrypt_blob(
                 blob_bytes=dpapi_blob, masterkey=masterkey, entropy=self.entropy
             )
-        return not (self.masterpassword_decrypted is None)
+        return self.masterpassword_decrypted is not None
 
     @property
     def key(self):

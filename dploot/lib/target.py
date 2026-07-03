@@ -1,7 +1,4 @@
 import argparse
-import logging
-import sys
-from typing import Optional
 
 class Target:
     def __init__(self) -> None:

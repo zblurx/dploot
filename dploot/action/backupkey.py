@@ -1,6 +1,5 @@
 import argparse
 import logging
-import sys
 from typing import Callable, Tuple
 
 from dploot.action import DPLootAction
@@ -29,7 +28,7 @@ class BackupkeyAction(DPLootAction):
         
         if self.legacy:
             if not self.options.quiet:
-                logging.critical("Exporting legacy key to file {}.legacy".format(self.outputfile))
+                logging.critical(f"Exporting legacy key to file {self.outputfile}.legacy")
             open(self.outputfile + ".legacy", "wb").write(backupkey.backupkey_v1)
         
         if not self.options.quiet:
@@ -57,6 +56,6 @@ def add_subparser(subparsers: argparse._SubParsersAction, protocol: str) -> Tupl
         "--legacy", action="store_true", help=("Get also backupkey v1 (legacy)")
     )
 
-    DPLootAction.add_general_args(subparser, 'protocol', supported_protocol=["smb"])
+    DPLootAction.add_general_args(subparser, "protocol", supported_protocol=["smb"])
 
     return NAME, entry

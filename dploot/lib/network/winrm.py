@@ -3,7 +3,7 @@ import hashlib
 import argparse
 import base64
 import xml.etree.ElementTree as ET
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from impacket.smb import SharedFile, ATTR_DIRECTORY
 
@@ -13,7 +13,6 @@ from pypsrp._utils import get_pwsh_script
 from pypsrp.powershell import (
     DEFAULT_CONFIGURATION_NAME,
     PowerShell,
-    PSDataStreams,
     RunspacePool,
 )
 
@@ -38,7 +37,7 @@ class DPLootWINRMConnection(DPLootConnection):
         else:
             path = f"\\{path}"    
         if double_escape:
-            path = path.replace('\\', '\\\\')
+            path = path.replace("\\", "\\\\")
         return path, share
 
     def execute_ps(self, command):

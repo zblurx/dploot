@@ -10,7 +10,7 @@ from impacket.dpapi import DPAPI_BLOB
 from dploot.action import DPLootAction
 from dploot.action.masterkeys import add_user_masterkeys_argument_group
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
-from dploot.lib.utils import dump_looted_files_to_disk, find_guid, find_sha1, handle_outputdir_option
+from dploot.lib.utils import dump_looted_files_to_disk, find_guid, find_sha1
 from dploot.triage.masterkeys import MasterkeysTriage, Masterkey
 
 NAME = "blob"

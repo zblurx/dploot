@@ -1,9 +1,8 @@
 import argparse
 import logging
-import ntpath
 from binascii import unhexlify
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from impacket import tds
 from impacket.smb import SharedFile, ATTR_DIRECTORY
@@ -40,7 +39,7 @@ class DPLootMSSQLConnection(DPLootConnection):
         else:
             path = f"\\{path}"    
         if double_escape:
-            path = path.replace('\\', '\\\\')
+            path = path.replace("\\", "\\\\")
         return path, share
 
     def __get_hive_to_mssqlhive(self, hive:str) -> bytes:

@@ -1,6 +1,5 @@
 import argparse
 import logging
-import sys
 from typing import Callable, Tuple
 
 from dploot.action import DPLootAction

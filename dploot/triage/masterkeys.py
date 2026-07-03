@@ -1,7 +1,5 @@
-from binascii import hexlify, unhexlify
 import logging
 import ntpath
-import os
 from typing import Any, Dict, List, Optional
 
 from dploot.triage import Triage

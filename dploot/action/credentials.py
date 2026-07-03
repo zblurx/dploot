@@ -1,6 +1,5 @@
 import argparse
 import logging
-import sys
 from typing import Callable, Tuple
 from dploot.action import DPLootAction
 from dploot.action.masterkeys import add_user_masterkeys_argument_group

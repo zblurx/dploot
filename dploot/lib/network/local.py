@@ -46,6 +46,7 @@ class DPLootLocalConnection(DPLootConnection):
 
         Returns:
             str: real path on the filesystem
+
         """
         # clean path (remove c:\, /, and current root if already present)
         path=path.removeprefix(self.target.local_root)
@@ -152,7 +153,7 @@ class DPLootLocalConnection(DPLootConnection):
             with open(self.__get_real_path(path), "rb") as f:
                 data = f.read()
         except Exception as e:
-            logging.debug(f"Exception occurred while trying to read {path}: {repr(e)}")
+            logging.debug(f"Exception occurred while trying to read {path}: {e!r}")
 
         return data
     

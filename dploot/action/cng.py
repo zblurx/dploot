@@ -1,13 +1,12 @@
 import argparse
 import logging
-import sys
 from typing import Callable, Tuple
 
 from dploot.action.masterkeys import add_user_masterkeys_argument_group
 from dploot.action import DPLootAction
-from dploot.lib.utils import dump_looted_files_to_disk, handle_outputdir_option
+from dploot.lib.utils import dump_looted_files_to_disk
 from dploot.triage.cng import CngTriage
-from dploot.triage.masterkeys import MasterkeysTriage, parse_masterkey_file
+from dploot.triage.masterkeys import MasterkeysTriage
 
 
 NAME = "cng"

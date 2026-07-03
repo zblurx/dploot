@@ -1,7 +1,6 @@
 import hashlib
 import logging
 import ntpath
-import os
 from typing import Dict, List, Tuple, Callable
 from dataclasses import dataclass
 
@@ -127,7 +126,7 @@ class CertificatesTriage(Triage):
                         cert = self.der_to_cert(certblob.der)
                         certificates[certificate_key] = cert
                     except Exception as e:
-                        logging.debug(f'Excetpion while converting certificate: {repr(e)}')
+                        logging.debug(f"Excetpion while converting certificate: {e!r}")
         return certificates
 
     def triage_certificates(self) -> List[Certificate]:
@@ -285,7 +284,7 @@ class CertificatesTriage(Triage):
                             clientauth = True
                             break
                 except x509.ExtensionNotFound:
-                    logging.debug('no extended key usage in certificate')
+                    logging.debug("no extended key usage in certificate")
                 except (x509.DuplicateExtension, x509.UnsupportedGeneralNameType) as e:
                     logging.debug(e)
 
