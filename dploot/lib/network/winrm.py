@@ -220,7 +220,7 @@ class WINRMTarget(Target):
             lmhash = nthash = ""
 
         if dc_ip is None:
-            dc_ip = target
+            dc_ip = address
 
         self.domain = domain
         self.username = username
