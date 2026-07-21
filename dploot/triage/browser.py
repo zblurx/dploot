@@ -12,7 +12,7 @@ from impacket.structure import Structure
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
-from dploot.lib.masterkey import Masterkey
+from dploot.triage.masterkeys import Masterkey
 from dploot.lib.crypto import CHROME_KEY_DATA_BLOB, byte_xor, decrypt_chrome_password
 from dploot.lib.utils import datetime_to_time
 from dploot.triage import Triage
