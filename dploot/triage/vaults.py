@@ -215,7 +215,7 @@ class VaultsTriage(Triage):
                                         vault_cred = VaultCred(
                                             winuser=user,
                                             blob=vault,
-                                            type=type(vault),
+                                            vault_type=type(vault),
                                             username=vault["Username"].decode(
                                                 "utf-16le"
                                             ),
@@ -230,7 +230,7 @@ class VaultsTriage(Triage):
                                         vault_cred = VaultCred(
                                             winuser=user,
                                             blob=vault,
-                                            type=type(vault),
+                                            vault_type=type(vault),
                                             sid=RPC_SID(
                                                 b"\x05\x00\x00\x00" + vault["Sid"]
                                             ).formatCanonical(),
@@ -265,7 +265,7 @@ class VaultsTriage(Triage):
                                         vault_cred = VaultCred(
                                             winuser=user,
                                             blob=vault,
-                                            type=type(vault),
+                                            vault_type=type(vault),
                                             sid=RPC_SID(
                                                 b"\x05\x00\x00\x00" + vault["Sid"]
                                             ).formatCanonical(),
