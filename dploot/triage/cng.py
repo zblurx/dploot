@@ -5,7 +5,7 @@ from typing import Callable, List
 
 from dploot.lib.crypto import CNG_BLOB, CNG_PROPERTIES
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
-from dploot.triage.masterkeys import Masterkey
+from dploot.lib.masterkey import Masterkey
 from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
 from dploot.triage import Triage

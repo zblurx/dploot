@@ -3,7 +3,7 @@ from typing import List, Dict, Callable, Any
 
 from dploot.lib.target import Target
 from dploot.lib.network import DPLootConnection
-from dploot.triage.masterkeys import Masterkey
+from dploot.lib.masterkey import Masterkey
 from dploot.lib.consts import FalsePositives
 
 # Define base triage class.
