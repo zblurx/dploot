@@ -130,7 +130,8 @@ class DPLootWINRMConnection(DPLootConnection):
                 logging.debug("Starting remote process to output file data")
                 powershell.invoke()
                 logging.debug("Finished remote process to output file data")
-                
+                if len(powershell.output) == 0:
+                    return None
                 expected_hash = powershell.output[-1]
                 file_bytes = base64.b64decode(powershell.output[0])
                 sha1 = hashlib.sha1()
