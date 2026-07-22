@@ -385,7 +385,6 @@ class WMITarget(Target):
             do_kerberos=options.k or options.aesKey is not None or options.use_kcache,
             kdcHost=options.kdcHost,
             use_kcache=options.use_kcache,
-            no_pass=options.no_pass,
             dc_ip=options.dc_ip,
             aesKey=options.aesKey,
         )
@@ -402,7 +401,6 @@ class WMITarget(Target):
         do_kerberos: bool = False,
         kdcHost: Optional[str] = None,
         use_kcache: bool = False,
-        no_pass: bool = False,
         dc_ip: Optional[str] = None,
         aesKey: Optional[str] = None,
     ) -> "Target":
@@ -485,9 +483,6 @@ class WMITarget(Target):
             action="store",
             metavar="LMHASH:NTHASH",
             help="NTLM hashes, format is LMHASH:NTHASH",
-        )
-        group.add_argument(
-            "--no-pass", action="store_true", help="don't ask for password (useful for -k)"
         )
         group.add_argument("-k", action="store_true", help="Use Kerberos authentication")
         group.add_argument(
