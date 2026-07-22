@@ -25,9 +25,13 @@ class DPLootWMIConnection(DPLootConnection):
         self._managementtools_namespace = None
 
     def get_namespace(self, namespace_name:str):
-        namespace = self.iWbemLevel1Login.NTLMLogin(namespace_name, NULL, NULL)
-        self.iWbemLevel1Login.RemRelease()
-        return namespace
+        try:
+            namespace = self.iWbemLevel1Login.NTLMLogin(namespace_name, NULL, NULL)
+            self.iWbemLevel1Login.RemRelease()
+            return namespace
+        except Exception as e:
+            logging.debug(f"Cannot load WMI Namespace {namespace_name}: {e}")
+        return None
 
     def execute_wmi_query(self, query, namespace=None):
         if namespace is None:
