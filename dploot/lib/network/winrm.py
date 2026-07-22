@@ -122,6 +122,7 @@ class DPLootWINRMConnection(DPLootConnection):
     ) -> bytes:
         path, share = self.__prepare_path_and_share(path, share, isfile=True, double_escape=True)
         fullpath = f"{share}{path}"
+        logging.debug(f"Reading {fullpath}")
         with RunspacePool(self.conn.wsman, configuration_name=DEFAULT_CONFIGURATION_NAME) as pool:
             try:
                 script = get_pwsh_script("fetch.ps1")
