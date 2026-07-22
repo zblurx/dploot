@@ -158,7 +158,10 @@ class DPLootWINRMConnection(DPLootConnection):
         results = self.execute_ps(f"(Get-ItemProperty -Path '{fullpath}' -Name '{value_name}').{value_name}")
         
         if isinstance(results,list):
-            return bytes(int(x) for x in results)
+            if len(results) == 1:
+                return results[0]
+            else:
+                return bytes(int(x) for x in results)
         return results
 
 class WINRMTarget(Target):

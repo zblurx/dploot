@@ -216,6 +216,9 @@ class DPLootWMIConnection(DPLootConnection):
         if ret.sNames is None:
             return None
         try:
+            if value_name not in ret.sNames:
+                logging.debug(f"{value_name} not found in {hive}\\{keypath}")
+                return None
             index = ret.sNames.index(value_name)
         except Exception as e:
             logging.debug(f"Exception in WMI reg_get_key_value({hive},{keypath},{value_name}): {e})")
