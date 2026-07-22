@@ -56,6 +56,6 @@ def add_subparser(subparsers: argparse._SubParsersAction, protocol: str) -> Tupl
         "--legacy", action="store_true", help=("Get also backupkey v1 (legacy)")
     )
 
-    DPLootAction.add_general_args(subparser, "protocol", supported_protocol=["smb"])
+    DPLootAction.add_general_args(subparser, protocol, supported_protocol=["smb"])
 
     return NAME, entry
