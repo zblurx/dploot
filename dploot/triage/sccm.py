@@ -227,27 +227,29 @@ class SCCMTriage(Triage):
         query_naa = "SELECT NetworkAccessUsername, NetworkAccessPassword FROM CCM_NetworkAccessAccount"
         query_task = "SELECT TS_Sequence FROM CCM_TaskSequence"
         query_collection = "SELECT Name, Value FROM CCM_CollectionVariable"
-        
-        try:
-            namespace = self.conn.get_namespace("root\\ccm\\Policy\\Machine\\RequestedConfig")
-            logging.debug("Query WMI for Network access accounts")
-            class_obj = self.conn.execute_wmi_query(query_naa, namespace)
-            sccm_cred = self.parse_wmi_reply(class_obj)
 
-            logging.debug("Query WMI for Task sequences")
-            class_obj = self.conn.execute_wmi_query(query_task, namespace)
-            sccm_task = self.parse_wmi_reply(class_obj)
+        namespace = self.conn.get_namespace("root\\ccm\\Policy\\Machine\\RequestedConfig")
+        if namespace is not None:
+            try:
+                
+                logging.debug("Query WMI for Network access accounts")
+                class_obj = self.conn.execute_wmi_query(query_naa, namespace)
+                sccm_cred = self.parse_wmi_reply(class_obj)
 
-            logging.debug("Query WMI for collection variables")
-            class_obj = self.conn.execute_wmi_query(query_collection, namespace)
-            sccm_collection = self.parse_wmi_reply(class_obj)
+                logging.debug("Query WMI for Task sequences")
+                class_obj = self.conn.execute_wmi_query(query_task, namespace)
+                sccm_task = self.parse_wmi_reply(class_obj)
 
-            class_obj.RemRelease()
-        except (Exception, KeyboardInterrupt) as e:
-            if logging.getLogger().level == logging.DEBUG:
-                import traceback
-                traceback.print_exc()
-                logging.debug(str(e))
+                logging.debug("Query WMI for collection variables")
+                class_obj = self.conn.execute_wmi_query(query_collection, namespace)
+                sccm_collection = self.parse_wmi_reply(class_obj)
+
+                class_obj.RemRelease()
+            except (Exception, KeyboardInterrupt) as e:
+                if logging.getLogger().level == logging.DEBUG:
+                    import traceback
+                    traceback.print_exc()
+                    logging.debug(str(e))
         return sccm_cred, sccm_task, sccm_collection
 
     def triage_sccm(
