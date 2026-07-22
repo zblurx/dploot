@@ -203,9 +203,10 @@ class Cookie:
     def decrypt(self, aeskey:bytes, app_bound_key:bytes):
         try:
             if self.encrypted_cookie_value[:3] == b"v20":
-                self.cookie_value = decrypt_chrome_password(
-                self.encrypted_cookie_value, app_bound_key
-                ).decode("utf-8")
+                if app_bound_key is not None:
+                    self.cookie_value = decrypt_chrome_password(
+                    self.encrypted_cookie_value, app_bound_key
+                    ).decode("utf-8")
             else:
                 self.cookie_value = decrypt_chrome_password(
                 self.encrypted_cookie_value, aeskey
