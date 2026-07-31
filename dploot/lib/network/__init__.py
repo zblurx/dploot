@@ -37,6 +37,9 @@ class DPLootConnection:
                 )
             )
     
+    def print_connection_error(self) -> None:
+        logging.error(f"Could not connect to {self.target.address} with {self.target.protocol.upper()}")
+    
     # The following functions should be implemented by every protocol if possible
     
     def connect(self) -> bool:

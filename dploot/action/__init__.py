@@ -28,6 +28,9 @@ class DPLootAction:
             case "local":
                 from dploot.lib.network.local import LocalTarget
                 self.target = LocalTarget.from_options(options)
+            case "cobaltstrike":
+                from dploot.lib.network.cobaltstrike import CobaltStrikeTarget
+                self.target = CobaltStrikeTarget.from_options(options) 
 
     def init_triage_generic(self, options: argparse.Namespace) -> None:
         self.init(options=options)
@@ -61,7 +64,7 @@ class DPLootAction:
         if self.connect():
             self.conn.print_connected_info()
         else:
-            logging.error(f"Could not connect to {self.target.address} with {self.target.protocol.upper()}")
+            self.conn.print_connection_error()
             sys.exit(1)
 
     def parse_masterkeys_options(
@@ -128,9 +131,12 @@ class DPLootAction:
             case "local":
                 from dploot.lib.network.local import LocalTarget
                 LocalTarget.add_network_argument_group(parser)
+            case "cobaltstrike":
+                from dploot.lib.network.cobaltstrike import CobaltStrikeTarget
+                CobaltStrikeTarget.add_network_argument_group(parser)
 
     @staticmethod
-    def add_general_args(parser, protocol: str = "smb", supported_protocol = ["smb", "wmi", "winrm", "winrm", "mssql", "local"]):
+    def add_general_args(parser, protocol: str = "smb", supported_protocol = ["smb", "wmi", "winrm", "winrm", "mssql", "local", "cobaltstrike"]):
         parser.add_argument("--debug", action="store_true", help="Turn DEBUG output ON")
 
         parser.add_argument(
