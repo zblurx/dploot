@@ -28,6 +28,7 @@ dependencies = [
     "pyasn1>=0.4.8",
     "lxml>=5.0",
     "pypsrp (>=0.9.1,<0.10.0)",
+    "pick (>=2.6.0,<3.0.0)",
 ]
 
 [project.scripts]
