@@ -145,7 +145,7 @@ class LoginData:
             f"[{self.browser.upper()}] {self.url} - {self.username}:{self.password}"
         )
 
-    def decrypt(self, aeskey:bytes, app_bound_key:bytes, header:bytes = b''):
+    def decrypt(self, aeskey:bytes, app_bound_key:bytes, header:bytes = b""):
         try:
             if self.encrypted_password[:3] == b"v20":
                 if app_bound_key is not None:
@@ -434,7 +434,7 @@ class BrowserTriage(Triage):
                                 ).digest()
                                 encrypted_password = b"v10"+encrypted_password
                             else:
-                                header = b''
+                                header = b""
 
                             login_data = LoginData(
                                 winuser=user,
