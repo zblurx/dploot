@@ -1,24 +1,16 @@
 import argparse
 import logging
-from binascii import hexlify
-import sys
 from typing import Callable, Tuple
 
-from dploot.lib.target import Target, add_target_argument_group
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.action import DPLootAction
 from dploot.triage.backupkey import BackupkeyTriage
 
 NAME = "backupkey"
 
 
-class BackupkeyAction:
+class BackupkeyAction(DPLootAction):
     def __init__(self, options: argparse.Namespace) -> None:
-        self.options = options
-        self.target = Target.from_options(options)
-
-        self.conn = None
-        self._is_admin = None
-        self.dce = None
+        super().init(options)
         self.outputfile = None
         self.legacy = self.options.legacy
 
@@ -27,76 +19,43 @@ class BackupkeyAction:
         else:
             self.outputfile = "key.pvk"
 
-    def connect(self) -> None:
-        self.conn = DPLootSMBConnection(self.target)
-        if self.conn.connect() is None:
-            logging.error("Could not connect to %s" % self.target.address)
-            sys.exit(1)
-        if self.conn.local_session:
-            logging.error("Backup key is not implemented with LOCAL target.")
-            sys.exit(1)
-
     def run(self) -> None:
-        self.connect()
-        logging.info(
-            "Connected to {} as {}\\{} {}\n".format(
-                self.target.address,
-                self.target.domain,
-                self.target.username,
-                ("(admin)" if self.is_admin else ""),
-            )
-        )
+        super().run()
         triage = BackupkeyTriage(target=self.target, conn=self.conn)
         backupkey = triage.triage_backupkey()
-        if backupkey.backupkey_v1 is not None and self.legacy:
-            if not self.options.quiet:
-                print("Legacy key:")
-                print("0x%s" % hexlify(backupkey.backupkey_v1).decode("latin-1"))
-                print("\n")
-            logging.info("Exporting key to file {}".format(self.outputfile + ".key"))
-            open(self.outputfile + ".key", "wb").write(backupkey.backupkey_v1)
         if not self.options.quiet:
-            print("[DOMAIN BACKUPKEY V2]")
-            backupkey.pvk_header.dump()
-            print(
-                "PRIVATEKEYBLOB:{%s}"
-                % (hexlify(backupkey.backupkey_v2).decode("latin-1"))
+            backupkey.dump()
+        
+        if self.legacy:
+            if not self.options.quiet:
+                logging.critical(f"Exporting legacy key to file {self.outputfile}.legacy")
+            open(self.outputfile + ".legacy", "wb").write(backupkey.backupkey_v1)
+        
+        if not self.options.quiet:
+            logging.critical(
+                f"Exporting domain backupkey to file {self.outputfile}"
             )
-            print("\n")
-        logging.critical(
-            f"Exporting domain backupkey to file {self.outputfile}"
-        )
         open(self.outputfile, "wb").write(backupkey.backupkey_v2)
-
-    @property
-    def is_admin(self) -> bool:
-        if self._is_admin is not None:
-            return self._is_admin
-
-        self._is_admin = self.conn.is_admin()
-        return self._is_admin
-
 
 def entry(options: argparse.Namespace) -> None:
     a = BackupkeyAction(options)
     a.run()
 
-
-def add_subparser(subparsers: argparse._SubParsersAction) -> Tuple[str, Callable]:
+def add_subparser(subparsers: argparse._SubParsersAction, protocol: str) -> Tuple[str, Callable]:
     subparser = subparsers.add_parser(NAME, help="Backup Keys from domain controller")
 
     group = subparser.add_argument_group("backupkey options")
 
     group.add_argument(
-        "-outputfile",
+        "--outputfile",
         action="store",
         help=("Export keys to specific filename (default key.pvk)"),
     )
 
     group.add_argument(
-        "-legacy", action="store_true", help=("Get also backupkey v1 (legacy)")
+        "--legacy", action="store_true", help=("Get also backupkey v1 (legacy)")
     )
 
-    add_target_argument_group(subparser)
+    DPLootAction.add_general_args(subparser, protocol, supported_protocol=["smb"])
 
     return NAME, entry

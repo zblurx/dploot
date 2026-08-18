@@ -1,4 +1,5 @@
 import struct
+from binascii import hexlify
 
 from impacket.dcerpc.v5 import transport
 from impacket import crypto
@@ -9,7 +10,7 @@ from impacket.dpapi import P_BACKUP_KEY, PREFERRED_BACKUP_KEY, PVK_FILE_HDR
 
 from dploot.triage import Triage
 from dploot.lib.target import Target
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.lib.network.smb import DPLootSMBConnection
 
 
 class Backupkey:
@@ -19,13 +20,26 @@ class Backupkey:
         self.pvk_data = pvk_data
         self.backupkey_v2 = self.pvk_header.getData() + self.pvk_data
 
+    def dump(self):
+        print("[DOMAIN BACKUPKEY V2]")
+        self.pvk_header.dump()
+        print(
+            "PRIVATEKEYBLOB:{%s}"
+            % (hexlify(self.backupkey_v2).decode("latin-1"))
+        )
+        print("\n")
+        if self.backupkey_v1 is not None:
+            print("Legacy key:")
+            print("0x%s" % hexlify(self.backupkey_v1).decode("latin-1"))
+            print("\n")
+
 
 class BackupkeyTriage(Triage):
     def __init__(self, target: Target, conn: DPLootSMBConnection) -> None:
+        if type(conn) != DPLootSMBConnection:
+            raise Exception(f"BackupkeyTriage only supports connection with DPLootSMBConnection, not {type(conn)}")
         super().__init__(target=target, conn=conn)
-        
         self.dce = None
-        self._users = None
 
     def connect(self) -> None:
         rpctransport = transport.DCERPCTransportFactory(r"ncacn_np:445[\pipe\lsarpc]")

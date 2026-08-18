@@ -376,12 +376,12 @@ def pvkblob_to_pkcs1(key):
     return RSA.construct((modulus, pubExp, privateExp, prime1, prime2))
 
 
-def decrypt_chrome_password(encrypted_password: str, aeskey: bytes):
+def decrypt_chrome_password(encrypted_password: str, aeskey: bytes, header:bytes = b""):
     version, rest = encrypted_password[:3], encrypted_password[3:]
-    iv, payload = rest[:12], rest[12:]
+    iv, payload, tag = rest[:12], rest[12:-16], rest[-16:]
     cipher = AES.new(aeskey, AES.MODE_GCM, iv)
-    decrypted = cipher.decrypt(payload)
-    decrypted = decrypted[:-16]
+    cipher.update(header)
+    decrypted = cipher.decrypt_and_verify(payload, tag)
     return decrypted or None
 
 def deriveKeysFromUser(sid, password):
