@@ -247,7 +247,6 @@ class DPLootSMBConnection(DPLootConnection):
                     offset += len(bytesRead)
                     data += bytesRead
         except Exception as e:
-            logging.debug(f"Exception occurred while trying to read {path}: {e}")
             if "STATUS_OBJECT_PATH_NOT_FOUND" in str(e) or "STATUS_OBJECT_NAME_NOT_FOUND" in str(e):
                 pass
             elif bypass_shared_violation and "STATUS_SHARING_VIOLATION" in str(e):
@@ -278,7 +277,7 @@ class DPLootSMBConnection(DPLootConnection):
                     bypass_shared_violation=bypass_shared_violation,
                 )
             else:
-                logging.debug(str(e))
+                logging.debug(f"Exception occurred while trying to read {path}: {e}")
         finally:
             if fileId is not None:
                 self.smb_session._SMBConnection.close(treeId, fileId)
