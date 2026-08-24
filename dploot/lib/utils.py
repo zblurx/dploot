@@ -81,19 +81,3 @@ def parse_file_as_dict(filename: str) -> Dict[str, str]:
             tmp_line = tmp_line.split(":", 1)
             arr[tmp_line[0]] = tmp_line[1]
     return arr
-
-def add_general_args(parser):
-    parser.add_argument("-debug", action="store_true", help="Turn DEBUG output ON")
-
-    parser.add_argument(
-        "-quiet", action="store_true", help="Only output dumped credentials"
-    )
-
-    parser.add_argument(
-        "-export-dir",
-        action="store",
-        metavar="DIR",
-        help=(
-            "Dump looted files to specified directory, regardless they were decrypted"
-        ),
-    )

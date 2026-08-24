@@ -4,10 +4,9 @@ import logging
 import ntpath
 from typing import List, Callable
 
-
 from dploot.triage import Triage
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
 from dploot.triage.masterkeys import Masterkey
 from impacket.structure import Structure, unpack
@@ -182,7 +181,7 @@ class WamTriage(Triage):
     def __init__(
         self,
         target: Target,
-        conn: DPLootSMBConnection,
+        conn: DPLootConnection,
         masterkeys: List[Masterkey],
         per_token_callback: Callable = None,
         false_positive: List[str] | None = None,
@@ -194,8 +193,6 @@ class WamTriage(Triage):
             per_loot_callback=per_token_callback, 
             false_positive=false_positive
         )
-        
-        self._users = None
 
     def triage_wam(self):
         tbres_responses_cache = []
@@ -206,7 +203,7 @@ class WamTriage(Triage):
     def triage_wam_for_user(self, user):
         tbres_responses_cache = []
         tbc_user_path = self.token_broker_cache_path.format(username=user)
-        tbc_dir = self.conn.remote_list_dir(self.share, tbc_user_path)
+        tbc_dir = self.conn.list_dir(share=self.share, path=tbc_user_path)
         if tbc_dir is None:
             return []
         for file in tbc_dir:
@@ -218,7 +215,7 @@ class WamTriage(Triage):
             ):
                 logging.debug(f"Got {filename} cache file for user {user}")
                 tbres_filepath = ntpath.join(tbc_user_path, filename)
-                data_bytes = self.conn.readFile(self.share, tbres_filepath, looted_files=self.looted_files)
+                data_bytes = self.conn.read_file(share=self.share, path=tbres_filepath, looted_files=self.looted_files)
                 if data_bytes is None:
                     continue
                 decrypted_blob = self.decypt_tbres_file(data_bytes)
@@ -240,12 +237,3 @@ class WamTriage(Triage):
             return decrypt_blob(masterkey=masterkey, blob_bytes=blob)
             
         return None
-
-    @property
-    def users(self) -> List[str]:
-        if self._users is not None:
-            return self._users
-
-        self._users = self.conn.list_users(self.share)
-
-        return self._users

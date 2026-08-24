@@ -52,13 +52,24 @@ ENTRY_PARSERS = [
     wifi,
 ]
 
+def get_network_protocol(argv: list[str]) -> str:
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--protocol", default="smb")
+    ns, _ = pre.parse_known_args(argv)
+    return ns.protocol
 
-def main() -> None:
+def main(argv=None) -> None:
     logger.init()
     version = importlib.metadata.version("dploot")
     print(f"dploot (https://github.com/zblurx/dploot) v{version} by @_zblurx")
+
+    # Hacky way to get the network protocol before Argparse is called
+    # allowing to dynamically set the argparse supported paramater
+    argv = argv if argv is not None else sys.argv[1:]
+    protocol = get_network_protocol(argv)
+
     parser = argparse.ArgumentParser(
-        description="DPAPI looting locally remotely in Python",
+        description="DPAPI looting in Python",
         add_help=True,
     )
 
@@ -67,14 +78,20 @@ def main() -> None:
     actions = {}
 
     for entry_parser in ENTRY_PARSERS:
-        action, entry = entry_parser.add_subparser(subparsers)
+        action, entry = entry_parser.add_subparser(subparsers, protocol)
         actions[action] = entry
 
+    options,remaining = parser.parse_known_args()
+
     if len(sys.argv) == 1:
-        parser.print_help()
+        sub = subparsers.choices[options.action]
+        sub.print_help()
         sys.exit(1)
 
-    options = parser.parse_args()
+    if remaining:
+        # Little hack to reparse the dynamically addded protocol arguments
+        options = parser.parse_args()
+    
 
     if options.debug is True:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -91,8 +108,7 @@ def main() -> None:
         if options.debug:
             traceback.print_exc()
         else:
-            logging.error("Use -debug to print a stacktrace")
-
+            logging.error("Use --debug to print a stacktrace")
 
 if __name__ == "__main__":
     main()
