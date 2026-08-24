@@ -76,7 +76,7 @@ class DPLoootCobaltStrikeConnection(DPLootConnection):
             beacons = [beacon for beacon in beacons if beacon["note"] == self.target.beacon_note]
         
         if len(beacons) <= 0:
-            logging.error(f"No beacon available")
+            logging.error("No beacon available")
             return None
         elif len(beacons) == 1:
             return beacons[0]
@@ -156,7 +156,7 @@ class DPLoootCobaltStrikeConnection(DPLootConnection):
         logging.info(self.beacon)
 
     def print_connection_error(self) -> None:
-        logging.error(f"Could not connect to Cobalt Strike REST API")
+        logging.error("Could not connect to Cobalt Strike REST API")
 
     def is_admin(self) -> bool:
         return True # :)
@@ -242,13 +242,13 @@ class DPLoootCobaltStrikeConnection(DPLootConnection):
 
     def list_users(self):
         if len(self.target.target_users) > 0:
-            logging.info(f"Target usernames list supplied, we can skip listing the usernames.")
+            logging.info("Target usernames list supplied, we can skip listing the usernames.")
             return self.target.target_users
         directories = self.list_dir(path="Users")
         return [d.get_longname() for d in directories if d.get_longname() not in self.false_positive and d.is_directory() > 0]
 
     def get_dpapi_system_keys(self, looted_files=None) -> Dict[str,bytes]:
-        raise NotImplementedError(f"DPLoot won't handle the DPAPI SYSTEM keys recovery for Cobalt Strike collection, you handle the OPSEC. Once recovered, you can fill them with --dpapi-system-key on dploot machinemasterkeys.")
+        raise NotImplementedError("DPLoot won't handle the DPAPI SYSTEM keys recovery for Cobalt Strike collection, you handle the OPSEC. Once recovered, you can fill them with --dpapi-system-key on dploot machinemasterkeys.")
 
     @property
     def beacon(self) -> Dict:
