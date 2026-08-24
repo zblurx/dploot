@@ -45,8 +45,9 @@ class DPLoootCobaltStrikeConnection(DPLootConnection):
     def ask_user_dropdown_beacon_selection(self, beacons: List[Dict]):
         from pick import pick
         title = "Please select a beacon to work from"
-        beacon, _ = pick(beacons, title)
-        return beacon
+        beacons_list = [f"Computer: {b['computer']} ({b['internal']}/{b['external']}) - Listener: {b['listener']} - Process: {b['process']}({b['pid']}) - User: {b['impersonated']+ '(imp)' if b['impersonated'] != '' else b['user']} - Note: {b['note']} - Last seen: {b['lastCheckinTime']} - Sleep: {b['sleep']}" for b in beacons]
+        beacon, index = pick(beacons_list, title)
+        return beacons[index]
 
     def select_beacon(self) -> Dict:
         if self.target.beacon_id is not None:
