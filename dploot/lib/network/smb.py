@@ -340,10 +340,6 @@ class DPLootSMBConnection(DPLootConnection):
     def reg_get_key_value(self, hive:str, keypath:str, value_name:str) -> Any:
         reg_handle = self.__get_hive_to_rrphandle(hive)
         value = None
-        ans = rrp.hBaseRegOpenKey(
-            self.remote_ops._RemoteOperations__rrp, reg_handle, keypath
-        )
-        key_handle = ans["phkResult"]
         try:
             ans = rrp.hBaseRegOpenKey(
                 self.remote_ops._RemoteOperations__rrp, reg_handle, keypath
