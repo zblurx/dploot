@@ -320,26 +320,39 @@ class DPLootSMBConnection(DPLootConnection):
     def reg_enum_values(self, hive:str, keypath:str) -> List[str]:
         values_names = []
         reg_handle = self.__get_hive_to_rrphandle(hive)
-        ans = rrp.hBaseRegOpenKey(
-            self.remote_ops._RemoteOperations__rrp, reg_handle, keypath
-        )
-        i = 0
-        while True:
-            try:
-                ans2 = rrp.hBaseRegEnumValue(
-                    self.remote_ops._RemoteOperations__rrp,
-                    ans["phkResult"], i)
-                lp_value_name = ans2["lpValueNameOut"][:-1]
-                values_names.append(lp_value_name)
-                i += 1
-            except rrp.DCERPCSessionError as e:
-                if e.get_error_code() == ERROR_NO_MORE_ITEMS:
-                    break
+        key_handle = None
+
+        try:
+            ans = rrp.hBaseRegOpenKey(
+                self.remote_ops._RemoteOperations__rrp, reg_handle, keypath
+            )
+            key_handle = ans["phkResult"]
+        except rrp.DCERPCSessionError as e:
+            if e.get_error_code() == ERROR_FILE_NOT_FOUND:
+                logging.debug(f"Exception in SMB reg_enum_values({hive},{keypath},{value_name}): Key not found")
+            else:
+                logging.debug(f"Exception in SMB reg_enum_values({hive},{keypath},{value_name}): {e}")
+        if key_handle is not None:
+            i = 0
+            while True:
+                try:
+                    ans2 = rrp.hBaseRegEnumValue(
+                        self.remote_ops._RemoteOperations__rrp,
+                        ans["phkResult"], i)
+                    lp_value_name = ans2["lpValueNameOut"][:-1]
+                    values_names.append(lp_value_name)
+                    i += 1
+                except rrp.DCERPCSessionError as e:
+                    if e.get_error_code() == ERROR_NO_MORE_ITEMS:
+                        break
+            rrp.hBaseRegCloseKey(self.remote_ops._RemoteOperations__rrp, key_handle)
         return values_names
 
     def reg_get_key_value(self, hive:str, keypath:str, value_name:str) -> Any:
         reg_handle = self.__get_hive_to_rrphandle(hive)
         value = None
+        key_handle = None
+
         try:
             ans = rrp.hBaseRegOpenKey(
                 self.remote_ops._RemoteOperations__rrp, reg_handle, keypath
@@ -353,7 +366,9 @@ class DPLootSMBConnection(DPLootConnection):
                 logging.debug(f"Exception in SMB reg_get_key_value({hive},{keypath},{value_name}): Key not found")
             else:
                 logging.debug(f"Exception in SMB reg_get_key_value({hive},{keypath},{value_name}): {e}")
-        rrp.hBaseRegCloseKey(self.remote_ops._RemoteOperations__rrp, key_handle)
+        finally:
+            if key_handle is not None:
+                rrp.hBaseRegCloseKey(self.remote_ops._RemoteOperations__rrp, key_handle)
         return value
     
     def get_dpapi_system_keys(self, looted_files=None) -> Dict[str,bytes]:
