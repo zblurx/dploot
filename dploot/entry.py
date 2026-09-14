@@ -70,7 +70,7 @@ def main(argv=None) -> None:
 
     parser = argparse.ArgumentParser(
         description="DPAPI looting in Python",
-        add_help=False,
+        add_help=True,
     )
 
     subparsers = parser.add_subparsers(help="Action", dest="action", required=True)
