@@ -287,17 +287,23 @@ class DPLootSMBConnection(DPLootConnection):
             looted_files[os.path.join(*(path.split("\\")))]=data
         return data
     
-    def reg_enum_key(self, hive:str, path:str) -> List[str]:
-        keys = []
-        reg_handle = self.__get_hive_to_rrphandle(hive)
-
+    def reg_open_key(self, reg_handle, path):
         ans = rrp.hBaseRegOpenKey(
                 self.remote_ops._RemoteOperations__rrp,
                 reg_handle,
                 path,
-                samDesired=rrp.KEY_ENUMERATE_SUB_KEYS,
+                samDesired=rrp.MAXIMUM_ALLOWED | rrp.KEY_ENUMERATE_SUB_KEYS | rrp.KEY_QUERY_VALUE,
             )
-        key_handle = ans["phkResult"]
+        return ans["phkResult"]
+
+    def reg_enum_key(self, hive:str, path:str) -> List[str]:
+        keys = []
+        reg_handle = self.__get_hive_to_rrphandle(hive)
+        try:
+            key_handle = self.reg_open_key(reg_handle, path)
+        except rrp.DCERPCSessionError as e:
+            if e.get_error_code() == ERROR_FILE_NOT_FOUND:
+                return keys
         i = 0
         while True:
             try:
@@ -320,15 +326,17 @@ class DPLootSMBConnection(DPLootConnection):
     def reg_enum_values(self, hive:str, keypath:str) -> List[str]:
         values_names = []
         reg_handle = self.__get_hive_to_rrphandle(hive)
-        ans = rrp.hBaseRegOpenKey(
-            self.remote_ops._RemoteOperations__rrp, reg_handle, keypath
-        )
+        try:
+            key_handle = self.reg_open_key(reg_handle, keypath)
+        except rrp.DCERPCSessionError as e:
+                if e.get_error_code() == ERROR_FILE_NOT_FOUND:
+                    return values_names
         i = 0
         while True:
             try:
                 ans2 = rrp.hBaseRegEnumValue(
                     self.remote_ops._RemoteOperations__rrp,
-                    ans["phkResult"], i)
+                    key_handle, i)
                 lp_value_name = ans2["lpValueNameOut"][:-1]
                 values_names.append(lp_value_name)
                 i += 1
@@ -340,15 +348,9 @@ class DPLootSMBConnection(DPLootConnection):
     def reg_get_key_value(self, hive:str, keypath:str, value_name:str) -> Any:
         reg_handle = self.__get_hive_to_rrphandle(hive)
         value = None
-        ans = rrp.hBaseRegOpenKey(
-            self.remote_ops._RemoteOperations__rrp, reg_handle, keypath
-        )
-        key_handle = ans["phkResult"]
+        key_handle = None
         try:
-            ans = rrp.hBaseRegOpenKey(
-                self.remote_ops._RemoteOperations__rrp, reg_handle, keypath
-            )
-            key_handle = ans["phkResult"]
+            key_handle = self.reg_open_key(reg_handle, keypath)
             _, value = rrp.hBaseRegQueryValue(
                 self.remote_ops._RemoteOperations__rrp, key_handle, value_name
             )
@@ -357,7 +359,8 @@ class DPLootSMBConnection(DPLootConnection):
                 logging.debug(f"Exception in SMB reg_get_key_value({hive},{keypath},{value_name}): Key not found")
             else:
                 logging.debug(f"Exception in SMB reg_get_key_value({hive},{keypath},{value_name}): {e}")
-        rrp.hBaseRegCloseKey(self.remote_ops._RemoteOperations__rrp, key_handle)
+        if key_handle is not None:
+            rrp.hBaseRegCloseKey(self.remote_ops._RemoteOperations__rrp, key_handle)
         return value
     
     def get_dpapi_system_keys(self, looted_files=None) -> Dict[str,bytes]:
