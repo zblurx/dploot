@@ -307,8 +307,6 @@ class MobaXtermTriage(Triage):
             logging.debug(f"Found Mobaxterm MasterPassword for user {user}")
         else:
             return mobaxterm_masterpassword_key, mobaxterm_credentials
-        
-        mobaxterm_masterpassword_key.dump()
 
         if mobaxterm_masterpassword_key is None:
             return None, []
