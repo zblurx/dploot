@@ -296,10 +296,10 @@ class MobaXtermTriage(Triage):
         name, host = value_name.split("@")
         mobaxterm_masterpassword_key = MobaXtermMasterPassword(
             winuser=user,
-            entropy=entropy.encode(),
+            entropy=entropy.rstrip("\0").encode(),
             host=host,
             username=name,
-            masterpassword_raw_value=value_data.encode(),
+            masterpassword_raw_value=value_data.rstrip("\0").encode(),
         )
         if mobaxterm_masterpassword_key.decrypt_masterpassword_raw_value(
             masterkeys=self.masterkeys
@@ -320,28 +320,28 @@ class MobaXtermTriage(Triage):
             for value_name in self.conn.reg_enum_values("HKU",
                                           ntpath.join(sid, 
                                             self.mobaxterm_registry_key_path, 
-                                            self.mobaxterm_masterpassword_registry_key
+                                            key
                                         )):
                 value_data = self.conn.reg_get_key_value("HKU", 
                                     ntpath.join(sid, 
                                         self.mobaxterm_registry_key_path, 
-                                        self.mobaxterm_masterpassword_registry_key
+                                        key
                                         ),
                                     value_name
                                     )
                 if ":" in value_data:
-                    username, password_encrypted = value_data.split(b":")
+                    username, password_encrypted = value_data.encode().split(b":")
                     mobaxterm_credential = MobaXtermCredential(
                         winuser=user,
                         name=name,
                         username=username.decode(
                             "utf-16le", errors="backslashreplace"
                         ),
-                        password_encrypted=password_encrypted.encode(),
+                        password_encrypted=password_encrypted.rstrip(b"\0"),
                     )
                 else:
                     mobaxterm_credential = MobaXtermPassword(
-                        winuser=user, username=name, password_encrypted=value_data.encode()
+                        winuser=user, username=name, password_encrypted=value_data.rstrip("\0").encode()
                     )
                 mobaxterm_credential.decrypt(mobaxterm_masterpassword_key.key)
                 mobaxterm_credentials.append(mobaxterm_credential)
