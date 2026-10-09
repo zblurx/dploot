@@ -18,14 +18,14 @@ NAME = "blob"
 
 class BlobAction(DPLootAction):
     def __init__(self, options: argparse.Namespace) -> None:
-        super().init_triage_user()
+        super().init_triage_user(options)
 
         if not self.handle_blob_option(self.options.blob):
             sys.exit(1)
         
         if self.options.masterkey is not None:
             guid, sha1 = self.options.masterkey.split(":")
-            self.masterkeys[Masterkey(
+            self.masterkeys = [Masterkey(
                 guid=find_guid(guid),
                 sha1=find_sha1(sha1),
             )]
