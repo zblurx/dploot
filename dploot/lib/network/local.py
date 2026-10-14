@@ -16,8 +16,6 @@ from impacket.winregistry import (
     REG_SZ,
     REG_EXPAND_SZ,
     REG_MULTISZ,
-    REG_DWORD,
-    REG_QWORD,
 )
 from impacket.smb import ATTR_DIRECTORY
 from impacket.examples.secretsdump import LocalOperations, LSASecrets
@@ -188,98 +186,23 @@ class DPLootLocalConnection(DPLootConnection):
         reg.close()
         return values
 
-    def reg_get_key_value(self, hive: str, keypath: str, value_name: str) -> Any:
+    def reg_get_key_value(self, hive:str, keypath:str, value_name:str) -> Any:
+        value = None
         hive_filepath, updated_key_path = self.__open_corresponding_hive(hive, keypath)
-
         reg = self.__get_registry_if_exists(hive_filepath)
         if reg is None:
-            return None
-
-        try:
-            result = reg.getValue(
-                ntpath.join(updated_key_path, value_name)
-            )
-
-            if result is None:
-                return None
-
-            value_type, value = result
-
-            # Registry string types are stored as UTF-16LE.
-            if value_type in (REG_SZ, REG_EXPAND_SZ, REG_MULTISZ):
-                if isinstance(value, bytes):
-                    raw_value = value
-
-                    try:
-                        value = raw_value.decode("utf-16le")
-                    except UnicodeDecodeError as e:
-                        logging.warning(
-                            "Failed to decode registry value "
-                            "%s\\%s\\%s as UTF-16LE "
-                            "(type=0x%x): %s. Returning raw bytes.",
-                            hive,
-                            keypath,
-                            value_name,
-                            value_type,
-                            e,
-                        )
-                        return raw_value
-
-                if isinstance(value, str):
-                    return value.rstrip("\0")
-
-                return value
-
-            # REG_DWORD normally comes back from Impacket as an int
-            # because DWORD registry values are generally stored inline.
-            # Handle a 4-byte representation as well.
-            if value_type == REG_DWORD:
-                if isinstance(value, bytes):
-                    if len(value) == 4:
-                        return int.from_bytes(
-                            value,
-                            byteorder="little",
-                            signed=False,
-                        )
-
-                    logging.warning(
-                        "Unexpected REG_DWORD size for %s\\%s\\%s: "
-                        "%d bytes. Returning raw value.",
-                        hive,
-                        keypath,
-                        value_name,
-                        len(value),
-                    )
-
-                return value
-
-            # REG_QWORD is normally returned by Impacket as 8 raw bytes.
-            if value_type == REG_QWORD:
-                if isinstance(value, bytes):
-                    if len(value) == 8:
-                        return int.from_bytes(
-                            value,
-                            byteorder="little",
-                            signed=False,
-                        )
-
-                    logging.warning(
-                        "Unexpected REG_QWORD size for %s\\%s\\%s: "
-                        "%d bytes. Returning raw value.",
-                        hive,
-                        keypath,
-                        value_name,
-                        len(value),
-                    )
-
-                return value
-
-            # REG_BINARY, REG_NONE, resource types, and any type we don't
-            # explicitly understand must remain untouched.
             return value
+        (value_type, value) = reg.getValue(
+            ntpath.join(updated_key_path, value_name)
+        )
+        if isinstance(value, bytes) and value_type in (REG_SZ, REG_EXPAND_SZ, REG_MULTISZ):
+            value = value.decode("utf-16le")
+        reg.close()
 
-        finally:
-            reg.close()
+        if isinstance(value, str):
+            return value.rstrip("\0")
+
+        return value
 
     def get_dpapi_system_keys(self, looted_files=None) -> Dict[str,bytes]:
         dpapiSystem = {}
