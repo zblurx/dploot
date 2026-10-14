@@ -11,7 +11,12 @@ from dploot.lib.network import DPLootConnection
 from dploot.lib.target import Target
 
 from impacket.smb import SharedFile
-from impacket.winregistry import get_registry_parser
+from impacket.winregistry import (
+    get_registry_parser,
+    REG_SZ,
+    REG_EXPAND_SZ,
+    REG_MULTISZ,
+)
 from impacket.smb import ATTR_DIRECTORY
 from impacket.examples.secretsdump import LocalOperations, LSASecrets
 
@@ -187,13 +192,17 @@ class DPLootLocalConnection(DPLootConnection):
         reg = self.__get_registry_if_exists(hive_filepath)
         if reg is None:
             return value
-        (_, value) = reg.getValue(
+        (value_type, value) = reg.getValue(
             ntpath.join(updated_key_path, value_name)
         )
-        if type(value) == bytes: 
+        if isinstance(value, bytes) and value_type in (REG_SZ, REG_EXPAND_SZ, REG_MULTISZ):
             value = value.decode("utf-16le")
         reg.close()
-        return value.rstrip("\0")
+
+        if isinstance(value, str):
+            return value.rstrip("\0")
+
+        return value
 
     def get_dpapi_system_keys(self, looted_files=None) -> Dict[str,bytes]:
         dpapiSystem = {}
