@@ -30,6 +30,7 @@ class DPLootSMBConnection(DPLootConnection):
         self.smb_session = None
         self._remote_ops = None
         self._bootkey = None
+        self._trees = {}
 
     def __create_smbv1_conn(self, kdc=""):
         try:
@@ -87,6 +88,7 @@ class DPLootSMBConnection(DPLootConnection):
         if self.remote_ops is not None:
             self.remote_ops.finish()
         self.smb_session.reconnect()
+        self._trees = {}
 
     def __get_hive_to_rrphandle(self, hive:str) -> bytes:
         if hive.lower() == "hkcr":
@@ -211,7 +213,10 @@ class DPLootSMBConnection(DPLootConnection):
         path = ntpath.normpath(path)
         if len(path) > 0 and path[0] == "\\":
             path = path[1:]
-        treeId = self.smb_session.connectTree(share)
+        # Keep one tree per share: connecting and disconnecting it for every file costs two round trips
+        if share not in self._trees:
+            self._trees[share] = self.smb_session.connectTree(share)
+        treeId = self._trees[share]
         fileId = None
 
         data = None
@@ -281,7 +286,6 @@ class DPLootSMBConnection(DPLootConnection):
         finally:
             if fileId is not None:
                 self.smb_session._SMBConnection.close(treeId, fileId)
-            self.smb_session.disconnectTree(treeId)
 
         if looted_files is not None and data is not None and data != b"":
             looted_files[os.path.join(*(path.split("\\")))]=data
