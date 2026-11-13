@@ -299,12 +299,23 @@ class BrowserTriage(Triage):
             "Users\\%s\\AppData\\Local\\Microsoft\\Copilot\\User Data\\%s\\Network\\Cookies",
         ],
     }
+    user_codex_generic_login_path = {
+        "aesStateKeyPath": "Users\\%s\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Roaming\\Codex\\web\\Codex\\Local State",
+        "loginDataPath": "Users\\%s\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Roaming\\Codex\\web\\Codex\\%s\\Partitions\\codex-browser-app\\Login Data",
+        "webDataPath": "Users\\%s\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Roaming\\Codex\\web\\Codex\\%s\\Partitions\\codex-browser-app\\Web Data",
+        "cookiesDataPath": [
+            "Users\\%s\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Roaming\\Codex\\web\\Codex\\%s\\Partitions\\codex-browser-app\\Cookies",
+            "Users\\%s\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Roaming\\Codex\\web\\Codex\\%s\\Partitions\\codex-browser-app\\Network\\Cookies",
+        ],
+    }
+
     user_generic_chrome_paths = {
         "google chrome": user_google_chrome_generic_login_path,
         "msedge": user_msedge_generic_login_path,
         "brave": user_brave_generic_login_path,
         "yandex": user_yandex_generic_login_path,
         "copilot": user_copilot_generic_login_path,
+        "codex": user_codex_generic_login_path,
     }
 
     share = "C$"
