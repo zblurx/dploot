@@ -1,9 +1,10 @@
 import argparse
 import logging
+import os
 from typing import Callable, Tuple
 
 from dploot.action import DPLootAction
-from dploot.lib.utils import dump_looted_files_to_disk
+from dploot.lib.utils import dump_looted_files_to_disk, safe_filename
 from dploot.triage.cng import CngTriage
 from dploot.triage.masterkeys import MasterkeysTriage
 
@@ -41,6 +42,14 @@ class MachineCngAction(DPLootAction):
                     cng_file.dump_quiet()
                 else:
                     cng_file.dump()
+                if self.outputdir is not None and cng_file.decrypted_private_key_pem is not None:
+                    filename = os.path.join(
+                        self.outputdir,
+                        f"{safe_filename(cng_file.winuser)}_{safe_filename(cng_file.key_name)}.pem",
+                    )
+                    with open(filename, "wb") as f:
+                        f.write(cng_file.decrypted_private_key_pem)
+                    logging.critical("Writting CNG private key to %s", filename)
 
             triage = CngTriage(
                 target=self.target,

@@ -1,11 +1,86 @@
+import struct
 from binascii import hexlify
 from hashlib import pbkdf2_hmac
 from Cryptodome.Cipher import AES
 from Cryptodome.Hash import HMAC, SHA1, MD4
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Util.number import bytes_to_long
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa as crypto_rsa
 from impacket.dpapi import DPAPI_BLOB
 from impacket.structure import Structure
+
+
+# Magic at the start of a BCRYPT_RSAKEY_BLOB holding an RSA private key.
+# This is the little-endian uint32 reading of the ASCII tag "RSA2".
+BCRYPT_RSAPRIVATE_MAGIC = 0x32415352  # "RSA2"
+
+
+def cng_rsa_private_to_key(data: bytes) -> "crypto_rsa.RSAPrivateKey | None":
+    """Parse a decrypted CNG ``RSA2`` (``BCRYPT_RSAKEY_BLOB``) private key.
+
+    The ``PrivateKey`` DPAPI blob of a CNG key file, once decrypted, is a
+    ``BCRYPT_RSAKEY_BLOB`` whose header is six little-endian ``uint32`` values
+    (magic, bits, cbPublicExp, cbModulus, cbPrime1, cbPrime2) followed by the
+    big-endian unsigned integers ``e``, ``n``, ``p`` and ``q``.
+
+    Returns a ``cryptography`` ``RSAPrivateKey`` object, or ``None`` if ``data``
+    is not a valid ``RSA2`` blob (so non-RSA payloads are handled gracefully).
+    """
+    if data is None or len(data) < 24:
+        return None
+
+    magic, _bits, cb_e, cb_n, cb_p, cb_q = struct.unpack("<6I", data[:24])
+    if magic != BCRYPT_RSAPRIVATE_MAGIC:
+        return None
+
+    # Make sure the blob is large enough to hold every announced field.
+    if 24 + cb_e + cb_n + cb_p + cb_q > len(data):
+        return None
+
+    offset = 24
+    e = int.from_bytes(data[offset : offset + cb_e], "big")
+    offset += cb_e
+    n = int.from_bytes(data[offset : offset + cb_n], "big")
+    offset += cb_n
+    p = int.from_bytes(data[offset : offset + cb_p], "big")
+    offset += cb_p
+    q = int.from_bytes(data[offset : offset + cb_q], "big")
+    offset += cb_q
+
+    if e == 0 or n == 0 or p == 0 or q == 0:
+        return None
+
+    try:
+        d = pow(e, -1, (p - 1) * (q - 1))
+        dmp1 = d % (p - 1)
+        dmq1 = d % (q - 1)
+        iqmp = pow(q, -1, p)
+
+        public_numbers = crypto_rsa.RSAPublicNumbers(e, n)
+        private_numbers = crypto_rsa.RSAPrivateNumbers(
+            p, q, d, dmp1, dmq1, iqmp, public_numbers
+        )
+        return private_numbers.private_key()
+    except ValueError:
+        return None
+
+
+def cng_rsa_private_to_pem(data: bytes) -> "bytes | None":
+    """Convert a decrypted CNG ``RSA2`` private key blob to unencrypted PEM.
+
+    Returns the PEM-encoded private key bytes, or ``None`` when ``data`` is not
+    a valid ``RSA2`` blob.
+    """
+    private_key = cng_rsa_private_to_key(data)
+    if private_key is None:
+        return None
+
+    return private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
 
 
 # https://blog.nviso.eu/2019/08/28/extracting-certificates-from-the-windows-registry/

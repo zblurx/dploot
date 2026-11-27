@@ -9,8 +9,9 @@ from impacket.dpapi import DPAPI_BLOB
 
 from dploot.action import DPLootAction
 from dploot.action.masterkeys import add_user_masterkeys_argument_group
+from dploot.lib.crypto import cng_rsa_private_to_pem
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
-from dploot.lib.utils import dump_looted_files_to_disk, find_guid, find_sha1
+from dploot.lib.utils import dump_looted_files_to_disk, find_guid, find_sha1, parse_entropy
 from dploot.triage.masterkeys import MasterkeysTriage, Masterkey
 
 NAME = "blob"
@@ -58,8 +59,19 @@ class BlobAction(DPLootAction):
             DPAPI_BLOB(self.blob).dump()
             masterkey = find_masterkey_for_blob(self.blob, masterkeys=self.masterkeys)
             if masterkey is not None:
-                cleartext = decrypt_blob(blob_bytes=self.blob, masterkey=masterkey, entropy=self.options.entropy if self.options.entropy != "" else None)
+                cleartext = decrypt_blob(blob_bytes=self.blob, masterkey=masterkey, entropy=parse_entropy(self.options.entropy))
                 print("Data decrypted: %s" % cleartext)
+                if cleartext is not None and cleartext[:4] == b"RSA2":
+                    pem = cng_rsa_private_to_pem(cleartext)
+                    if pem is not None:
+                        print()
+                        print("Decrypted CNG RSA private key (PEM):")
+                        print(pem.decode())
+                        if self.outputdir is not None:
+                            filename = os.path.join(self.outputdir, "blob_privatekey.pem")
+                            with open(filename, "wb") as f:
+                                f.write(pem)
+                            logging.critical("Writting private key to %s", filename)
         else:
             logging.info("Not an admin, exiting...")
     

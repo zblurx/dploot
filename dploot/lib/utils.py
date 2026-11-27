@@ -49,6 +49,33 @@ def handle_outputdir_option(directory: str) -> str:
     return None
 
 
+def parse_entropy(value) -> "bytes | None":
+    r"""Normalise a CLI ``--entropy`` value into ``bytes`` (or ``None``).
+
+    CLI arguments arrive as ``str``; passing them straight into the DPAPI
+    crypto routines raises ``Object type <class 'str'> cannot be passed to C
+    code``. This converts the value to ``bytes`` and interprets backslash
+    escape sequences such as ``\\x00`` so entropy with trailing null bytes
+    (e.g. ``xT5rZW5qVVbrvpuA\\x00``) can be supplied on the command line.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, (bytes, bytearray)):
+        return bytes(value)
+    try:
+        # latin-1 round-trips bytes 0x00-0xFF unchanged; unicode_escape then
+        # turns literal sequences like "\x00" into their byte values while
+        # leaving already-literal characters intact.
+        return value.encode("latin-1").decode("unicode_escape").encode("latin-1")
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return value.encode("utf-8", errors="surrogateescape")
+
+
+def safe_filename(name: str) -> str:
+    """Make a string safe to use as a filename component."""
+    return "".join(c if c.isalnum() or c in "-_." else "_" for c in name) or "key"
+
+
 def get_random_chars(size: int = 10) -> str:
     charset = string.ascii_uppercase + string.digits + string.ascii_lowercase
     return "".join(random.choice(charset) for i in range(size))
