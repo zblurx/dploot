@@ -215,7 +215,11 @@ def find_masterkey_for_vpol_blob(vault_bytes: bytes, masterkeys: Any) -> "Any | 
     return find_masterkey(masterkey=masterkey, masterkeys=masterkeys)
 
 
-def decrypt_blob(blob_bytes: bytes, masterkey: Any, entropy=None) -> "bytes | None":
+def decrypt_blob(blob_bytes: bytes, masterkey: Any, entropy: Optional[bytes] = None) -> "bytes | None":
+    # Defensive: never let a raw str reach the C crypto routines, which raise
+    # "Object type <class 'str'> cannot be passed to C code".
+    if isinstance(entropy, str):
+        entropy = entropy.encode("latin-1", errors="surrogateescape")
     blob = DPAPI_BLOB(blob_bytes)
     # Ugly fix below:
     # if blob_bytes was too long, strip blob.rawData so its len matches len(blob)

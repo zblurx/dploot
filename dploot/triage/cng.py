@@ -3,7 +3,7 @@ import logging
 import ntpath
 from typing import Callable, List
 
-from dploot.lib.crypto import CNG_BLOB, CNG_PROPERTIES
+from dploot.lib.crypto import CNG_BLOB, CNG_PROPERTIES, cng_rsa_private_to_pem
 from dploot.lib.dpapi import decrypt_blob, find_masterkey_for_blob
 from dploot.lib.masterkey import Masterkey
 from dploot.lib.network import DPLootConnection
@@ -18,6 +18,14 @@ class CngFile:
 
         self.decrypted_private_props = None
         self.decrypted_private_key = None
+        self.decrypted_private_key_pem = None
+
+    @property
+    def key_name(self) -> str:
+        try:
+            return self.cng_blob["Name"].decode("utf-16le").rstrip("\0")
+        except Exception:
+            return "cng_key"
 
     def decrypt_cng_private_properties(self, masterkeys: List[Masterkey]) -> CNG_PROPERTIES:
         masterkey = find_masterkey_for_blob(
@@ -48,7 +56,9 @@ class CngFile:
             )
 
             self.decrypted_private_key = private_key
-        
+            if private_key is not None and private_key[:4] == b"RSA2":
+                self.decrypted_private_key_pem = cng_rsa_private_to_pem(private_key)
+
         return self.decrypted_private_key
 
     def decrypt_cng_file(self, masterkeys: List[Masterkey]) -> bool:
@@ -64,10 +74,16 @@ class CngFile:
         if self.decrypted_private_key is not None:
             print()
             print("Decrypted Private Key: %s" % hexlify(self.decrypted_private_key))
+            if self.decrypted_private_key_pem is not None:
+                print()
+                print("Decrypted RSA Private Key (PEM):")
+                print(self.decrypted_private_key_pem.decode())
             print()
 
     def dump_quiet(self):
-        if self.decrypted_private_key is not None:
+        if self.decrypted_private_key_pem is not None:
+            print(self.decrypted_private_key_pem.decode())
+        elif self.decrypted_private_key is not None:
             print("%s" % hexlify(self.decrypted_private_key))
         
 

